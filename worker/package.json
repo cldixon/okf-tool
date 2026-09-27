@@ -1,0 +1,20 @@
+{
+  "name": "worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "^4.13.9"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.142.0"
+  }
+}

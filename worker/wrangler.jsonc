@@ -1,0 +1,28 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "okf-service",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // One SQLite-backed Durable Object per library (spec: Backend architecture).
+  "durable_objects": {
+    "bindings": [{ "name": "LIBRARY", "class_name": "Library" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Library"] }],
+
+  // Account layer. database_id is filled in when the remote database is created;
+  // local `wrangler dev` does not need a real one.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "okf-accounts",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Attachment blobs (blobs/<sha256>) and exports.
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "okf-blobs" }]
+}
