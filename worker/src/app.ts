@@ -1,7 +1,7 @@
 import { type Context, Hono } from "hono";
 import type { Authenticate, TokenInfo } from "./auth";
-import type { BlobStore, LibraryClient } from "./client";
-import { sha256Hex } from "./okf/hash";
+import { type BlobStore, type LibraryClient, mediaFor, putBlob } from "./client";
+import { handleMcp } from "./mcp/server";
 import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
 import { OkfError } from "./store/errors";
@@ -12,6 +12,8 @@ import { maybeGunzip, readTar, writeTar } from "./util/tar";
 export interface Deps {
   authenticate: Authenticate;
   library(token: TokenInfo): LibraryClient;
+  /** The library a signed download URL names, or null when no such library exists. */
+  libraryByDoId(doId: string): Promise<LibraryClient | null>;
   blobs: BlobStore;
 }
 
@@ -20,9 +22,6 @@ type Env = {
   Variables: { token: TokenInfo; lib: LibraryClient; deps: Deps };
 };
 type C = Context<Env>;
-
-/** Attachments that pass through the Worker (Phase 1 has no presigned uploads). */
-export const WORKER_ATTACHMENT_CAP = 10 * 1024 * 1024;
 
 const BASE = "/api/v1/libraries/:lib";
 
@@ -98,41 +97,6 @@ function isMarkdownRequest(c: C, path: string): boolean {
   return false;
 }
 
-/** Stores attachment bytes by hash (the key is content-addressed, so orphans are harmless). */
-async function putBlob(deps: Deps, bytes: Uint8Array, media: string | null) {
-  if (bytes.length > WORKER_ATTACHMENT_CAP) {
-    throw new OkfError(
-      413,
-      "attachment_too_large",
-      `Attachments through the Worker are capped at ${WORKER_ATTACHMENT_CAP} bytes.`,
-    );
-  }
-  const hash = sha256Hex(bytes);
-  await deps.blobs.put(hash, bytes, media);
-  return { hash, size: bytes.length, media };
-}
-
-const MEDIA: Record<string, string> = {
-  html: "text/html",
-  py: "text/x-python",
-  json: "application/json",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  svg: "image/svg+xml",
-  pdf: "application/pdf",
-  txt: "text/plain",
-  csv: "text/csv",
-  sql: "application/sql",
-};
-
-function mediaFor(path: string, header?: string | null): string | null {
-  if (header && header !== "application/octet-stream") return header.split(";")[0]?.trim() ?? null;
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  return MEDIA[ext] ?? null;
-}
-
 /** A batch op as sent over the wire; attachments reference an uploaded blob by hash. */
 type WireOp =
   | {
@@ -171,10 +135,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   app.use(`${BASE}/*`, async (c, next) => {
     const d = deps(c.env);
-    const auth = c.req.header("Authorization") ?? "";
-    const m = /^Bearer\s+(\S+)$/i.exec(auth);
-    if (!m?.[1]) throw new OkfError(401, "no_token", "Send Authorization: Bearer <token>.");
-    const token = await d.authenticate(m[1]);
+    const token = await d.authenticate(bearer(c));
     const lib = c.req.param("lib");
     if (lib !== token.library.slug && lib !== token.library.id) {
       throw new OkfError(403, "wrong_library", "This token is for a different library.");
@@ -241,7 +202,11 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       op = { op: "write", path, content, if_match: ifMatch, if_none_match: ifNoneMatch };
     } else {
       const bytes = new Uint8Array(await c.req.arrayBuffer());
-      const blob = await putBlob(c.var.deps, bytes, mediaFor(path, c.req.header("Content-Type")));
+      const blob = await putBlob(
+        c.var.deps.blobs,
+        bytes,
+        mediaFor(path, c.req.header("Content-Type")),
+      );
       op = { op: "attach", path, blob, if_match: ifMatch, if_none_match: ifNoneMatch };
     }
     const res = await c.var.lib.apply(requestContext(c), [op]);
@@ -425,7 +390,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       const path = normalizePath(f.path.split("/").slice(strip).join("/"));
       if (!path || path.split("/").some((s) => s.startsWith("."))) continue; // .git, .obsidian, ...
       if (path.endsWith(".md")) files.push({ path, markdown: new TextDecoder().decode(f.bytes) });
-      else files.push({ path, blob: await putBlob(c.var.deps, f.bytes, mediaFor(path)) });
+      else files.push({ path, blob: await putBlob(c.var.deps.blobs, f.bytes, mediaFor(path)) });
     }
     if (files.length === 0) throw new OkfError(400, "empty_import", "No files found to import.");
     requireWrite(c, ...files.map((f) => f.path));
@@ -437,30 +402,96 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   app.get(`${BASE}/export`, async (c) => {
     const format = c.req.query("format") ?? "tar";
     if (format !== "tar") throw new OkfError(400, "bad_format", "Only format=tar is supported.");
-    const bundle = await c.var.lib.exportBundle(num(c, "at"));
-    const enc = new TextEncoder();
-    const files = [];
-    for (const f of bundle.files) {
-      if (f.text !== undefined) files.push({ path: f.path, bytes: enc.encode(f.text) });
-      else if (f.blob) {
-        const obj = await c.var.deps.blobs.get(f.blob.hash);
-        if (!obj) throw new OkfError(500, "blob_missing", `Bytes for ${f.path} are missing.`);
-        const bytes =
-          obj.body instanceof Uint8Array
-            ? obj.body
-            : new Uint8Array(await new Response(obj.body).arrayBuffer());
-        files.push({ path: f.path, bytes });
-      }
-    }
-    const name = `${c.var.token.library.slug}-${bundle.seq}.tar`;
-    return c.body(writeTar(files) as unknown as ArrayBuffer, 200, {
-      "Content-Type": "application/x-tar",
-      "Content-Disposition": `attachment; filename="${name}"`,
-      "X-Seq": String(bundle.seq),
+    return exportTar(c.var.lib, c.var.deps.blobs, num(c, "at"), c.var.token.library.slug);
+  });
+
+  // ------------------------------------------------------------------ tier 2 extras
+
+  app.get(`${BASE}/sources/*`, async (c) => c.json(await c.var.lib.sources(tail(c, "/sources/"))));
+
+  app.get(`${BASE}/diff`, async (c) => {
+    const path = c.req.query("path");
+    if (!path) throw new OkfError(400, "bad_param", "Send `path`.");
+    return c.json(await c.var.lib.diff(path, { from: num(c, "from"), to: num(c, "to") }));
+  });
+
+  app.get(`${BASE}/work`, async (c) =>
+    c.json(await c.var.lib.work({ kind: c.req.query("kind"), limit: num(c, "limit") })),
+  );
+
+  app.post(`${BASE}/verify/*`, async (c) => {
+    const path = tail(c, "/verify/");
+    requireWrite(c, path);
+    return c.json(await c.var.lib.verify(requestContext(c), path));
+  });
+
+  // ------------------------------------------------------------------ signed downloads
+
+  /** Short-lived download URLs for exports and attachments; the signature is the credential. */
+  app.get("/dl/:lib/:token", async (c) => {
+    const d = deps(c.env);
+    const lib = await d.libraryByDoId(c.req.param("lib"));
+    const bad = new OkfError(403, "bad_download", "This download link is invalid or has expired.");
+    if (!lib) throw bad;
+    const payload = await lib.openDownload(c.req.param("token"));
+    if (payload.k === "export") return exportTar(lib, d.blobs, payload.at, "library");
+    const obj = await d.blobs.get(payload.hash);
+    if (!obj) throw new OkfError(404, "not_found", "The file's bytes are missing.");
+    return c.body(obj.body as ReadableStream, 200, {
+      "Content-Type": payload.media ?? "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${payload.path.split("/").pop()}"`,
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+      "X-Content-Type-Options": "nosniff",
     });
   });
 
+  // ------------------------------------------------------------------ MCP
+
+  app.all("/mcp", async (c) => {
+    const d = deps(c.env);
+    const token = await d.authenticate(bearer(c));
+    const origin = new URL(c.req.url).origin;
+    return handleMcp(c.req.raw, { token, lib: d.library(token), blobs: d.blobs, origin });
+  });
+
   return app;
+}
+
+function bearer(c: C): string {
+  const m = /^Bearer\s+(\S+)$/i.exec(c.req.header("Authorization") ?? "");
+  if (!m?.[1]) throw new OkfError(401, "no_token", "Send Authorization: Bearer <token>.");
+  return m[1];
+}
+
+/** A conformant bundle as a tar, attachments read from blob storage. */
+async function exportTar(
+  lib: LibraryClient,
+  blobs: BlobStore,
+  at: number | undefined,
+  name: string,
+) {
+  const bundle = await lib.exportBundle(at);
+  const enc = new TextEncoder();
+  const files = [];
+  for (const f of bundle.files) {
+    if (f.text !== undefined) files.push({ path: f.path, bytes: enc.encode(f.text) });
+    else if (f.blob) {
+      const obj = await blobs.get(f.blob.hash);
+      if (!obj) throw new OkfError(500, "blob_missing", `Bytes for ${f.path} are missing.`);
+      const bytes =
+        obj.body instanceof Uint8Array
+          ? obj.body
+          : new Uint8Array(await new Response(obj.body).arrayBuffer());
+      files.push({ path: f.path, bytes });
+    }
+  }
+  return new Response(writeTar(files) as unknown as ArrayBuffer, {
+    headers: {
+      "Content-Type": "application/x-tar",
+      "Content-Disposition": `attachment; filename="${name}-${bundle.seq}.tar"`,
+      "X-Seq": String(bundle.seq),
+    },
+  });
 }
 
 function writeResponse(

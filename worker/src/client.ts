@@ -1,3 +1,4 @@
+import { sha256Hex } from "./okf/hash";
 import { OkfError } from "./store/errors";
 import type { BlobRef, ImportFile, LibraryStore, WriteOp } from "./store/store";
 
@@ -18,6 +19,13 @@ export const LIBRARY_METHODS = [
   "history",
   "exportBundle",
   "headSeq",
+  "sources",
+  "diff",
+  "work",
+  "verify",
+  "summary",
+  "signDownload",
+  "openDownload",
 ] as const;
 
 export type LibraryMethod = (typeof LIBRARY_METHODS)[number];
@@ -131,4 +139,42 @@ export async function callStore(
     }
     throw e;
   }
+}
+
+/** Attachments that pass through the Worker (Phase 1 has no presigned uploads). */
+export const WORKER_ATTACHMENT_CAP = 10 * 1024 * 1024;
+
+/** Stores attachment bytes by hash (the key is content-addressed, so orphans are harmless). */
+export async function putBlob(blobs: BlobStore, bytes: Uint8Array, media: string | null) {
+  if (bytes.length > WORKER_ATTACHMENT_CAP) {
+    throw new OkfError(
+      413,
+      "attachment_too_large",
+      `Attachments through the Worker are capped at ${WORKER_ATTACHMENT_CAP} bytes.`,
+    );
+  }
+  const hash = sha256Hex(bytes);
+  await blobs.put(hash, bytes, media);
+  return { hash, size: bytes.length, media };
+}
+
+const MEDIA: Record<string, string> = {
+  html: "text/html",
+  py: "text/x-python",
+  json: "application/json",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  svg: "image/svg+xml",
+  pdf: "application/pdf",
+  txt: "text/plain",
+  csv: "text/csv",
+  sql: "application/sql",
+};
+
+export function mediaFor(path: string, header?: string | null): string | null {
+  if (header && header !== "application/octet-stream") return header.split(";")[0]?.trim() ?? null;
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return MEDIA[ext] ?? null;
 }

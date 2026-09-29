@@ -366,3 +366,54 @@ describe("import and export round-trip the sample bundles (store level)", () => 
     });
   }
 });
+
+describe("tier 2", () => {
+  test("stored lint drops a broken link once its target exists", () => {
+    const s = newStore();
+    s.apply(ctx(), [{ op: "write", path: "a.md", content: md("Note", "[b](b.md)\n") }]);
+    expect(conceptView(s.read("a.md")).lint.map((l) => l.code)).toEqual(["broken_link"]);
+    s.apply(ctx(), [{ op: "write", path: "b.md", content: md("Note", "b\n") }]);
+    expect(conceptView(s.read("a.md")).lint).toEqual([]);
+    expect(s.work().items).toEqual([]);
+  });
+
+  test("sources, diff, verify and signed downloads", () => {
+    const s = newStore();
+    s.apply(ctx(), [
+      { op: "write", path: "p.md", content: md("Policy", "Rules.\n") },
+      {
+        op: "write",
+        path: "m.md",
+        content: md(
+          "Metric",
+          "Claim.[^pol] Other.[^nope]\n\n[^pol]: Policy\n[^nope]: x\n",
+          "sources:\n  - { id: pol, resource: /p.md }\n  - { resource: https://e.com }\n",
+        ),
+      },
+    ]);
+    const src = s.sources("m.md");
+    expect(
+      src.sources.map((x) => [x.cited, (x.internal as { path?: string } | null)?.path]),
+    ).toEqual([
+      [1, "p.md"],
+      [0, undefined],
+    ]);
+    expect(src.unmatched_footnotes).toEqual(["nope"]);
+
+    const h = conceptView(s.read("p.md")).hash;
+    s.apply(ctx(), [
+      { op: "write", path: "p.md", content: md("Policy", "New rules.\n"), if_match: h },
+    ]);
+    const d = s.diff("p.md");
+    expect([d.from, d.to]).toEqual([2, 3]);
+    expect(d.diff).toContain("-Rules.\n+New rules.");
+
+    expect(errorOf(() => s.verify(ctx("claude-code/x"), "p.md")).code).toBe("cannot_verify");
+    s.verify(ctx("human:me"), "p.md");
+    expect(conceptView(s.read("p.md")).trust_tier).toBe("human-reviewed");
+
+    const token = s.signDownload({ k: "export", at: 2 });
+    expect(s.openDownload(token)).toMatchObject({ k: "export", at: 2 });
+    expect(errorOf(() => s.openDownload(`${token}x`)).code).toBe("bad_download");
+  });
+});

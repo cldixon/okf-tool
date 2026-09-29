@@ -37,6 +37,22 @@ curl -H "Authorization: Bearer $T" -o out.tar $L/export          # export a conf
 
 Routes are listed in the spec's HTTP API section; Phase 1 ships `/files` (GET, PUT, PATCH, DELETE,
 move), `/batch`, `/tree`, `/grep`, `/concepts`, `/search`, `/links`, `/events`, `/requests`,
-`/history`, `/revert`, `/import` and `/export`.
+`/history`, `/revert`, `/import` and `/export`; Phase 2 adds `/sources`, `/diff`, `/work`, `/verify`
+and short-lived `/dl/…` download links.
+
+## Agents (MCP)
+
+The Worker serves an MCP server at `/mcp` (Streamable HTTP, bearer token, one library per token):
+
+```sh
+claude mcp add --transport http okf https://okf-service.cl-dixon.workers.dev/mcp \
+  --header "Authorization: Bearer <token>"
+```
+
+Tier 1 tools mirror file work (`start`, `browse`, `read`, `write`, `edit`, `grep`, `move`,
+`delete`, `batch`, `attach`); tier 2 adds what files lack (`search`, `query`, `links`, `sources`,
+`log`, `history`, `diff`, `revert`, `work`, `export`, and `verify` for `process:` tokens). A token
+with `mcp_tiers = 'files'` sees tier 1 only. [`skills/okf/SKILL.md`](skills/okf/SKILL.md) teaches the
+workflow to agents that load skills.
 
 `fixtures/` holds Google's sample OKF bundles (Apache 2.0), vendored for the round-trip tests.

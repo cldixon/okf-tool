@@ -33,21 +33,22 @@ worker/src/app.ts        Hono app: REST routes under /api/v1/libraries/{lib}/, w
 worker/src/auth.ts       Bearer tokens: hash lookup in D1, scope, prefix, expiry, revocation
 worker/src/client.ts     Worker <-> DO boundary: one `call` RPC, errors as data, R2 blob checks
 worker/src/library.ts    Library DO: one per OKF library, hosts the store on its SQLite
-worker/src/okf/          OKF semantics: parse, record, render, links, footnotes, trust, lint, index/log render
+worker/src/okf/          OKF semantics: parse, record, render, links, footnotes, trust, lint, index/log render, diff
 worker/src/store/        Library schema and LibraryStore (writes, ledger, snapshots, queries) against a plain SQLite handle
 worker/src/util/tar.ts   Tar reader and writer for import and export
-worker/src/mcp/          (planned, Phase 2) MCP server
+worker/src/mcp/server.ts MCP server at /mcp: stateless Streamable HTTP, tier 1 and tier 2 tools, okf:// resources
 worker/scripts/          seed.ts (`bun run seed`) and gate.ts (`bun run gate`)
 worker/migrations/       D1 migrations (account layer)
 worker/test/             bun tests; worker/test/tsconfig.json adds bun types
-skills/okf/SKILL.md      (planned, Phase 2) agent skill doc
+skills/okf/SKILL.md      Agent skill doc: the OKF workflow over the MCP tools
 fixtures/                Google's four sample OKF bundles, vendored unchanged; do not edit
 ```
 
 ## Testing
 - Unit tests run under `bun test`. `cloudflare:workers` does not exist outside workerd, so tests stub it with `mock.module` (see `worker/test/healthz.test.ts`).
 - Keep storage and OKF logic free of Worker APIs so it can be tested under bun with `bun:sqlite` standing in for the DO's SQLite handle (`worker/test/sqlite.ts`).
-- Route tests (`worker/test/api.test.ts`) run the real app in process: a bun:sqlite store behind the same `callStore` the DO uses, an in-memory blob store and fake tokens.
+- Route and MCP tests (`worker/test/api.test.ts`, `mcp.test.ts`) run the real app in process via `worker/test/harness.ts`: a bun:sqlite store behind the same `callStore` the DO uses, an in-memory blob store and fake tokens. MCP tests drive it with the SDK's own client.
+- MCP tool descriptions and `INSTRUCTIONS` in `worker/src/mcp/server.ts` carry the agent workflow; keep them in step with `skills/okf/SKILL.md`.
 - The DO write transaction must stay synchronous (no awaits); hash with `okf/hash.ts`, not WebCrypto.
 
 ## Cloudflare

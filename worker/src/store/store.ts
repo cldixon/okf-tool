@@ -1,3 +1,6 @@
+import { hmac } from "@noble/hashes/hmac.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
 import { stringify as yamlStringify } from "yaml";
 import {
   buildRecord,
@@ -8,6 +11,7 @@ import {
   serializeRecord,
 } from "../okf/concept";
 import { type LogRequest, renderIndex, renderLog } from "../okf/derived";
+import { unifiedDiff } from "../okf/diff";
 import { sha256Hex } from "../okf/hash";
 import { lintFields } from "../okf/lint";
 import { scanBody } from "../okf/markdown";
@@ -539,14 +543,7 @@ export class LibraryStore {
       const id = w.written.get(r.path);
       if (!id || r.hash === null) continue;
       const broken = this.refreshBroken(id);
-      if (broken.length > 0) {
-        r.lint = [...r.lint, ...broken];
-        this.sql.run(
-          "UPDATE concepts SET lint = ? WHERE concept_id = ?",
-          JSON.stringify(r.lint),
-          id,
-        );
-      }
+      if (broken.length > 0) r.lint = [...r.lint, ...broken];
     }
     return results;
   }
@@ -1159,7 +1156,10 @@ export class LibraryStore {
     for (const r of from) w.affected.add(r.from_id);
   }
 
-  /** Recomputes a concept's broken_link flag; returns its broken links as lint. */
+  /**
+   * Recomputes a concept's broken links: its broken_link flag and the broken_link entries in its
+   * stored lint. Returns them as lint.
+   */
   private refreshBroken(id: string): LintWarning[] {
     const broken = this.sql.all<{ to_path: string; raw: string }>(
       `SELECT to_path, raw FROM links WHERE from_id = ?
@@ -1167,15 +1167,31 @@ export class LibraryStore {
       id,
     );
     const exists = this.sql.all("SELECT 1 FROM paths WHERE concept_id = ?", id).length > 0;
-    if (broken.length === 0 || !exists) {
+    const lint: LintWarning[] = exists
+      ? broken.map((b) => ({
+          code: "broken_link",
+          message: `Link ${b.raw} points to /${b.to_path}, which does not exist.`,
+          target: b.to_path,
+        }))
+      : [];
+    const stored = this.sql.all<{ lint: string | null }>(
+      "SELECT lint FROM concepts WHERE concept_id = ?",
+      id,
+    )[0];
+    if (stored) {
+      const others = (JSON.parse(stored.lint ?? "[]") as LintWarning[]).filter(
+        (l) => l.code !== "broken_link",
+      );
+      this.sql.run(
+        "UPDATE concepts SET lint = ? WHERE concept_id = ?",
+        JSON.stringify([...others, ...lint]),
+        id,
+      );
+    }
+    if (lint.length === 0) {
       this.sql.run("DELETE FROM flags WHERE concept_id = ? AND kind = 'broken_link'", id);
       return [];
     }
-    const lint = broken.map((b) => ({
-      code: "broken_link",
-      message: `Link ${b.raw} points to /${b.to_path}, which does not exist.`,
-      target: b.to_path,
-    }));
     this.sql.run(
       `INSERT INTO flags (concept_id, kind, since_seq, detail) VALUES (?, 'broken_link', ?, ?)
        ON CONFLICT(concept_id, kind) DO UPDATE SET detail = excluded.detail`,
@@ -1592,18 +1608,22 @@ export class LibraryStore {
     return { head: this.headSeq(), events, next: events.length === limit && last ? last : null };
   }
 
-  /** GET /requests: requests newest first, each with its events. `before` is a seq cursor. */
-  requests(opts: { before?: number; prefix?: string; limit?: number } = {}) {
+  /**
+   * GET /requests: requests newest first, each with its events. `before` is a seq cursor for
+   * paging back; `since` keeps only requests that started after that seq.
+   */
+  requests(opts: { before?: number; since?: number; prefix?: string; limit?: number } = {}) {
     const prefix = normalizeDir(opts.prefix);
     const limit = Math.min(Math.max(opts.limit ?? 20, 1), 200);
     const ids = this.sql.all<{ request_id: string; last: number }>(
-      `SELECT request_id, MAX(seq) AS last FROM events
+      `SELECT request_id, MIN(seq) AS first, MAX(seq) AS last FROM events
        WHERE (? = '' OR path = ? OR path LIKE ? ESCAPE '\\')
-       GROUP BY request_id HAVING last < ? ORDER BY last DESC LIMIT ?`,
+       GROUP BY request_id HAVING last < ? AND first > ? ORDER BY last DESC LIMIT ?`,
       prefix,
       prefix,
       `${escapeLike(prefix)}/%`,
       opts.before ?? Number.MAX_SAFE_INTEGER,
+      opts.since ?? 0,
       limit,
     );
     const requests = ids.map((r) => this.request(r.request_id));
@@ -1670,6 +1690,281 @@ export class LibraryStore {
     files.push({ path: "log.md", text: this.log({ at: snap.seq }) });
     return { seq: snap.seq, files };
   }
+
+  // ---------------------------------------------------------------- tier 2: beyond files
+
+  /** GET /sources: a concept's sources with footnote counts and internal targets' signals. */
+  sources(input: string) {
+    const snap = this.snapshot();
+    const e = snap.lookup(normalizePath(input) ?? "");
+    if (e?.kind !== "concept") throw notFound(input);
+    const r = this.record(e.hash);
+    const refs = scanBody(r.body, e.path).footnoteRefs;
+    const list = field(r, "sources");
+    const ids = new Set<string>();
+    const sources: JsonObject[] = [];
+    for (const s of Array.isArray(list) ? list : []) {
+      if (!s || typeof s !== "object" || Array.isArray(s)) continue;
+      const id = str(s.id);
+      if (id) ids.add(id);
+      const resource = str(s.resource);
+      const targetId = resource ? this.internalTarget(e.path, resource) : null;
+      const target = targetId ? snap.byId.get(targetId) : undefined;
+      let internal: JsonObject | null = null;
+      if (target?.kind === "concept") {
+        const tr = this.record(target.hash);
+        internal = {
+          path: target.path,
+          trust_tier: trustTier(tr.generated, this.verifiedAt(target.concept_id, snap.seq)),
+          stale: isStale(field(tr, "stale_after"), this.clock().getTime()),
+          status: effectiveStatus(field(tr, "status")),
+          inbound_links: this.inboundCount(target.concept_id),
+        };
+      } else if (target) internal = { path: target.path };
+      sources.push({ ...s, cited: id ? refs.filter((x) => x === id).length : 0, internal });
+    }
+    return {
+      path: e.path,
+      sources,
+      unmatched_footnotes: refs.filter((label) => !ids.has(label)),
+    };
+  }
+
+  /**
+   * GET /diff: unified diff of a concept's rendering between two sequences. `to` defaults to head;
+   * `from` defaults to just before the concept's latest content change at or before `to`.
+   */
+  diff(input: string, opts: { from?: number; to?: number } = {}) {
+    const p = normalizePath(input) ?? "";
+    const to = opts.to ?? this.headSeq();
+    const snapTo = this.snapshot(to);
+    const id = snapTo.lookup(p)?.concept_id ?? this.lastConceptAt(p);
+    if (!id) throw notFound(input);
+    let from = opts.from;
+    if (from === undefined) {
+      const last = this.sql.all<{ seq: number }>(
+        "SELECT seq FROM events WHERE concept_id = ? AND seq <= ? AND op NOT IN ('move', 'verify') ORDER BY seq DESC LIMIT 1",
+        id,
+        to,
+      )[0];
+      from = last ? last.seq - 1 : 0;
+    }
+    const snapFrom = this.snapshot(from);
+    const a = snapFrom.byId.get(id);
+    const b = snapTo.byId.get(id);
+    const text = (snap: Snapshot, e: Entry | undefined) => {
+      if (!e) return "";
+      if (e.kind === "concept") return this.renderEntry(snap, e, false);
+      return `(attachment ${e.hash})\n`;
+    };
+    const label = (e: Entry | undefined, seq: number) =>
+      e ? `${e.path}@${seq}` : `/dev/null@${seq}`;
+    return {
+      path: (b ?? a)?.path ?? p,
+      from,
+      to,
+      diff: unifiedDiff(text(snapFrom, a), text(snapTo, b), {
+        from: label(a, from),
+        to: label(b, to),
+      }),
+    };
+  }
+
+  private lastConceptAt(path: string): string | undefined {
+    return this.sql.all<{ concept_id: string }>(
+      "SELECT concept_id FROM events WHERE path IN (?, ?) ORDER BY seq DESC LIMIT 1",
+      path,
+      `${path}.md`,
+    )[0]?.concept_id;
+  }
+
+  /**
+   * GET /work: the work queue (spec: Write path and maintainers). Stale concepts are computed at
+   * read time until the staleness maintainer arrives; broken links and lint come from flags.
+   * Ranked by inbound links, then age.
+   */
+  work(opts: { kind?: string; limit?: number } = {}) {
+    const snap = this.snapshot();
+    const now = this.clock().getTime();
+    const limit = Math.min(Math.max(opts.limit ?? 50, 1), 500);
+    const items: WorkItem[] = [];
+    const want = (k: string) => opts.kind === undefined || opts.kind === k;
+    if (want("stale")) {
+      for (const e of snap.sorted()) {
+        if (e.kind !== "concept") continue;
+        const staleAfter = field(this.record(e.hash), "stale_after");
+        if (!isStale(staleAfter, now)) continue;
+        items.push({
+          kind: "stale",
+          path: e.path,
+          since: String(staleAfter),
+          detail: `stale_after ${String(staleAfter)} has passed`,
+          suggested_action:
+            "Re-check the concept against its sources and resource. Update it (which restamps generated) and move stale_after forward, or set status: deprecated if it no longer holds.",
+          inbound_links: this.inboundCount(e.concept_id),
+        });
+      }
+    }
+    const flags = this.sql.all<{
+      concept_id: string;
+      kind: string;
+      since_seq: number;
+      detail: string;
+    }>(
+      "SELECT f.concept_id, f.kind, f.since_seq, f.detail FROM flags f JOIN paths p ON p.concept_id = f.concept_id",
+    );
+    for (const f of flags) {
+      if (!want(f.kind)) continue;
+      const e = snap.byId.get(f.concept_id);
+      if (!e) continue;
+      const since =
+        this.sql.all<{ ts: string }>("SELECT ts FROM events WHERE seq = ?", f.since_seq)[0]?.ts ??
+        "";
+      let detail = f.detail;
+      let action = "Fix the frontmatter or body with edit; the lint messages say what is wrong.";
+      if (f.kind === "broken_link") {
+        const targets = JSON.parse(f.detail) as string[];
+        detail = `links to missing ${targets.map((t) => `/${t}`).join(", ")}`;
+        action =
+          "Write the missing concept, point the link at an existing one, or remove the link.";
+      } else if (f.kind === "lint") {
+        detail = (JSON.parse(f.detail) as LintWarning[]).map((l) => l.message).join(" ");
+      }
+      items.push({
+        kind: f.kind,
+        path: e.path,
+        since,
+        detail,
+        suggested_action: action,
+        inbound_links: this.inboundCount(e.concept_id),
+      });
+    }
+    items.sort((a, b) => b.inbound_links - a.inbound_links || (a.since < b.since ? -1 : 1));
+    return { seq: snap.seq, total: items.length, items: items.slice(0, limit) };
+  }
+
+  /**
+   * POST /verify: adds `{ by, at }` to `verified` as one verify event; the content version is
+   * unchanged (spec: OKF conformance). Only `human:` and `process:` actors may verify.
+   */
+  verify(ctx: RequestContext, input: string): WriteResult {
+    if (!ctx.actor.startsWith("human:") && !ctx.actor.startsWith("process:")) {
+      throw new OkfError(
+        403,
+        "cannot_verify",
+        "Only human: and process: actors may verify; agents do not claim verification.",
+      );
+    }
+    return this.guard(() =>
+      this.sql.transaction(() => {
+        const w = this.begin(ctx);
+        const p = normalizePath(input);
+        const row = p ? this.lookupRow(p) : undefined;
+        if (row?.kind !== "concept") throw notFound(input);
+        const seq = this.recordVerification(w, row.concept_id, row.path, row.hash, {
+          by: ctx.actor,
+          at: w.now,
+        });
+        return {
+          request_id: ctx.request_id,
+          seq,
+          results: [{ op: "verify", path: row.path, hash: row.hash, seq, lint: [] }],
+        };
+      }),
+    );
+  }
+
+  /** Counts for the MCP `start` entry point. */
+  summary() {
+    const snap = this.snapshot();
+    const types: Record<string, number> = {};
+    let concepts = 0;
+    let attachments = 0;
+    for (const e of snap.byPath.values()) {
+      if (e.kind === "attachment") {
+        attachments++;
+        continue;
+      }
+      concepts++;
+      const t = str(field(this.record(e.hash), "type")) || "(no type)";
+      types[t] = (types[t] ?? 0) + 1;
+    }
+    return {
+      seq: snap.seq,
+      concepts,
+      attachments,
+      types,
+      open_work: this.work({ limit: 1 }).total,
+    };
+  }
+
+  // ---------------------------------------------------------------- signed download URLs
+
+  /** A per-library HMAC key, created on first use; it never leaves the object. */
+  private signingKey(): Uint8Array {
+    const row = this.sql.all<{ value: string }>(
+      "SELECT value FROM meta WHERE key = 'signing_key'",
+    )[0];
+    if (row) return hexToBytes(row.value);
+    const key = randomBytes(32);
+    this.sql.run("INSERT INTO meta (key, value) VALUES ('signing_key', ?)", bytesToHex(key));
+    return key;
+  }
+
+  /** A short-lived token for a download URL: a file's bytes or an export at a seq. */
+  signDownload(payload: DownloadPayload, ttlSeconds = 900): string {
+    const exp = Math.floor(this.clock().getTime() / 1000) + ttlSeconds;
+    const body = b64url(new TextEncoder().encode(JSON.stringify({ ...payload, exp })));
+    return `${body}.${b64url(hmac(sha256, this.signingKey(), new TextEncoder().encode(body)))}`;
+  }
+
+  /** Checks a download token's signature and expiry. */
+  openDownload(token: string): DownloadPayload {
+    const [body, sig] = token.split(".");
+    const bad = new OkfError(403, "bad_download", "This download link is invalid or has expired.");
+    if (!body || !sig) throw bad;
+    const expected = b64url(hmac(sha256, this.signingKey(), new TextEncoder().encode(body)));
+    if (expected.length !== sig.length || !equalBytes(expected, sig)) throw bad;
+    let payload: DownloadPayload & { exp: number };
+    try {
+      payload = JSON.parse(new TextDecoder().decode(fromB64url(body)));
+    } catch {
+      throw bad;
+    }
+    if (payload.exp * 1000 < this.clock().getTime()) throw bad;
+    return payload;
+  }
+}
+
+export type DownloadPayload =
+  | { k: "file"; path: string; hash: string; media: string | null }
+  | { k: "export"; at: number };
+
+export interface WorkItem {
+  kind: string;
+  path: string;
+  since: string;
+  detail: string;
+  suggested_action: string;
+  inbound_links: number;
+}
+
+function b64url(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromB64url(s: string): Uint8Array {
+  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+/** Constant-time string comparison. */
+function equalBytes(a: string, b: string): boolean {
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 type WriteMode = "write" | "import";

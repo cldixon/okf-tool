@@ -1,84 +1,9 @@
-import { describe, expect, mock, test } from "bun:test";
-
-mock.module("cloudflare:workers", () => ({ DurableObject: class {} }));
-
-import { createApp, type Deps } from "../src/app";
-import type { TokenInfo } from "../src/auth";
-import { type BlobStore, callStore, makeClient } from "../src/client";
+import { describe, expect, test } from "bun:test";
 import { parseConcept } from "../src/okf/concept";
-import { OkfError } from "../src/store/errors";
-import { LibraryStore } from "../src/store/store";
 import { readTar, writeTar } from "../src/util/tar";
 import { compareBundle } from "./compare";
 import { BUNDLES, loadBundle } from "./fixtures";
-import { bunSqlHandle } from "./sqlite";
-
-function memoryBlobs(): BlobStore & { map: Map<string, Uint8Array> } {
-  const map = new Map<string, Uint8Array>();
-  return {
-    map,
-    async put(hash, bytes) {
-      map.set(hash, bytes);
-    },
-    async get(hash) {
-      const b = map.get(hash);
-      return b ? { body: b, size: b.length } : null;
-    },
-    async head(hash) {
-      const b = map.get(hash);
-      return b ? { size: b.length } : null;
-    },
-  };
-}
-
-const LIB = { id: "lib-1", slug: "demo", do_id: "lib-1" };
-const TOKENS: Record<string, TokenInfo> = {
-  writer: {
-    id: "t1",
-    actor: "claude-code/test",
-    scope: "write",
-    prefix: null,
-    mcp_tiers: "all",
-    library: LIB,
-  },
-  reader: {
-    id: "t2",
-    actor: "claude-code/reader",
-    scope: "read",
-    prefix: null,
-    mcp_tiers: "all",
-    library: LIB,
-  },
-  scoped: {
-    id: "t3",
-    actor: "process:scoped",
-    scope: "write",
-    prefix: "notes",
-    mcp_tiers: "all",
-    library: LIB,
-  },
-};
-
-function setup() {
-  const store = new LibraryStore(bunSqlHandle());
-  const blobs = memoryBlobs();
-  const deps: Deps = {
-    authenticate: async (secret) => {
-      const t = TOKENS[secret];
-      if (!t) throw new OkfError(401, "bad_token", "Unknown bearer token.");
-      return t;
-    },
-    blobs,
-    library: () => makeClient((method, args) => callStore(store, blobs, method, args)),
-  };
-  const app = createApp(() => deps);
-  const req = (path: string, init: RequestInit & { token?: string } = {}) => {
-    const headers = new Headers(init.headers);
-    if (init.token !== "") headers.set("Authorization", `Bearer ${init.token ?? "writer"}`);
-    return app.request(`/api/v1/libraries/demo${path}`, { ...init, headers });
-  };
-  return { app, req, store, blobs };
-}
+import { setup } from "./harness";
 
 const doc = (body: string, extra = "") => `---\ntype: Note\n${extra}---\n${body}`;
 
