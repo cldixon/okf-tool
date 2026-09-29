@@ -52,4 +52,5 @@ fixtures/                Google's four sample OKF bundles, vendored unchanged; d
 
 ## Cloudflare
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set in the cloud environment; wrangler reads them automatically.
-- The D1 `database_id` in `wrangler.jsonc` is a placeholder until the remote database is created. Do not create or delete remote resources without asking.
+- Remote resources: D1 `okf-accounts` (id in `wrangler.jsonc`) and R2 bucket `okf-blobs`. Do not create or delete remote resources without asking.
+- `bun run seed --remote` (from `worker/`) creates a library and token in the deployed D1.

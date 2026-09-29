@@ -12,13 +12,12 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Library"] }],
 
-  // Account layer. database_id is filled in when the remote database is created;
-  // local `wrangler dev` does not need a real one.
+  // Account layer (users, libraries, tokens).
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "okf-accounts",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "c36c4e44-2d34-4053-9fee-3ac7f1ad6c0c",
       "migrations_dir": "migrations"
     }
   ],
