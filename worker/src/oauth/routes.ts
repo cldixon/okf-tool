@@ -30,7 +30,7 @@ interface RouteDeps {
   accounts(env: Cloudflare.Env): Accounts;
 }
 
-async function signedIn(
+export async function signedIn(
   req: Request,
   env: Cloudflare.Env,
   accounts: Accounts,

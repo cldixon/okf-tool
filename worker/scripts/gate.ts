@@ -5,7 +5,8 @@
  * Starts the Worker with fresh local D1, R2 and DO state, seeds one library and write token per
  * sample bundle, imports each bundle as a tarball, exports it, and compares: same parsed
  * frontmatter (generated and verified included) and bodies, byte-identical attachments,
- * synthesized index.md and log.md ignored. Exits non-zero on any mismatch.
+ * synthesized index.md and log.md ignored. Then renders every concept and directory of each bundle
+ * in the built-in UI (signed in with the dev Access identity). Exits non-zero on any mismatch.
  *
  *   bun run gate [--port 8799] [--keep]
  */
@@ -36,7 +37,20 @@ const tokens = BUNDLES.map((b) => ({
 const mcpToken = seed({ slug: "mcp", actor: "claude-code/gate", persistTo: state }).token;
 
 const dev = Bun.spawn(
-  ["bunx", "wrangler", "dev", "--port", String(port), "--ip", "127.0.0.1", "--persist-to", state],
+  [
+    "bunx",
+    "wrangler",
+    "dev",
+    "--port",
+    String(port),
+    "--ip",
+    "127.0.0.1",
+    "--persist-to",
+    state,
+    // The dev Access identity, honored only on loopback when no Access team is configured.
+    "--var",
+    "DEV_ACCESS_EMAIL:gate@localhost",
+  ],
   {
     cwd: WORKER_DIR,
     env: { ...process.env, WRANGLER_SEND_METRICS: "false", CI: "1" },
@@ -54,6 +68,32 @@ async function waitForHealth() {
     await Bun.sleep(500);
   }
   throw new Error("wrangler dev did not become healthy");
+}
+
+/** Fetches the library page, every directory page and every concept page of a library. */
+async function uiPages(slug: string, paths: string[]): Promise<string[]> {
+  const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
+  const lib = `${base}/app/libraries/${slug}`;
+  const concepts = paths.filter((p) => p.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(p));
+  const dirs = new Set<string>();
+  for (const p of paths) {
+    const parts = p.split("/").slice(0, -1);
+    for (let i = 1; i <= parts.length; i++) dirs.add(parts.slice(0, i).join("/"));
+  }
+  const urls = [
+    `${lib}/`,
+    ...[...dirs].map((d) => `${lib}/tree/${enc(d)}/`),
+    ...concepts.map((p) => `${lib}/files/${enc(p)}`),
+  ];
+  const problems: string[] = [];
+  for (const url of urls) {
+    const r = await fetch(url);
+    const html = await r.text();
+    if (r.status !== 200 || !html.includes("</main>")) {
+      problems.push(`${url.slice(base.length)}: ${r.status} ${html.slice(0, 200)}`);
+    }
+  }
+  return problems;
 }
 
 let failed = false;
@@ -87,6 +127,14 @@ try {
     );
     for (const p of problems) console.log(`  - ${p}`);
     if (problems.length > 0) failed = true;
+
+    const uiProblems = await uiPages(
+      t.slug,
+      original.map((f) => f.path),
+    );
+    console.log(`${uiProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: UI pages render`);
+    for (const p of uiProblems) console.log(`  - ${p}`);
+    if (uiProblems.length > 0) failed = true;
   }
   const mcpOk = await mcpSmoke({ url: base, token: mcpToken });
   console.log(`${mcpOk ? "PASS" : "FAIL"} MCP smoke on an empty library`);

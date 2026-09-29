@@ -15,16 +15,21 @@
     "@cloudflare/workers-oauth-provider": "^1.2.1",
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@noble/hashes": "^2.4.0",
+    "hast-util-to-html": "^9.0.5",
     "hono": "^4.13.9",
     "jose": "^6.2.12",
     "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
     "mdast-util-gfm-footnote": "^2.1.0",
+    "mdast-util-to-hast": "^13.2.1",
+    "micromark-extension-gfm": "^3.0.0",
     "micromark-extension-gfm-footnote": "^2.1.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
+    "@types/hast": "^3.0.5",
     "@types/mdast": "^4.0.4",
     "typescript": "^7.0.2",
     "wrangler": "^4.142.0"

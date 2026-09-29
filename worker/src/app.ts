@@ -7,6 +7,7 @@ import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
 import { OkfError } from "./store/errors";
 import type { ConceptContent, ImportFile, RequestContext, WriteOp } from "./store/store";
+import { registerUiRoutes } from "./ui/routes";
 import { maybeGunzip, readTar, writeTar } from "./util/tar";
 
 /** What the app needs from the platform; production wires D1, the DO and R2, tests fakes. */
@@ -319,7 +320,9 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     ),
   );
 
-  app.get(`${BASE}/links/*`, async (c) => c.json(await c.var.lib.links(tail(c, "/links/"))));
+  app.get(`${BASE}/links/*`, async (c) =>
+    c.json(await c.var.lib.links(tail(c, "/links/"), { at: num(c, "at") })),
+  );
 
   // ------------------------------------------------------------------ ledger
 
@@ -410,7 +413,9 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   // ------------------------------------------------------------------ tier 2 extras
 
-  app.get(`${BASE}/sources/*`, async (c) => c.json(await c.var.lib.sources(tail(c, "/sources/"))));
+  app.get(`${BASE}/sources/*`, async (c) =>
+    c.json(await c.var.lib.sources(tail(c, "/sources/"), { at: num(c, "at") })),
+  );
 
   app.get(`${BASE}/diff`, async (c) => {
     const path = c.req.query("path");
@@ -454,6 +459,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   // /mcp itself is served by the OAuth provider (worker.ts), which checks tokens first.
   registerAppRoutes(app, { accounts: (env) => deps(env).accounts });
+  registerUiRoutes(app, deps);
 
   return app;
 }
