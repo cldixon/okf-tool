@@ -1,7 +1,8 @@
 import { type Context, Hono } from "hono";
+import type { Accounts } from "./accounts";
 import type { Authenticate, TokenInfo } from "./auth";
 import { type BlobStore, type LibraryClient, mediaFor, putBlob } from "./client";
-import { handleMcp } from "./mcp/server";
+import { registerAppRoutes } from "./oauth/routes";
 import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
 import { OkfError } from "./store/errors";
@@ -11,6 +12,8 @@ import { maybeGunzip, readTar, writeTar } from "./util/tar";
 /** What the app needs from the platform; production wires D1, the DO and R2, tests fakes. */
 export interface Deps {
   authenticate: Authenticate;
+  /** Users and libraries in D1, for the consent page. */
+  accounts: Accounts;
   library(token: TokenInfo): LibraryClient;
   /** The library a signed download URL names, or null when no such library exists. */
   libraryByDoId(doId: string): Promise<LibraryClient | null>;
@@ -447,12 +450,10 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   // ------------------------------------------------------------------ MCP
 
-  app.all("/mcp", async (c) => {
-    const d = deps(c.env);
-    const token = await d.authenticate(bearer(c));
-    const origin = new URL(c.req.url).origin;
-    return handleMcp(c.req.raw, { token, lib: d.library(token), blobs: d.blobs, origin });
-  });
+  // ------------------------------------------------------------------ apps (OAuth consent)
+
+  // /mcp itself is served by the OAuth provider (worker.ts), which checks tokens first.
+  registerAppRoutes(app, { accounts: (env) => deps(env).accounts });
 
   return app;
 }

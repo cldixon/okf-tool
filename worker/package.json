@@ -12,9 +12,11 @@
     "gate": "bun scripts/gate.ts"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.2.1",
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@noble/hashes": "^2.4.0",
     "hono": "^4.13.9",
+    "jose": "^6.2.12",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm-footnote": "^2.1.0",
     "micromark-extension-gfm-footnote": "^2.1.0",

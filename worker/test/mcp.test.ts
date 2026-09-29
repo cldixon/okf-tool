@@ -7,7 +7,7 @@ import { setup } from "./harness";
 type Text = { type: "text"; text: string };
 
 async function connect(app: ReturnType<typeof setup>["app"], token = "writer") {
-  const transport = new StreamableHTTPClientTransport(new URL("http://okf.test/mcp"), {
+  const transport = new StreamableHTTPClientTransport(new URL("http://localhost/mcp"), {
     requestInit: { headers: { Authorization: `Bearer ${token}` } },
     fetch: async (url, init) => app.request(url.toString(), init as RequestInit),
   });

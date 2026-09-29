@@ -1,12 +1,13 @@
-import { createApp } from "./app";
+import { d1Accounts } from "./accounts";
 import { d1Authenticate } from "./auth";
 import { makeClient, r2BlobStore } from "./client";
+import { createWorker } from "./worker";
 
 export { Library } from "./library";
 
 let authenticate: ReturnType<typeof d1Authenticate> | undefined;
 
-const app = createApp((env) => {
+export default createWorker((env) => {
   authenticate ??= d1Authenticate(env.DB);
   const client = (doId: string) => {
     const stub = env.LIBRARY.get(env.LIBRARY.idFromName(doId));
@@ -14,6 +15,7 @@ const app = createApp((env) => {
   };
   return {
     authenticate,
+    accounts: d1Accounts(env.DB),
     blobs: r2BlobStore(env.BLOBS),
     library: (token) => client(token.library.do_id),
     // Checked against D1 first, so a forged download URL cannot create Durable Objects.
@@ -24,6 +26,4 @@ const app = createApp((env) => {
       return row ? client(doId) : null;
     },
   };
-});
-
-export default app satisfies ExportedHandler<Env>;
+}) satisfies ExportedHandler<Env>;

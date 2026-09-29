@@ -1,0 +1,9 @@
+# Copy to .dev.vars for `bun run dev`. Never commit .dev.vars.
+#
+# Production sets these as Worker secrets from the Cloudflare Access application that covers /app/*:
+#   ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com
+#   ACCESS_AUD=<the application's audience tag>
+#
+# Local only: there is no Access in front of wrangler dev, so /app/* treats every request as
+# signed in with this email. Ignored when ACCESS_TEAM_DOMAIN is set.
+DEV_ACCESS_EMAIL=dev@localhost

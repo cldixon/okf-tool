@@ -100,11 +100,14 @@ Split when a concept covers more than one idea, mixes definitions with procedure
 
 ## Connecting
 
-The server speaks MCP over Streamable HTTP at `https://<worker-host>/mcp` with a bearer token bound to one library:
+The server speaks MCP over Streamable HTTP at `https://<worker-host>/mcp`. Each connection reaches one library.
+
+- **claude.ai, ChatGPT and other apps:** add the URL as a custom connector and approve it in the browser (OAuth; the approver picks the library, read or write access, and the name your changes carry).
+- **Claude Code and scripts:** use a bearer token:
 
 ```sh
 claude mcp add --transport http okf https://<worker-host>/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
-One MCP server entry per library token.
+To use two libraries, add two connections.
