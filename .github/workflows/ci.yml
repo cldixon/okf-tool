@@ -4,10 +4,21 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR supersedes the running checks.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
+    name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -16,9 +27,12 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check
 
-  # Phase 1 gate: import and export Google's sample bundles through `wrangler dev`.
+  # The Phase 1 gate (import and export Google's sample bundles) and the MCP smoke flow,
+  # both over HTTP against `wrangler dev` with local D1, R2 and Durable Object state.
   gate:
+    name: Gate (wrangler dev)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

@@ -1,5 +1,6 @@
 /**
- * `bun run gate`: the Phase 1 gate against `wrangler dev` (spec: Phase 1 in detail, Gate).
+ * `bun run gate`: the Phase 1 gate against `wrangler dev` (spec: Phase 1 in detail, Gate), plus
+ * the MCP smoke flow on a fresh, empty library.
  *
  * Starts the Worker with fresh local D1, R2 and DO state, seeds one library and write token per
  * sample bundle, imports each bundle as a tarball, exports it, and compares: same parsed
@@ -15,6 +16,7 @@ import { parseArgs } from "node:util";
 import { readTar, writeTar } from "../src/util/tar";
 import { compareBundle } from "../test/compare";
 import { BUNDLES, loadBundle } from "../test/fixtures";
+import { mcpSmoke } from "./mcp-smoke";
 import { seed } from "./seed";
 
 const WORKER_DIR = new URL("..", import.meta.url).pathname;
@@ -31,6 +33,7 @@ const tokens = BUNDLES.map((b) => ({
   bundle: b,
   ...seed({ slug: b.replace(/_/g, "-"), persistTo: state }),
 }));
+const mcpToken = seed({ slug: "mcp", actor: "claude-code/gate", persistTo: state }).token;
 
 const dev = Bun.spawn(
   ["bunx", "wrangler", "dev", "--port", String(port), "--ip", "127.0.0.1", "--persist-to", state],
@@ -85,6 +88,9 @@ try {
     for (const p of problems) console.log(`  - ${p}`);
     if (problems.length > 0) failed = true;
   }
+  const mcpOk = await mcpSmoke({ url: base, token: mcpToken });
+  console.log(`${mcpOk ? "PASS" : "FAIL"} MCP smoke on an empty library`);
+  if (!mcpOk) failed = true;
 } catch (e) {
   failed = true;
   console.error(e);

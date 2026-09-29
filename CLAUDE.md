@@ -21,7 +21,7 @@ Read it with the Docs tools before starting on a feature. There is no markdown c
 | `bun run format` | Apply Biome fixes |
 | `bun run deploy` | Deploy the Worker to Cloudflare |
 | `bun run seed` | Create a local user, library (`dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
-| `bun run gate` | Phase 1 gate: boots `wrangler dev` on fresh state, imports and exports Google's sample bundles, compares; also runs in CI |
+| `bun run gate` | Gate: boots `wrangler dev` on fresh state, round-trips Google's sample bundles over HTTP and runs the MCP smoke flow; also runs in CI |
 
 After changing `worker/wrangler.jsonc`, run `bunx wrangler types` in `worker/` and commit the regenerated `worker-configuration.d.ts`.
 
@@ -37,7 +37,7 @@ worker/src/okf/          OKF semantics: parse, record, render, links, footnotes,
 worker/src/store/        Library schema and LibraryStore (writes, ledger, snapshots, queries) against a plain SQLite handle
 worker/src/util/tar.ts   Tar reader and writer for import and export
 worker/src/mcp/server.ts MCP server at /mcp: stateless Streamable HTTP, tier 1 and tier 2 tools, okf:// resources
-worker/scripts/          seed.ts (`bun run seed`) and gate.ts (`bun run gate`)
+worker/scripts/          seed.ts (`bun run seed`), gate.ts (`bun run gate`), mcp-smoke.ts (MCP flow against any URL)
 worker/migrations/       D1 migrations (account layer)
 worker/test/             bun tests; worker/test/tsconfig.json adds bun types
 skills/okf/SKILL.md      Agent skill doc: the OKF workflow over the MCP tools
@@ -55,3 +55,6 @@ fixtures/                Google's four sample OKF bundles, vendored unchanged; d
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set in the cloud environment; wrangler reads them automatically.
 - Remote resources: D1 `okf-accounts` (id in `wrangler.jsonc`) and R2 bucket `okf-blobs`. Do not create or delete remote resources without asking.
 - `bun run seed --remote` (from `worker/`) creates a library and token in the deployed D1.
+
+## CI
+`.github/workflows/ci.yml` runs on PRs and pushes to `main`: `bun run check`, and `bun run gate` (wrangler dev, sample-bundle round-trip, MCP smoke). Both must pass before merging.
