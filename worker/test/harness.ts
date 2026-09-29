@@ -1,10 +1,26 @@
-/** The real app in process: a bun:sqlite store behind the same callStore the DO uses. */
-import { createApp, type Deps } from "../src/app";
+/**
+ * The real Worker in process: Cloudflare's OAuth provider in front of the app, bun:sqlite stores
+ * behind the same callStore the DO uses, and in-memory KV, blobs and accounts.
+ */
+import { mock } from "bun:test";
+
+// `cloudflare:workers` only exists inside workerd; the OAuth library imports WorkerEntrypoint.
+mock.module("cloudflare:workers", () => ({ DurableObject: class {}, WorkerEntrypoint: class {} }));
+// As in wrangler.jsonc: the OAuth library enables CIMD only under global_fetch_strictly_public.
+Object.assign(globalThis, {
+  Cloudflare: { compatibilityFlags: { global_fetch_strictly_public: true } },
+});
+
+import type { Accounts, LibraryRef, User } from "../src/accounts";
+import { checkSlug, humanActor } from "../src/accounts";
+import type { Deps } from "../src/app";
 import type { TokenInfo } from "../src/auth";
-import { type BlobStore, callStore, makeClient } from "../src/client";
+import { type BlobStore, callStore, type LibraryClient, makeClient } from "../src/client";
 import { OkfError } from "../src/store/errors";
 import { LibraryStore } from "../src/store/store";
 import { bunSqlHandle } from "./sqlite";
+
+const { createWorker } = await import("../src/worker");
 
 export function memoryBlobs(): BlobStore & { map: Map<string, Uint8Array> } {
   const map = new Map<string, Uint8Array>();
@@ -24,7 +40,64 @@ export function memoryBlobs(): BlobStore & { map: Map<string, Uint8Array> } {
   };
 }
 
-const LIB = { id: "lib-1", slug: "demo", do_id: "lib-1" };
+/** Enough of Workers KV for the OAuth provider: get (text/json), put with TTL, delete, list. */
+export function memoryKV() {
+  const data = new Map<string, { value: string; expires: number | null; metadata: unknown }>();
+  const live = (k: string) => {
+    const e = data.get(k);
+    if (e && e.expires !== null && e.expires <= Date.now()) {
+      data.delete(k);
+      return undefined;
+    }
+    return e;
+  };
+  const kv = {
+    data,
+    async get(key: string, opts?: string | { type?: string }) {
+      const e = live(key);
+      if (!e) return null;
+      const type = typeof opts === "string" ? opts : opts?.type;
+      return type === "json" ? JSON.parse(e.value) : e.value;
+    },
+    async getWithMetadata(key: string, opts?: string | { type?: string }) {
+      const value = await kv.get(key, opts);
+      return { value, metadata: live(key)?.metadata ?? null };
+    },
+    async put(
+      key: string,
+      value: string,
+      opts: { expirationTtl?: number; expiration?: number; metadata?: unknown } = {},
+    ) {
+      const expires = opts.expirationTtl
+        ? Date.now() + opts.expirationTtl * 1000
+        : opts.expiration
+          ? opts.expiration * 1000
+          : null;
+      data.set(key, { value: String(value), expires, metadata: opts.metadata ?? null });
+    },
+    async delete(key: string) {
+      data.delete(key);
+    },
+    async list(opts: { prefix?: string; cursor?: string; limit?: number } = {}) {
+      const names = [...data.keys()]
+        .filter((k) => live(k) && k.startsWith(opts.prefix ?? ""))
+        .sort();
+      const start = opts.cursor ? Number(opts.cursor) : 0;
+      const limit = opts.limit ?? 1000;
+      const page = names.slice(start, start + limit);
+      const done = start + limit >= names.length;
+      return {
+        keys: page.map((name) => ({ name, metadata: data.get(name)?.metadata ?? undefined })),
+        list_complete: done,
+        cursor: done ? undefined : String(start + limit),
+      };
+    },
+  };
+  return kv;
+}
+
+export const LIB: LibraryRef = { id: "lib-1", slug: "demo", do_id: "lib-1" };
+
 export const TOKENS: Record<string, TokenInfo> = {
   writer: {
     id: "t1",
@@ -68,25 +141,91 @@ export const TOKENS: Record<string, TokenInfo> = {
   },
 };
 
+export function memoryAccounts(): Accounts & { users: Map<string, User>; libs: LibraryRef[] } {
+  const users = new Map<string, User>();
+  const libs: LibraryRef[] = [LIB];
+  return {
+    users,
+    libs,
+    async user(email) {
+      let u = users.get(email);
+      if (!u) {
+        u = { id: `user_${users.size + 1}`, email, actor: humanActor(email) };
+        users.set(email, u);
+      }
+      return u;
+    },
+    async libraries() {
+      return [...libs].sort((a, b) => (a.slug < b.slug ? -1 : 1));
+    },
+    async createLibrary(slugInput) {
+      const slug = checkSlug(slugInput);
+      if (libs.some((l) => l.slug === slug)) {
+        throw new OkfError(409, "library_exists", `A library named ${slug} already exists.`);
+      }
+      const lib = { id: `lib-${libs.length + 1}`, slug, do_id: `lib-${libs.length + 1}` };
+      libs.push(lib);
+      return lib;
+    },
+  };
+}
+
+export const ORIGIN = "http://localhost";
+
 export function setup() {
-  const store = new LibraryStore(bunSqlHandle());
   const blobs = memoryBlobs();
-  const client = makeClient((method, args) => callStore(store, blobs, method, args));
+  const stores = new Map<string, LibraryStore>();
+  const clients = new Map<string, LibraryClient>();
+  const clientFor = (doId: string) => {
+    let c = clients.get(doId);
+    if (!c) {
+      const store = new LibraryStore(bunSqlHandle());
+      stores.set(doId, store);
+      c = makeClient((method, args) => callStore(store, blobs, method, args));
+      clients.set(doId, c);
+    }
+    return c;
+  };
+  clientFor(LIB.do_id);
+  const accounts = memoryAccounts();
   const deps: Deps = {
     authenticate: async (secret) => {
       const t = TOKENS[secret];
       if (!t) throw new OkfError(401, "bad_token", "Unknown bearer token.");
       return t;
     },
+    accounts,
     blobs,
-    library: () => client,
-    libraryByDoId: async (doId) => (doId === LIB.do_id ? client : null),
+    library: (token) => clientFor(token.library.do_id),
+    libraryByDoId: async (doId) =>
+      accounts.libs.some((l) => l.do_id === doId) ? clientFor(doId) : null,
   };
-  const app = createApp(() => deps);
+  const worker = createWorker(() => deps);
+  const kv = memoryKV();
+  const env = { OAUTH_KV: kv, DEV_ACCESS_EMAIL: "owner@example.com" } as unknown as Env;
+  const ctx = {
+    waitUntil() {},
+    passThroughOnException() {},
+    props: {},
+  } as unknown as ExecutionContext;
+
+  /** Like Hono's app.request: a path or URL, resolved against http://localhost. */
+  const app = {
+    request: (input: string | URL | Request, init?: RequestInit) => {
+      const request =
+        input instanceof Request ? input : new Request(new URL(String(input), ORIGIN), init);
+      return worker.fetch(
+        request as Request<unknown, IncomingRequestCfProperties>,
+        env,
+        ctx,
+      ) as Promise<Response>;
+    },
+  };
   const req = (path: string, init: RequestInit & { token?: string } = {}) => {
     const headers = new Headers(init.headers);
     if (init.token !== "") headers.set("Authorization", `Bearer ${init.token ?? "writer"}`);
     return app.request(`/api/v1/libraries/demo${path}`, { ...init, headers });
   };
-  return { app, req, store, blobs };
+  const store = () => stores.get(LIB.do_id) as LibraryStore;
+  return { app, req, store, blobs, kv, env, accounts, deps };
 }

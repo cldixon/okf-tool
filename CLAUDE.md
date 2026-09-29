@@ -28,9 +28,13 @@ After changing `worker/wrangler.jsonc`, run `bunx wrangler types` in `worker/` a
 ## Layout
 ```
 worker/                  Worker + Library Durable Object (TypeScript, Hono)
-worker/src/index.ts      Worker entry: wires D1 auth, the Library DO and R2 into the app
+worker/src/index.ts      Worker entry: wires D1, the Library DO, R2 and KV into createWorker
+worker/src/worker.ts     Cloudflare's OAuth provider in front of the app: discovery, /register, /token, guards /mcp
 worker/src/app.ts        Hono app: REST routes under /api/v1/libraries/{lib}/, with injectable deps
 worker/src/auth.ts       Bearer tokens: hash lookup in D1, scope, prefix, expiry, revocation
+worker/src/access.ts     Cloudflare Access sign-in for /app/* (verifies the Access JWT)
+worker/src/accounts.ts   Users and libraries in D1, for the consent page
+worker/src/oauth/        /app/authorize consent page and /app/grants (list, revoke)
 worker/src/client.ts     Worker <-> DO boundary: one `call` RPC, errors as data, R2 blob checks
 worker/src/library.ts    Library DO: one per OKF library, hosts the store on its SQLite
 worker/src/okf/          OKF semantics: parse, record, render, links, footnotes, trust, lint, index/log render, diff
@@ -49,12 +53,14 @@ fixtures/                Google's four sample OKF bundles, vendored unchanged; d
 - Keep storage and OKF logic free of Worker APIs so it can be tested under bun with `bun:sqlite` standing in for the DO's SQLite handle (`worker/test/sqlite.ts`).
 - Route and MCP tests (`worker/test/api.test.ts`, `mcp.test.ts`) run the real app in process via `worker/test/harness.ts`: a bun:sqlite store behind the same `callStore` the DO uses, an in-memory blob store and fake tokens. MCP tests drive it with the SDK's own client.
 - MCP tool descriptions and `INSTRUCTIONS` in `worker/src/mcp/server.ts` carry the agent workflow; keep them in step with `skills/okf/SKILL.md`.
+- `worker/test/oauth.test.ts` drives the OAuth flow as an MCP client would: discovery, DCR, consent (dev sign-in), token with PKCE, MCP calls, revocation.
 - The DO write transaction must stay synchronous (no awaits); hash with `okf/hash.ts`, not WebCrypto.
 
 ## Cloudflare
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set in the cloud environment; wrangler reads them automatically.
 - Remote resources: D1 `okf-accounts` (id in `wrangler.jsonc`) and R2 bucket `okf-blobs`. Do not create or delete remote resources without asking.
 - `bun run seed --remote` (from `worker/`) creates a library and token in the deployed D1.
+- KV `okf-oauth` (binding `OAUTH_KV`) holds OAuth clients and grants. Secrets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` come from the Access application covering `/app/*`; never put Access on `/mcp`. Local dev uses `DEV_ACCESS_EMAIL` from `worker/.dev.vars`.
 
 ## CI
 `.github/workflows/ci.yml` runs on PRs and pushes to `main`: `bun run check`, and `bun run gate` (wrangler dev, sample-bundle round-trip, MCP smoke). Both must pass before merging.

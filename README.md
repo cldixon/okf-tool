@@ -42,17 +42,54 @@ and short-lived `/dl/…` download links.
 
 ## Agents (MCP)
 
-The Worker serves an MCP server at `/mcp` (Streamable HTTP, bearer token, one library per token):
+The Worker serves an MCP server at `/mcp` (Streamable HTTP). Each connection reaches one library.
+
+**claude.ai, ChatGPT and other apps (OAuth).** Add `https://<your-worker>/mcp` as a custom
+connector. The app sends you to `/app/authorize`, where you sign in with Cloudflare Access and choose
+what the app may do: which library (or a new one), read only or read and write, an optional
+directory, the name its changes carry in the ledger (e.g. `claude-ai/connector`), and all tools or
+file tools only. `/app/grants` lists connected apps and revokes them.
+
+**Claude Code, scripts and scheduled tasks (bearer token).** Mint a token with
+`bun run seed --remote --slug <library> --actor <app>/<label>` from `worker/`, then:
 
 ```sh
-claude mcp add --transport http okf https://okf-service.cl-dixon.workers.dev/mcp \
+claude mcp add --transport http okf https://<your-worker>/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
 Tier 1 tools mirror file work (`start`, `browse`, `read`, `write`, `edit`, `grep`, `move`,
 `delete`, `batch`, `attach`); tier 2 adds what files lack (`search`, `query`, `links`, `sources`,
-`log`, `history`, `diff`, `revert`, `work`, `export`, and `verify` for `process:` tokens). A token
-with `mcp_tiers = 'files'` sees tier 1 only. [`skills/okf/SKILL.md`](skills/okf/SKILL.md) teaches the
-workflow to agents that load skills.
+`log`, `history`, `diff`, `revert`, `work`, `export`, and `verify` for `process:` tokens). A
+connection limited to file tools sees tier 1 only. [`skills/okf/SKILL.md`](skills/okf/SKILL.md)
+teaches the workflow to agents that load skills.
+
+## Operator setup: sign-in for connecting apps
+
+Connecting an app is approved by a person signed in through
+[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/).
+Access covers only `/app/`; `/mcp`, the OAuth endpoints and the REST API stay reachable by apps and
+are protected by tokens. Once per deployment:
+
+1. In the Cloudflare dashboard, open **Zero Trust** (create the free organization if asked) and
+   make sure a login method is available: **One-time PIN** (email codes) works with no setup.
+2. **Access → Applications → Add an application → Self-hosted.** Add a public hostname: your
+   Worker's host (e.g. `okf-service.<subdomain>.workers.dev`) with path `app`. Add a policy that
+   allows the people who may connect apps, e.g. **Include → Emails → you@example.com**.
+   Do not use the Worker's one-click **Enable Cloudflare Access** toggle: it protects the whole
+   hostname, including `/mcp`.
+3. From the application's **Overview**, copy the **Application Audience (AUD) Tag**. Your team
+   domain (`https://<team>.cloudflareaccess.com`) is shown in the Zero Trust **Settings**.
+4. From `worker/`:
+
+   ```sh
+   bunx wrangler secret put ACCESS_TEAM_DOMAIN   # https://<team>.cloudflareaccess.com
+   bunx wrangler secret put ACCESS_AUD           # the audience tag
+   ```
+
+5. Open `https://<your-worker>/app/grants`: after signing in you should see "Connected apps".
+
+For local development, copy `worker/.dev.vars.example` to `worker/.dev.vars`; `/app/` then treats
+`localhost` requests as signed in with `DEV_ACCESS_EMAIL`.
 
 `fixtures/` holds Google's sample OKF bundles (Apache 2.0), vendored for the round-trip tests.
