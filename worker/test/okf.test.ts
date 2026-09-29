@@ -123,6 +123,43 @@ describe("links", () => {
     expect(scan.footnoteRefs).toEqual(["foot"]);
   });
 
+  test("counts every footnote reference, with or without a definition, outside code", () => {
+    const body = [
+      "One.[^a] Two.[^a] Three.[^b] Escaped \\[^c].",
+      "`[^d]`",
+      "```",
+      "[^e]",
+      "```",
+      "",
+      "[^a]: defined",
+      "[^z]: defined but unused",
+    ].join("\n");
+    const scan = scanBody(body, "x.md");
+    expect(scan.footnoteRefs).toEqual(["a", "b"]);
+    expect([...scan.footnoteCounts]).toEqual([
+      ["a", 2],
+      ["b", 1],
+    ]);
+    expect(scan.footnoteDefs).toEqual(["a", "z"]);
+  });
+
+  test("lints undefined footnotes and plain-date timestamps", () => {
+    const built = buildRecord(
+      parseConcept(
+        "---\ntype: Note\nstale_after: 2026-12-31\nsources:\n  - { id: a, resource: https://e.com }\n---\nClaim.[^a] Other.[^b]\n\n[^b]: b\n",
+      ),
+      { ...opts, mode: "write", path: "x.md" },
+    );
+    const lint = built.lint.map((l) => [l.code, l.message]);
+    expect(lint.map(([c]) => c)).toEqual([
+      "timestamp_offset",
+      "footnote_undefined",
+      "footnote_unmatched",
+    ]);
+    expect(lint[0]?.[1]).toContain("2026-12-31T00:00:00Z; a plain date is not enough");
+    expect(lint[1]?.[1]).toContain("[^a]");
+  });
+
   test("path helpers", () => {
     expect(resolveLinkPath("a/b/c.md", "../d.md")).toBe("a/d.md");
     expect(resolveLinkPath("a/b/c.md", "/x.md")).toBe("x.md");

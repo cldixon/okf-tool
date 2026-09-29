@@ -9,6 +9,7 @@ import {
   parseConcept,
   renderConcept,
   serializeRecord,
+  sourceCandidates,
 } from "../okf/concept";
 import { type LogRequest, renderIndex, renderLog } from "../okf/derived";
 import { unifiedDiff } from "../okf/diff";
@@ -19,7 +20,6 @@ import {
   basename,
   dirname,
   isConceptPath,
-  isExternal,
   isReserved,
   normalizeDir,
   normalizePath,
@@ -36,6 +36,7 @@ import type {
   JsonObject,
   LintWarning,
   StoredLink,
+  StoredSource,
   TrustTier,
   Verification,
 } from "../okf/types";
@@ -232,8 +233,27 @@ function tagsOf(r: ConceptRecord): string[] {
   return typeof t === "string" ? [t] : [];
 }
 
+type LinkKind = "body" | "source";
+
+/** A record's links into the library: body links, then internal source resources. */
+function linkGraph(r: ConceptRecord): [StoredLink | StoredSource, LinkKind][] {
+  const out: [StoredLink | StoredSource, LinkKind][] = [];
+  for (const l of r.links) if (!isDerivedTarget(l)) out.push([l, "body"]);
+  for (const s of r.sources ?? []) out.push([s, "source"]);
+  return out;
+}
+
+function brokenLink(kind: string, raw: string, path: string): LintWarning {
+  const what = kind === "source" ? `Source resource ${raw}` : `Link ${raw}`;
+  return {
+    code: "broken_link",
+    message: `${what} points to /${path}, which does not exist.`,
+    target: path,
+  };
+}
+
 /** Links to `index.md`, `log.md` or a directory name synthesized files, not concepts. */
-function isDerivedTarget(link: StoredLink): boolean {
+function isDerivedTarget(link: { raw: string; path: string }): boolean {
   const raw = splitAnchor(link.raw.replace(/^<|>$/g, "")).path;
   return isReserved(link.path) || raw.endsWith("/");
 }
@@ -610,7 +630,7 @@ export class LibraryStore {
         ? { generated: this.record(curConcept.hash).generated, verified: storedVerified }
         : null,
     });
-    this.resolveTargets(built.record, w);
+    this.resolveTargets(built.record, path, w);
     const verified = w.mode === "import" ? built.verified : storedVerified;
     const size = utf8Length(renderConcept(built.record, { verified }));
     if (size > this.cap) {
@@ -964,11 +984,7 @@ export class LibraryStore {
     let lint: LintWarning[] = [];
     if (kind === "concept") {
       const r = this.record(hash);
-      const refs = scanBody(r.body, path).footnoteRefs;
-      lint =
-        r.raw_fm === null
-          ? lintFields(r.fm, r.generated, this.verifiedAt(conceptId, seq), refs)
-          : [];
+      lint = this.fieldLint(r, path, this.verifiedAt(conceptId, seq));
       this.indexConcept(conceptId, path, r, lint, seq);
       w.written.set(path, conceptId);
     }
@@ -1000,23 +1016,46 @@ export class LibraryStore {
     );
   }
 
-  /** Resolves each link to a concept ID: an existing path, a file created in this request, or a redirect. */
-  private resolveTargets(r: ConceptRecord, w: WriteState) {
+  /** The concept a path names: an existing path, a file created in this request, or a redirect. */
+  private resolvePath(p: string, w: WriteState): string | null {
+    return (
+      this.lookupRow(p)?.concept_id ??
+      w.pending.get(p) ??
+      (p.endsWith(".md") ? undefined : w.pending.get(`${p}.md`)) ??
+      this.sql.all<{ concept_id: string }>(
+        "SELECT r.concept_id FROM redirects r JOIN paths p ON p.concept_id = r.concept_id WHERE r.old_path IN (?, ?)",
+        p,
+        `${p}.md`,
+      )[0]?.concept_id ??
+      null
+    );
+  }
+
+  /**
+   * Resolves each body link and each internal `sources[].resource` of a record written at `path`
+   * to a concept ID (spec: Concept model, Links).
+   */
+  private resolveTargets(r: ConceptRecord, path: string, w: WriteState) {
     for (const link of r.links) {
       if (isDerivedTarget(link)) continue;
-      const p = link.path;
-      const row = this.lookupRow(p);
-      link.target =
-        row?.concept_id ??
-        w.pending.get(p) ??
-        (p.endsWith(".md") ? undefined : w.pending.get(`${p}.md`)) ??
-        this.sql.all<{ concept_id: string }>(
-          "SELECT r.concept_id FROM redirects r JOIN paths p ON p.concept_id = r.concept_id WHERE r.old_path IN (?, ?)",
-          p,
-          `${p}.md`,
-        )[0]?.concept_id ??
-        null;
+      link.target = this.resolvePath(link.path, w);
     }
+    const sources: StoredSource[] = [];
+    for (const c of sourceCandidates(path, r.fm)) {
+      const base = { index: c.index, raw: c.raw, anchor: c.anchor };
+      let found: StoredSource | null = null;
+      for (const o of c.options) {
+        const target = this.resolvePath(o.path, w);
+        if (target) {
+          found = { ...base, ...o, target };
+          break;
+        }
+      }
+      if (!found && c.fallback) found = { ...base, ...c.fallback, target: null };
+      if (found) sources.push(found);
+    }
+    if (sources.length > 0) r.sources = sources;
+    else delete r.sources;
   }
 
   private indexConcept(
@@ -1064,37 +1103,37 @@ export class LibraryStore {
       this.sql.run("INSERT INTO tags (concept_id, tag) VALUES (?, ?)", id, t);
 
     this.sql.run("DELETE FROM links WHERE from_id = ?", id);
-    for (const l of r.links) {
-      if (isDerivedTarget(l)) continue;
+    for (const [l, kind] of linkGraph(r)) {
       this.sql.run(
-        "INSERT INTO links (from_id, to_id, to_path, anchor, form, raw) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO links (from_id, to_id, to_path, anchor, form, raw, kind) VALUES (?, ?, ?, ?, ?, ?, ?)",
         id,
         l.target,
         l.path,
         l.anchor,
         l.form,
         l.raw,
+        kind,
       );
     }
 
     this.sql.run("DELETE FROM sources WHERE concept_id = ?", id);
     const sources = field(r, "sources");
     if (Array.isArray(sources)) {
-      const refs = scanBody(r.body, path).footnoteRefs;
-      for (const s of sources) {
-        if (!s || typeof s !== "object" || Array.isArray(s)) continue;
+      const counts = scanBody(r.body, path).footnoteCounts;
+      sources.forEach((s, i) => {
+        if (!s || typeof s !== "object" || Array.isArray(s)) return;
         const resource = str(s.resource);
-        if (!resource) continue;
+        if (!resource) return;
         const sid = str(s.id);
         this.sql.run(
           "INSERT INTO sources (concept_id, id, resource, internal_id, cited) VALUES (?, ?, ?, ?, ?)",
           id,
           sid,
           resource,
-          this.internalTarget(path, resource),
-          sid ? refs.filter((x) => x === sid).length : 0,
+          r.sources?.find((x) => x.index === i)?.target ?? null,
+          sid ? (counts.get(sid) ?? 0) : 0,
         );
-      }
+      });
     }
 
     this.sql.run("DELETE FROM fts WHERE concept_id = ?", id);
@@ -1118,21 +1157,6 @@ export class LibraryStore {
     } else {
       this.sql.run("DELETE FROM flags WHERE concept_id = ? AND kind = 'lint'", id);
     }
-  }
-
-  /** The concept an internal `sources[].resource` names: relative to the concept, then to the root. */
-  private internalTarget(path: string, resource: string): string | null {
-    if (isExternal(resource)) return null;
-    const target = splitAnchor(resource).path;
-    for (const p of [
-      resolveLinkPath(path, safeDecode(target)),
-      normalizePath(safeDecode(target)),
-    ]) {
-      if (!p) continue;
-      const row = this.lookupRow(p);
-      if (row) return row.concept_id;
-    }
-    return null;
   }
 
   private unindex(id: string) {
@@ -1161,19 +1185,13 @@ export class LibraryStore {
    * stored lint. Returns them as lint.
    */
   private refreshBroken(id: string): LintWarning[] {
-    const broken = this.sql.all<{ to_path: string; raw: string }>(
-      `SELECT to_path, raw FROM links WHERE from_id = ?
+    const broken = this.sql.all<{ to_path: string; raw: string; kind: string }>(
+      `SELECT to_path, raw, kind FROM links WHERE from_id = ?
          AND (to_id IS NULL OR to_id NOT IN (SELECT concept_id FROM paths))`,
       id,
     );
     const exists = this.sql.all("SELECT 1 FROM paths WHERE concept_id = ?", id).length > 0;
-    const lint: LintWarning[] = exists
-      ? broken.map((b) => ({
-          code: "broken_link",
-          message: `Link ${b.raw} points to /${b.to_path}, which does not exist.`,
-          target: b.to_path,
-        }))
-      : [];
+    const lint = exists ? broken.map((b) => brokenLink(b.kind, b.raw, b.to_path)) : [];
     const stored = this.sql.all<{ lint: string | null }>(
       "SELECT lint FROM concepts WHERE concept_id = ?",
       id,
@@ -1205,31 +1223,62 @@ export class LibraryStore {
   // ---------------------------------------------------------------- reads
 
   /** The href to render for a link, as of the snapshot (spec: Concept model, Reads and export). */
-  private href(snap: Snapshot, from: Entry, link: StoredLink): string {
+  private href(snap: Snapshot, from: Entry, link: StoredLink | StoredSource): string {
     if (isDerivedTarget(link)) return link.raw;
-    let target: Entry | undefined;
-    if (link.target) target = snap.byId.get(link.target);
-    if (!target) target = snap.lookup(link.path);
-    if (!target) {
-      const id = this.redirectAt(link.path, snap.seq);
-      if (id) target = snap.byId.get(id);
-    }
+    const target = this.targetAt(snap, link);
     if (!target) return link.raw;
-    const angle = link.raw.startsWith("<") && link.raw.endsWith(">");
+    const source = "index" in link;
+    const angle = !source && link.raw.startsWith("<") && link.raw.endsWith(">");
     const written = splitAnchor(angle ? link.raw.slice(1, -1) : link.raw).path;
-    const resolved = resolveLinkPath(from.path, safeDecode(written));
+    const resolved =
+      link.form === "root"
+        ? normalizePath(safeDecode(written))
+        : resolveLinkPath(from.path, safeDecode(written));
     if (resolved === target.path || `${resolved}.md` === target.path) return link.raw;
     let next: string;
     if (link.form === "absolute") next = `/${target.path}`;
+    else if (link.form === "root") next = target.path;
     else {
       next = relativePath(from.path, target.path);
       if (written.startsWith("./") && !next.startsWith("../")) next = `./${next}`;
     }
     // A link written as a concept ID (no `.md`) keeps that form.
     if (!written.endsWith(".md") && next.endsWith(".md")) next = next.slice(0, -3);
+    // A frontmatter value needs no URL escaping.
+    if (source) return next + (link.anchor ?? "");
     next = angle ? next : next.replace(/[ ()]/g, (c) => encodeURIComponent(c));
     const out = next + (link.anchor ?? "");
     return angle ? `<${out}>` : out;
+  }
+
+  /** A link's target as of the snapshot: by ID, else by path, else through a redirect. */
+  private targetAt(snap: Snapshot, link: { path: string; target: string | null }) {
+    let target = link.target ? snap.byId.get(link.target) : undefined;
+    if (!target) target = snap.lookup(link.path);
+    if (!target) {
+      const id = this.redirectAt(link.path, snap.seq);
+      if (id) target = snap.byId.get(id);
+    }
+    return target;
+  }
+
+  /** Field lint of a content version, as a write of it would report (spec: OKF conformance). */
+  private fieldLint(r: ConceptRecord, path: string, verified: Verification[]): LintWarning[] {
+    if (r.raw_fm !== null) {
+      return [
+        { code: "unparseable_frontmatter", message: "Frontmatter could not be parsed as YAML." },
+      ];
+    }
+    return lintFields(r.fm, r.generated, verified, scanBody(r.body, path));
+  }
+
+  /** Lint of a past version: its field lint and its links that were broken as of the snapshot. */
+  private lintAt(snap: Snapshot, e: Entry, r: ConceptRecord, verified: Verification[]) {
+    const lint = this.fieldLint(r, e.path, verified);
+    for (const [l, kind] of linkGraph(r)) {
+      if (!this.targetAt(snap, l)) lint.push(brokenLink(kind, l.raw, l.path));
+    }
+    return lint;
   }
 
   private renderEntry(snap: Snapshot, e: Entry, computed: boolean): string {
@@ -1238,6 +1287,7 @@ export class LibraryStore {
     return renderConcept(r, {
       verified,
       href: (l) => this.href(snap, e, l),
+      sourceHref: (s) => this.href(snap, e, s),
       computed: computed ? this.computedValues(snap, e, r, verified) : undefined,
     });
   }
@@ -1311,6 +1361,9 @@ export class LibraryStore {
           e.concept_id,
         )[0]
       : undefined;
+    const lint: LintWarning[] = atHead
+      ? JSON.parse(lintRow?.lint ?? "[]")
+      : this.lintAt(snap, e, r, verified);
     return {
       kind: "concept",
       path: e.path,
@@ -1319,7 +1372,7 @@ export class LibraryStore {
       markdown,
       frontmatter,
       body: parsed.body,
-      lint: lintRow?.lint ? (JSON.parse(lintRow.lint) as LintWarning[]) : [],
+      lint,
       trust_tier: trustTier(r.generated, verified),
       stale: isStale(field(r, "stale_after"), this.clock().getTime()),
       inbound_links: atHead ? this.inboundCount(e.concept_id) : 0,
@@ -1562,23 +1615,23 @@ export class LibraryStore {
     const e = snap.lookup(normalizePath(input) ?? "");
     if (e?.kind !== "concept") throw notFound(input);
     const r = this.record(e.hash);
-    const outbound: { raw: string; path: string; anchor: string | null }[] = [];
-    const broken: { raw: string; path: string }[] = [];
-    for (const l of r.links) {
-      if (isDerivedTarget(l)) continue;
-      const target = (l.target ? snap.byId.get(l.target) : undefined) ?? snap.lookup(l.path);
-      const redirected = target ?? snap.byId.get(this.redirectAt(l.path, snap.seq) ?? "");
-      if (redirected) outbound.push({ raw: l.raw, path: redirected.path, anchor: l.anchor });
-      else broken.push({ raw: l.raw, path: l.path });
+    const outbound: { raw: string; path: string; anchor: string | null; kind: LinkKind }[] = [];
+    const broken: { raw: string; path: string; kind: LinkKind }[] = [];
+    for (const [l, kind] of linkGraph(r)) {
+      const target = this.targetAt(snap, l);
+      if (target) outbound.push({ raw: l.raw, path: target.path, anchor: l.anchor, kind });
+      else broken.push({ raw: l.raw, path: l.path, kind });
     }
     const inbound = this.sql
-      .all<{ from_id: string; raw: string; anchor: string | null }>(
-        "SELECT from_id, raw, anchor FROM links WHERE to_id = ? AND from_id <> ?",
+      .all<{ from_id: string; raw: string; anchor: string | null; kind: LinkKind }>(
+        "SELECT from_id, raw, anchor, kind FROM links WHERE to_id = ? AND from_id <> ?",
         e.concept_id,
         e.concept_id,
       )
-      .map((l) => ({ path: snap.byId.get(l.from_id)?.path, raw: l.raw, anchor: l.anchor }))
-      .filter((l): l is { path: string; raw: string; anchor: string | null } => !!l.path)
+      .flatMap((l) => {
+        const from = snap.byId.get(l.from_id)?.path;
+        return from ? [{ path: from, raw: l.raw, anchor: l.anchor, kind: l.kind }] : [];
+      })
       .sort((a, b) => (a.path < b.path ? -1 : 1));
     return { path: e.path, outbound, inbound, broken };
   }
@@ -1699,17 +1752,16 @@ export class LibraryStore {
     const e = snap.lookup(normalizePath(input) ?? "");
     if (e?.kind !== "concept") throw notFound(input);
     const r = this.record(e.hash);
-    const refs = scanBody(r.body, e.path).footnoteRefs;
+    const counts = scanBody(r.body, e.path).footnoteCounts;
     const list = field(r, "sources");
     const ids = new Set<string>();
     const sources: JsonObject[] = [];
-    for (const s of Array.isArray(list) ? list : []) {
+    for (const [i, s] of (Array.isArray(list) ? list : []).entries()) {
       if (!s || typeof s !== "object" || Array.isArray(s)) continue;
       const id = str(s.id);
       if (id) ids.add(id);
-      const resource = str(s.resource);
-      const targetId = resource ? this.internalTarget(e.path, resource) : null;
-      const target = targetId ? snap.byId.get(targetId) : undefined;
+      const stored = r.sources?.find((x) => x.index === i);
+      const target = stored ? this.targetAt(snap, stored) : undefined;
       let internal: JsonObject | null = null;
       if (target?.kind === "concept") {
         const tr = this.record(target.hash);
@@ -1721,12 +1773,16 @@ export class LibraryStore {
           inbound_links: this.inboundCount(target.concept_id),
         };
       } else if (target) internal = { path: target.path };
-      sources.push({ ...s, cited: id ? refs.filter((x) => x === id).length : 0, internal });
+      else if (stored) internal = { path: stored.path, broken: true };
+      // The resource as rendered: an internal one shows its target's current path.
+      const entry: JsonObject = { ...s };
+      if (stored) entry.resource = this.href(snap, e, stored);
+      sources.push({ ...entry, cited: id ? (counts.get(id) ?? 0) : 0, internal });
     }
     return {
       path: e.path,
       sources,
-      unmatched_footnotes: refs.filter((label) => !ids.has(label)),
+      unmatched_footnotes: [...counts.keys()].filter((label) => !ids.has(label)),
     };
   }
 

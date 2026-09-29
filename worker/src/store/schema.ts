@@ -4,7 +4,7 @@ import type { SqlHandle } from "./sql";
  * The Library DO schema (spec: Data model). `blobs` and `events` are the source of truth and are
  * append-only; every other table is derived and can be rebuilt by replaying `events`.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const V1 = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS flags (
 );
 `;
 
+/** v2: links also carry internal `sources[].resource` citations, told apart by `kind`. */
+const V2 = `ALTER TABLE links ADD COLUMN kind TEXT NOT NULL DEFAULT 'body';`;
+
 /** Creates or migrates the schema forward; a no-op when already current. */
 export function migrate(sql: SqlHandle): void {
   sql.script("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);");
@@ -102,6 +105,7 @@ export function migrate(sql: SqlHandle): void {
   if (current >= SCHEMA_VERSION) return;
   sql.transaction(() => {
     if (current < 1) sql.script(V1);
+    if (current < 2) sql.script(V2);
     sql.run(
       "INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       String(SCHEMA_VERSION),

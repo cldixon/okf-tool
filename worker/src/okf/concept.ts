@@ -10,6 +10,14 @@ import {
 } from "yaml";
 import { lintFields } from "./lint";
 import { findSection, scanBody } from "./markdown";
+import {
+  isExternal,
+  isReserved,
+  normalizePath,
+  resolveLinkPath,
+  safeDecode,
+  splitAnchor,
+} from "./paths";
 import { normalizeVerified } from "./trust";
 import type {
   ConceptRecord,
@@ -17,6 +25,7 @@ import type {
   JsonObject,
   LintWarning,
   StoredLink,
+  StoredSource,
   Verification,
 } from "./types";
 
@@ -216,9 +225,7 @@ export function buildRecord(parsed: ParsedConcept, opts: BuildOptions): BuiltCon
   const scan = scanBody(body, opts.path);
   const links: StoredLink[] = scan.links.map((l) => ({ ...l, target: null }));
   const verified = opts.mode === "import" ? (parsed.verified ?? []) : [];
-  if (parsed.rawFm === null) {
-    lint.push(...lintFields(entries, generated, verified, scan.footnoteRefs));
-  }
+  if (parsed.rawFm === null) lint.push(...lintFields(entries, generated, verified, scan));
   const record: ConceptRecord = {
     v: 1,
     fm: entries,
@@ -269,7 +276,72 @@ export function serializeRecord(r: ConceptRecord): string {
       form: l.form,
       target: l.target,
     })),
+    // Only when present, so records without internal sources keep the hashes they always had.
+    ...(r.sources?.length
+      ? {
+          sources: r.sources.map((x) => ({
+            index: x.index,
+            raw: x.raw,
+            path: x.path,
+            anchor: x.anchor,
+            form: x.form,
+            target: x.target,
+          })),
+        }
+      : {}),
   });
+}
+
+/** A `sources[].resource` that may name a file in the bundle, with the paths it could mean. */
+export interface SourceCandidate {
+  index: number;
+  raw: string;
+  anchor: string | null;
+  /** Readings to try in order; the first that names a file wins. */
+  options: { form: StoredSource["form"]; path: string }[];
+  /** The reading kept when none resolves, or null when the value does not look like a path. */
+  fallback: { form: StoredSource["form"]; path: string } | null;
+}
+
+/**
+ * The internal-looking `sources[].resource` values of a concept at `conceptPath` (spec: Concept
+ * model, Links). A bare path is tried relative to the concept, then to the bundle root.
+ */
+export function sourceCandidates(conceptPath: string, fm: [string, Json][]): SourceCandidate[] {
+  const list = fm.find(([k]) => k === "sources")?.[1];
+  if (!Array.isArray(list)) return [];
+  const out: SourceCandidate[] = [];
+  list.forEach((s, index) => {
+    if (!s || typeof s !== "object" || Array.isArray(s)) return;
+    const raw = s.resource;
+    if (typeof raw !== "string" || raw.trim() === "" || isExternal(raw)) return;
+    const split = splitAnchor(raw.trim());
+    const written = safeDecode(split.path);
+    if (written === "" || written.endsWith("/")) return;
+    const options: SourceCandidate["options"] = [];
+    const add = (form: StoredSource["form"], path: string | null) => {
+      if (path && !isReserved(path) && !options.some((o) => o.path === path)) {
+        options.push({ form, path });
+      }
+    };
+    if (written.startsWith("/")) add("absolute", normalizePath(written));
+    else {
+      add("relative", resolveLinkPath(conceptPath, written));
+      if (!written.startsWith("./") && !written.startsWith("../"))
+        add("root", normalizePath(written));
+    }
+    if (options.length === 0) return;
+    const pathLike =
+      written.startsWith("/") ||
+      written.startsWith("./") ||
+      written.startsWith("../") ||
+      written.endsWith(".md");
+    const fallback = pathLike
+      ? (options.find((o) => o.form === "root") ?? options[0] ?? null)
+      : null;
+    out.push({ index, raw, anchor: split.anchor, options, fallback });
+  });
+  return out;
 }
 
 export function deserializeRecord(s: string): ConceptRecord {
@@ -285,6 +357,8 @@ export interface RenderOptions {
   verified: Verification[];
   /** The href to emit for each stored link; defaults to the link as written. */
   href?: (link: StoredLink) => string;
+  /** The `resource` to emit for each internal source; defaults to the value as written. */
+  sourceHref?: (source: StoredSource) => string;
   /** Computed values appended to the frontmatter on request. */
   computed?: [string, Json][];
 }
@@ -293,12 +367,13 @@ export interface RenderOptions {
 export function renderConcept(r: ConceptRecord, opts: RenderOptions): string {
   const body = renderBody(r, opts.href);
   if (r.raw_fm !== null) return `---\n${r.raw_fm}\n---\n${body}`;
+  const fm = renderSources(r, opts.sourceHref);
   const ordered: [string, Json][] = [];
   for (const key of OKF_ORDER) {
-    const e = r.fm.find(([k]) => k === key);
+    const e = fm.find(([k]) => k === key);
     if (e) ordered.push(e);
   }
-  for (const e of r.fm) if (!OKF_ORDER.includes(e[0])) ordered.push(e);
+  for (const e of fm) if (!OKF_ORDER.includes(e[0])) ordered.push(e);
   if (r.generated) ordered.push(["generated", r.generated]);
   if (opts.verified.length > 0) {
     ordered.push(["verified", opts.verified.map((v) => ({ by: v.by, at: v.at }))]);
@@ -306,6 +381,24 @@ export function renderConcept(r: ConceptRecord, opts: RenderOptions): string {
   for (const e of opts.computed ?? []) ordered.push(e);
   if (ordered.length === 0) return body;
   return `---\n${stringifyFrontmatter(ordered)}---\n${body}`;
+}
+
+/** The frontmatter entries with each internal source's `resource` as `sourceHref` renders it. */
+function renderSources(r: ConceptRecord, sourceHref?: (s: StoredSource) => string) {
+  if (!sourceHref || !r.sources?.length) return r.fm;
+  const stored = r.sources;
+  return r.fm.map(([k, v]): [string, Json] => {
+    if (k !== "sources" || !Array.isArray(v)) return [k, v];
+    return [
+      k,
+      v.map((entry, i) => {
+        const s = stored.find((x) => x.index === i);
+        if (!s || !entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+        const resource = sourceHref(s);
+        return resource === s.raw ? entry : { ...entry, resource };
+      }),
+    ];
+  });
 }
 
 export function renderBody(r: ConceptRecord, href?: (link: StoredLink) => string): string {
