@@ -10,10 +10,16 @@
     "test": "bun test"
   },
   "dependencies": {
-    "hono": "^4.13.9"
+    "@noble/hashes": "^2.4.0",
+    "hono": "^4.13.9",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm-footnote": "^2.1.0",
+    "micromark-extension-gfm-footnote": "^2.1.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
+    "@types/mdast": "^4.0.4",
     "typescript": "^7.0.2",
     "wrangler": "^4.142.0"
   }
