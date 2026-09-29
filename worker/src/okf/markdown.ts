@@ -19,9 +19,19 @@ export interface BodyLink {
 
 export interface BodyScan {
   links: BodyLink[];
-  /** Footnote labels referenced in the body (`[^label]`), in order of first use. */
+  /**
+   * Footnote labels referenced in the body (`[^label]`), in order of first use, whether or not the
+   * body has a `[^label]: …` definition line for them.
+   */
   footnoteRefs: string[];
+  /** How many times each label is referenced. */
+  footnoteCounts: Map<string, number>;
+  /** Labels with a `[^label]: …` definition line. */
+  footnoteDefs: string[];
 }
+
+/** A `[^label]` in text: GFM leaves a reference without a definition as literal text. */
+const LITERAL_REF = /(?<!\\)\[\^([^\]\s]+)\](?!:)/g;
 
 export function parseMarkdown(body: string): Root {
   return fromMarkdown(body, {
@@ -37,15 +47,20 @@ export function parseMarkdown(body: string): Root {
 export function scanBody(body: string, conceptPath: string): BodyScan {
   const links: BodyLink[] = [];
   const refs: string[] = [];
-  const seenRefs = new Set<string>();
+  const counts = new Map<string, number>();
+  const defs: string[] = [];
+  const cite = (label: string) => {
+    if (!counts.has(label)) refs.push(label);
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  };
 
   const visit = (node: Nodes) => {
-    if (node.type === "footnoteReference") {
-      const label = node.label ?? node.identifier;
-      if (!seenRefs.has(label)) {
-        seenRefs.add(label);
-        refs.push(label);
-      }
+    if (node.type === "footnoteReference") cite(node.label ?? node.identifier);
+    if (node.type === "footnoteDefinition") defs.push(node.label ?? node.identifier);
+    if (node.type === "text") {
+      // Read the source, not the value, so an escaped `\[^x]` is not taken for a reference.
+      const raw = body.slice(node.position?.start.offset ?? 0, node.position?.end.offset ?? 0);
+      for (const m of raw.matchAll(LITERAL_REF)) cite(m[1] ?? "");
     }
     if (node.type === "link" || node.type === "image" || node.type === "definition") {
       const start = node.position?.start.offset;
@@ -65,7 +80,7 @@ export function scanBody(body: string, conceptPath: string): BodyScan {
   };
   visit(parseMarkdown(body));
   links.sort((a, b) => a.start - b.start);
-  return { links, footnoteRefs: refs };
+  return { links, footnoteRefs: refs, footnoteCounts: counts, footnoteDefs: defs };
 }
 
 function toLink(

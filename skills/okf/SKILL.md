@@ -10,9 +10,9 @@ description: Read and maintain an OKF (Open Knowledge Format) knowledge library 
 - A library (an OKF bundle) is a tree of markdown **concepts**, one idea per file, each with YAML frontmatter.
 - `type` is the only required key. `title`, a one-line `description`, `tags` and `resource` (the URI of the asset described) are recommended.
 - Concepts link to each other with ordinary markdown links. Absolute bundle links (`/tables/orders.md`) are preferred.
-- `sources` lists what a concept was derived from. Individual claims cite a source with a footnote whose label is a `sources[].id`: `…is sharded daily.[^ga4-schema]`.
+- `sources` lists what a concept was derived from. Individual claims cite a source with a footnote whose label is a `sources[].id`: `…is sharded daily.[^ga4-schema]`. A `resource` inside the library (`/policies/margin-standard.md`) is tracked like a link: it follows moves and is flagged when missing.
 - Trust: `generated` records who wrote the current content (stamped by the server). `verified` records who checked it (a human or a process, never you). The trust tier is derived from these: unverified, machine-confirmed, or human-reviewed.
-- Lifecycle: `status` is `draft`, `stable` (default) or `deprecated`. `stale_after` is the instant the content should be re-checked.
+- Lifecycle: `status` is `draft`, `stable` (default) or `deprecated`. `stale_after` is the instant the content should be re-checked: a full datetime with an offset (`2026-12-31T00:00:00Z`), not a plain date.
 - `index.md` (directory listings) and `log.md` (history) are synthesized by the server. Never write them.
 
 Every write is attributed to your token's actor and recorded in a ledger. Nothing is lost: any change can be diffed and reverted.
@@ -52,7 +52,8 @@ Gross margin equals recognized [revenue](/metrics/revenue.md) minus full COGS.[^
 - A non-empty `type` that says what kind of thing this is (`Metric`, `BigQuery Table`, `Decision`, `Playbook`). Reuse the types already in the library (`start` lists them).
 - A `description` of one sentence: it is what `browse` and indexes show.
 - Absolute links (`/dir/file.md`). A link to a concept that does not exist yet is allowed; it shows up in `work` as a broken link until someone writes it.
-- Every footnote label matches a `sources[].id`. Timestamps are ISO 8601 with an offset (`2026-06-30T14:00:00Z`).
+- Every footnote label matches a `sources[].id`, and every `[^id]` in the text has a `[^id]: …` definition line at the end of the body (without one, renderers show it as literal text).
+- Timestamps (`stale_after`, `sources[].last_modified`) are ISO 8601 datetimes with an offset (`2026-06-30T14:00:00Z`). A plain date such as `2026-12-31` is flagged.
 - Set `status` and `stale_after` honestly: `draft` when unsure; a `stale_after` when the content depends on something that changes.
 - Do not write `generated` or `verified`. The server ignores them and says so in lint.
 

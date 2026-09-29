@@ -22,6 +22,24 @@ export interface StoredLink {
 }
 
 /**
+ * An internal `sources[].resource` as stored in a concept record, resolved like a body link
+ * (spec: Concept model, Links). `root` is a bundle-root path without a leading slash, as OKF's
+ * sample bundles write them.
+ */
+export interface StoredSource {
+  /** Position of the entry in `sources`. */
+  index: number;
+  /** The resource exactly as written, anchor included. */
+  raw: string;
+  /** Bundle path the resource resolved to at write time, without anchor. */
+  path: string;
+  anchor: string | null;
+  form: "absolute" | "relative" | "root";
+  /** concept_id of the target, or null when it did not exist at write time. */
+  target: string | null;
+}
+
+/**
  * A concept's content version (spec: Concept model). Hashing its canonical serialization gives the
  * content-version hash used by ETags, If-Match and the ledger. `verified` is not part of it.
  */
@@ -35,6 +53,8 @@ export interface ConceptRecord {
   generated: JsonObject | null;
   body: string;
   links: StoredLink[];
+  /** Internal source resources; absent when there are none (and on records written before them). */
+  sources?: StoredSource[];
 }
 
 export interface Verification {

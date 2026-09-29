@@ -32,7 +32,7 @@ How to work:
 2. Write conformant concepts: a non-empty \`type\`, a \`title\` and one-line \`description\`, absolute links like [x](/dir/x.md), footnotes [^id] keyed to \`sources[].id\`, one idea per concept.
 3. Prefer \`edit\` for small changes, \`write\` for new concepts or rewrites, \`batch\` for related changes so they land as one request. Pass \`if_match\` (the hash from your last read); on a conflict, re-read and reapply.
 4. Put a one-line \`note\` on every write. Read the \`lint\` in every write result and fix what it reports. Keep concepts under 100 KB; split big ones into linked concepts.
-5. Never write index.md or log.md (the server synthesizes them). Never set \`generated\` (the server stamps it) or \`verified\` (not yours to claim). Set \`status\` and \`stale_after\` honestly.
+5. Never write index.md or log.md (the server synthesizes them). Never set \`generated\` (the server stamps it) or \`verified\` (not yours to claim). Set \`status\` and \`stale_after\` honestly. Timestamps are full ISO 8601 datetimes with an offset (\`stale_after: 2026-12-31T00:00:00Z\`); a plain date is flagged.
 6. Use \`work\` to find what needs doing: stale concepts, broken links, lint.`;
 
 const text = (t: string): CallToolResult => ({ content: [{ type: "text", text: t }] });
@@ -258,7 +258,7 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Create or replace a concept",
       description:
-        "Write a whole concept as OKF markdown: a YAML frontmatter block with a non-empty `type` (plus `title`, one-line `description`, optional `tags`, `resource`, `sources`, `status`, `stale_after`), then a markdown body. Prefer absolute links like [orders](/tables/orders.md); cite sources with footnotes [^id] matching `sources[].id`. Without `if_match` it creates and fails if the path exists; to replace, pass the hash from your last read. The server stamps `generated` from your token; `verified` is not yours to set. Prefer `edit` for small changes. Read the lint in the result and fix it.",
+        "Write a whole concept as OKF markdown: a YAML frontmatter block with a non-empty `type` (plus `title`, one-line `description`, optional `tags`, `resource`, `sources`, `status`, `stale_after`), then a markdown body. `stale_after` and other timestamps are full ISO 8601 datetimes with an offset, e.g. 2026-12-31T00:00:00Z (a plain date is flagged). Prefer absolute links like [orders](/tables/orders.md); cite sources with footnotes: [^id] in the text, matching a `sources[].id`, plus a `[^id]: …` definition line at the end of the body. Without `if_match` it creates and fails if the path exists; to replace, pass the hash from your last read. The server stamps `generated` from your token; `verified` is not yours to set. Prefer `edit` for small changes. Read the lint in the result and fix it.",
       inputSchema: {
         path: z.string().describe("Where to write, e.g. `metrics/revenue.md`."),
         content: z.string().describe("The full OKF markdown document."),
@@ -486,7 +486,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "links",
       {
         title: "Links and backlinks",
-        description: `${BEYOND}a concept's outbound links (with current target paths), inbound links (backlinks), and broken links.`,
+        description: `${BEYOND}a concept's outbound links (with current target paths), inbound links (backlinks), and broken links. \`kind\` is \`body\` for a markdown link or \`source\` for a \`sources[].resource\` inside the library.`,
         inputSchema: { path: z.string() },
         annotations: readOnly,
       },
@@ -497,7 +497,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "sources",
       {
         title: "Sources and citations",
-        description: `${BEYOND}a concept's sources with how often the body cites each (footnotes), footnotes with no matching source, and for sources inside the library their trust tier and staleness.`,
+        description: `${BEYOND}a concept's sources with how often the body cites each (\`cited\`: every [^id] reference), footnotes with no matching source, and for sources inside the library their current path, trust tier and staleness (\`broken: true\` when the path does not exist).`,
         inputSchema: { path: z.string() },
         annotations: readOnly,
       },

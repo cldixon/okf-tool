@@ -1,3 +1,4 @@
+import type { BodyScan } from "./markdown";
 import { hasOffset, isActor } from "./trust";
 import type { Json, JsonObject, LintWarning, Verification } from "./types";
 
@@ -19,7 +20,7 @@ export function lintFields(
   entries: [string, Json][],
   generated: JsonObject | null,
   verified: Verification[],
-  footnoteRefs: string[],
+  footnotes: Pick<BodyScan, "footnoteRefs" | "footnoteDefs">,
 ): LintWarning[] {
   const out: LintWarning[] = [];
   const type = get(entries, "type");
@@ -67,9 +68,12 @@ export function lintFields(
 
   for (const [name, value] of timestamps) {
     if (typeof value === "string" && !hasOffset(value)) {
+      const example = /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? `${value}T00:00:00Z; a plain date is not enough`
+        : "2026-06-30T14:00:00Z";
       out.push({
         code: "timestamp_offset",
-        message: `\`${name}\` should be an ISO 8601 datetime with an explicit offset, e.g. 2026-06-30T14:00:00Z.`,
+        message: `\`${name}\` should be an ISO 8601 datetime with an explicit offset, e.g. ${example}.`,
       });
     }
   }
@@ -88,11 +92,18 @@ export function lintFields(
     }
   }
 
-  for (const label of footnoteRefs) {
+  const defined = new Set(footnotes.footnoteDefs.map((d) => d.toLowerCase()));
+  for (const label of footnotes.footnoteRefs) {
     if (!sourceIds.has(label)) {
       out.push({
         code: "footnote_unmatched",
         message: `Footnote [^${label}] has no matching \`sources[].id\`.`,
+      });
+    }
+    if (!defined.has(label.toLowerCase())) {
+      out.push({
+        code: "footnote_undefined",
+        message: `Footnote [^${label}] has no \`[^${label}]: …\` definition line, so markdown renderers show it as literal text. Add one at the end of the body.`,
       });
     }
   }
