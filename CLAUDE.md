@@ -20,26 +20,35 @@ Read it with the Docs tools before starting on a feature. There is no markdown c
 | `bun run check` | Lint + typecheck + tests; run before every commit |
 | `bun run format` | Apply Biome fixes |
 | `bun run deploy` | Deploy the Worker to Cloudflare |
+| `bun run seed` | Create a local user, library (`dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
+| `bun run gate` | Phase 1 gate: boots `wrangler dev` on fresh state, imports and exports Google's sample bundles, compares; also runs in CI |
 
 After changing `worker/wrangler.jsonc`, run `bunx wrangler types` in `worker/` and commit the regenerated `worker-configuration.d.ts`.
 
 ## Layout
 ```
 worker/                  Worker + Library Durable Object (TypeScript, Hono)
-worker/src/index.ts      Worker entry: routing
-worker/src/library.ts    Library DO: one per OKF library
-worker/src/okf/          (planned) OKF semantics: parse, links, footnotes, trust, lint, index/log render
-worker/src/store/        (planned) storage logic against a plain SQLite handle
-worker/src/mcp/          (planned) MCP server
+worker/src/index.ts      Worker entry: wires D1 auth, the Library DO and R2 into the app
+worker/src/app.ts        Hono app: REST routes under /api/v1/libraries/{lib}/, with injectable deps
+worker/src/auth.ts       Bearer tokens: hash lookup in D1, scope, prefix, expiry, revocation
+worker/src/client.ts     Worker <-> DO boundary: one `call` RPC, errors as data, R2 blob checks
+worker/src/library.ts    Library DO: one per OKF library, hosts the store on its SQLite
+worker/src/okf/          OKF semantics: parse, record, render, links, footnotes, trust, lint, index/log render
+worker/src/store/        Library schema and LibraryStore (writes, ledger, snapshots, queries) against a plain SQLite handle
+worker/src/util/tar.ts   Tar reader and writer for import and export
+worker/src/mcp/          (planned, Phase 2) MCP server
+worker/scripts/          seed.ts (`bun run seed`) and gate.ts (`bun run gate`)
 worker/migrations/       D1 migrations (account layer)
 worker/test/             bun tests; worker/test/tsconfig.json adds bun types
-skills/okf/SKILL.md      (planned) agent skill doc
-fixtures/                (planned) Google's sample OKF bundles for round-trip tests
+skills/okf/SKILL.md      (planned, Phase 2) agent skill doc
+fixtures/                Google's four sample OKF bundles, vendored unchanged; do not edit
 ```
 
 ## Testing
 - Unit tests run under `bun test`. `cloudflare:workers` does not exist outside workerd, so tests stub it with `mock.module` (see `worker/test/healthz.test.ts`).
-- Keep storage and OKF logic free of Worker APIs so it can be tested under bun with `bun:sqlite` standing in for the DO's SQLite handle.
+- Keep storage and OKF logic free of Worker APIs so it can be tested under bun with `bun:sqlite` standing in for the DO's SQLite handle (`worker/test/sqlite.ts`).
+- Route tests (`worker/test/api.test.ts`) run the real app in process: a bun:sqlite store behind the same `callStore` the DO uses, an in-memory blob store and fake tokens.
+- The DO write transaction must stay synchronous (no awaits); hash with `okf/hash.ts`, not WebCrypto.
 
 ## Cloudflare
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set in the cloud environment; wrangler reads them automatically.

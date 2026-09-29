@@ -7,7 +7,9 @@
     "deploy": "wrangler deploy",
     "types": "wrangler types",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
-    "test": "bun test"
+    "test": "bun test",
+    "seed": "bun scripts/seed.ts",
+    "gate": "bun scripts/gate.ts"
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",

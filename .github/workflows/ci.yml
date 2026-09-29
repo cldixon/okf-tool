@@ -15,3 +15,16 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - run: bun run check
+
+  # Phase 1 gate: import and export Google's sample bundles through `wrangler dev`.
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run gate
+        env:
+          WRANGLER_SEND_METRICS: "false"
