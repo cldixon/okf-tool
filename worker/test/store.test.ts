@@ -450,6 +450,8 @@ describe("tier 2", () => {
           stale: false,
           status: "stable",
           inbound_links: 1,
+          // The test read pol/a.md once, before the move.
+          usage_count: 1,
         },
       ],
       ["root", "policies/b.md", 0, expect.objectContaining({ path: "policies/b.md" })],

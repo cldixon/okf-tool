@@ -1,14 +1,21 @@
 import { type Context, Hono } from "hono";
 import { type Accounts, checkNewToken } from "./accounts";
 import type { Authenticate, TokenInfo } from "./auth";
-import { type BlobStore, bundleFiles, type LibraryClient, mediaFor, putBlob } from "./client";
+import {
+  type BlobStore,
+  bundleFiles,
+  bundleTar,
+  type LibraryClient,
+  mediaFor,
+  putBlob,
+} from "./client";
 import { registerAppRoutes } from "./oauth/routes";
 import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
 import { OkfError } from "./store/errors";
 import type { ConceptContent, RequestContext, WriteOp } from "./store/store";
 import { registerUiRoutes } from "./ui/routes";
-import { maybeGunzip, readTar, writeTar } from "./util/tar";
+import { maybeGunzip, readTar } from "./util/tar";
 
 /** What the app needs from the platform; production wires D1, the DO and R2, tests fakes. */
 export interface Deps {
@@ -19,6 +26,18 @@ export interface Deps {
   /** The library a signed download URL names, or null when no such library exists. */
   libraryByDoId(doId: string): Promise<LibraryClient | null>;
   blobs: BlobStore;
+  /** Checks for /healthz: each dependency's name and "ok" or what failed. */
+  health?: () => Promise<Record<string, string>>;
+  /** Nightly exports in R2 (spec: Backups and recovery), for the UI. */
+  exports?: ExportStore;
+  /** Runs a library's daily maintainers now, by its Durable Object name. */
+  maintain?: (doId: string) => Promise<unknown>;
+}
+
+export interface ExportStore {
+  /** A library's export folders, newest first, with their manifests. */
+  list(libraryId: string): Promise<{ folder: string; manifest: Record<string, unknown> | null }[]>;
+  get(key: string): Promise<{ body: ReadableStream | Uint8Array; size: number } | null>;
 }
 
 type Env = {
@@ -135,7 +154,13 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   app.notFound((c) => c.json({ error: "No such route.", code: "no_route" }, 404));
 
-  app.get("/healthz", (c) => c.json({ ok: true }));
+  // Spec: Observability. Public, and says only which dependency failed.
+  app.get("/healthz", async (c) => {
+    const health = deps(c.env).health;
+    const checks = health ? await health() : {};
+    const ok = Object.values(checks).every((v) => v === "ok");
+    return c.json({ ok, checks }, ok ? 200 : 503);
+  });
 
   app.use(`${BASE}/*`, async (c, next) => {
     const d = deps(c.env);
@@ -419,6 +444,8 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     return c.json(await c.var.lib.diff(path, { from: num(c, "from"), to: num(c, "to") }));
   });
 
+  app.get(`${BASE}/stats`, async (c) => c.json(await c.var.lib.stats()));
+
   app.get(`${BASE}/work`, async (c) =>
     c.json(await c.var.lib.work({ kind: c.req.query("kind"), limit: num(c, "limit") })),
   );
@@ -546,22 +573,8 @@ async function exportTar(
   at: number | undefined,
   name: string,
 ) {
-  const bundle = await lib.exportBundle(at);
-  const enc = new TextEncoder();
-  const files = [];
-  for (const f of bundle.files) {
-    if (f.text !== undefined) files.push({ path: f.path, bytes: enc.encode(f.text) });
-    else if (f.blob) {
-      const obj = await blobs.get(f.blob.hash);
-      if (!obj) throw new OkfError(500, "blob_missing", `Bytes for ${f.path} are missing.`);
-      const bytes =
-        obj.body instanceof Uint8Array
-          ? obj.body
-          : new Uint8Array(await new Response(obj.body).arrayBuffer());
-      files.push({ path: f.path, bytes });
-    }
-  }
-  return new Response(writeTar(files) as unknown as ArrayBuffer, {
+  const bundle = await bundleTar(lib, blobs, at);
+  return new Response(bundle.bytes as unknown as ArrayBuffer, {
     headers: {
       "Content-Type": "application/x-tar",
       "Content-Disposition": `attachment; filename="${name}-${bundle.seq}.tar"`,

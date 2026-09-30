@@ -40,6 +40,40 @@ export function memoryBlobs(): BlobStore & { map: Map<string, Uint8Array> } {
   };
 }
 
+/** Enough of an R2 bucket for the export maintainer and the UI's export list. */
+export function memoryBucket() {
+  const objects = new Map<string, Uint8Array>();
+  const enc = new TextEncoder();
+  return {
+    objects,
+    async put(key: string, body: Uint8Array | string) {
+      objects.set(key, typeof body === "string" ? enc.encode(body) : body);
+    },
+    async get(key: string) {
+      const b = objects.get(key);
+      return b ? { body: b, size: b.length } : null;
+    },
+    async list(opts: { prefix: string; delimiter?: string }) {
+      const keys = [...objects.keys()].filter((k) => k.startsWith(opts.prefix)).sort();
+      if (!opts.delimiter) {
+        return { objects: keys.map((key) => ({ key })), delimitedPrefixes: [], truncated: false };
+      }
+      const prefixes = new Set<string>();
+      const direct: { key: string }[] = [];
+      for (const k of keys) {
+        const rest = k.slice(opts.prefix.length);
+        const i = rest.indexOf(opts.delimiter);
+        if (i === -1) direct.push({ key: k });
+        else prefixes.add(opts.prefix + rest.slice(0, i + 1));
+      }
+      return { objects: direct, delimitedPrefixes: [...prefixes], truncated: false };
+    },
+    async delete(keys: string | string[]) {
+      for (const k of Array.isArray(keys) ? keys : [keys]) objects.delete(k);
+    },
+  };
+}
+
 /** Enough of Workers KV for the OAuth provider: get (text/json), put with TTL, delete, list. */
 export function memoryKV() {
   const data = new Map<string, { value: string; expires: number | null; metadata: unknown }>();
@@ -230,7 +264,38 @@ export function setup() {
   };
   clientFor(LIB.do_id);
   const accounts = memoryAccounts();
+  const bucket = memoryBucket();
   const deps: Deps = {
+    health: async () => ({ d1: "ok", r2: "ok", durable_objects: "ok" }),
+    maintain: async (doId) => {
+      clientFor(doId);
+      const { runMaintenance } = await import("../src/maintain");
+      return runMaintenance({
+        store: stores.get(doId) as LibraryStore,
+        blobs,
+        bucket,
+        libraryId: doId,
+        now: new Date(),
+      });
+    },
+    exports: {
+      async list(libraryId) {
+        const { listExports } = await import("../src/maintain");
+        const folders = (await listExports(bucket, libraryId)).reverse();
+        return Promise.all(
+          folders.map(async (folder) => {
+            const m = await bucket.get(`${folder}manifest.json`);
+            return {
+              folder,
+              manifest: m
+                ? (JSON.parse(new TextDecoder().decode(m.body)) as Record<string, unknown>)
+                : null,
+            };
+          }),
+        );
+      },
+      get: (key) => bucket.get(key),
+    },
     authenticate: async (secret) => {
       const t = TOKENS[secret];
       if (t) return t;
@@ -280,5 +345,5 @@ export function setup() {
     return app.request(`/api/v1/libraries/demo${path}`, { ...init, headers });
   };
   const store = () => stores.get(LIB.do_id) as LibraryStore;
-  return { app, req, store, blobs, kv, env, accounts, deps };
+  return { app, req, store, blobs, kv, env, accounts, deps, bucket };
 }

@@ -209,7 +209,12 @@ export interface StoreOptions {
   conceptCap?: number;
   /** Server clock, injectable for tests. */
   now?: () => Date;
+  /** Bytes of storage the library uses; the Durable Object passes its SQLite size. */
+  size?: () => number;
 }
+
+/** Reads are counted over this window for internal sources' usage (spec: What the service derives). */
+export const USAGE_WINDOW_DAYS = 30;
 
 function iso(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -265,6 +270,7 @@ function isDerivedTarget(link: { raw: string; path: string }): boolean {
 export class LibraryStore {
   private readonly cap: number;
   private readonly clock: () => Date;
+  private readonly size: (() => number) | null;
   private readonly records = new Map<string, ConceptRecord>();
   private readonly snapshots = new Map<number, Snapshot>();
 
@@ -274,6 +280,7 @@ export class LibraryStore {
   ) {
     this.cap = opts.conceptCap ?? DEFAULT_CONCEPT_CAP;
     this.clock = opts.now ?? (() => new Date());
+    this.size = opts.size ?? null;
     migrate(sql);
   }
 
@@ -1308,8 +1315,37 @@ export class LibraryStore {
       ["trust_tier", trustTier(r.generated, verified)],
       ["stale", isStale(field(r, "stale_after"), this.clock().getTime())],
     ];
-    if (snap.seq === this.headSeq()) out.push(["inbound_links", this.inboundCount(e.concept_id)]);
+    if (snap.seq === this.headSeq()) {
+      out.push(["inbound_links", this.inboundCount(e.concept_id)]);
+      out.push(["usage_count", this.usageCount(e.concept_id)]);
+    }
     return out;
+  }
+
+  /** One more read of a concept's current version today (spec: usage-rollup maintainer). */
+  private countRead(id: string) {
+    this.sql.run(
+      `INSERT INTO access_log (day, concept_id, actor, reads) VALUES (?, ?, '', 1)
+       ON CONFLICT(day, concept_id, actor) DO UPDATE SET reads = reads + 1`,
+      iso(this.clock()).slice(0, 10),
+      id,
+    );
+  }
+
+  /** Reads of a concept over the usage window, today included. */
+  private usageCount(id: string): number {
+    return (
+      this.sql.all<{ n: number }>(
+        "SELECT COALESCE(SUM(reads), 0) AS n FROM access_log WHERE concept_id = ? AND day >= ?",
+        id,
+        this.windowStart(),
+      )[0]?.n ?? 0
+    );
+  }
+
+  private windowStart(): string {
+    const start = new Date(this.clock().getTime() - (USAGE_WINDOW_DAYS - 1) * 86_400_000);
+    return iso(start).slice(0, 10);
   }
 
   private inboundCount(id: string): number {
@@ -1361,6 +1397,7 @@ export class LibraryStore {
     const parsed = parseConcept(markdown);
     const r = this.record(e.hash);
     const verified = this.verifiedAt(e.concept_id, snap.seq);
+    if (snap.seq === this.headSeq()) this.countRead(e.concept_id);
     const frontmatter: JsonObject = Object.fromEntries(parsed.entries);
     if (parsed.generated) frontmatter.generated = parsed.generated;
     if (parsed.verified)
@@ -1818,6 +1855,7 @@ export class LibraryStore {
           stale: isStale(field(tr, "stale_after"), this.clock().getTime()),
           status: effectiveStatus(field(tr, "status")),
           inbound_links: this.inboundCount(target.concept_id),
+          usage_count: this.usageCount(target.concept_id),
         };
       } else if (target) internal = { path: target.path };
       else if (stored) internal = { path: stored.path, broken: true };
@@ -1893,9 +1931,14 @@ export class LibraryStore {
     const items: WorkItem[] = [];
     const want = (k: string) => opts.kind === undefined || opts.kind === k;
     if (want("stale")) {
-      for (const e of snap.sorted()) {
-        if (e.kind !== "concept") continue;
-        const staleAfter = field(this.record(e.hash), "stale_after");
+      // From the typed column, so the queue never parses records (spec: Tier 3, staleness).
+      const rows = this.sql.all<{ concept_id: string; stale_after: string }>(
+        "SELECT concept_id, stale_after FROM concepts WHERE stale_after IS NOT NULL",
+      );
+      for (const row of rows) {
+        const e = snap.byId.get(row.concept_id);
+        if (e?.kind !== "concept") continue;
+        const staleAfter = row.stale_after;
         if (!isStale(staleAfter, now)) continue;
         items.push({
           kind: "stale",
@@ -1975,6 +2018,90 @@ export class LibraryStore {
         };
       }),
     );
+  }
+
+  // ---------------------------------------------------------------- maintainers and stats
+
+  /**
+   * The ledger as JSON lines (spec: Backups and recovery): every blob row, then every event, in
+   * sequence order. Concept records are inline; attachment bytes stay in R2 under blobs/<hash>.
+   */
+  dump(): string {
+    const lines: string[] = [];
+    const blobs = this.sql.all<{
+      hash: string;
+      size: number;
+      location: string;
+      content: string | ArrayBuffer | null;
+      media: string | null;
+    }>("SELECT hash, size, location, content, media FROM blobs ORDER BY rowid");
+    for (const b of blobs) {
+      const content =
+        b.content === null || typeof b.content === "string"
+          ? b.content
+          : new TextDecoder().decode(b.content);
+      lines.push(JSON.stringify({ t: "blob", ...b, content }));
+    }
+    const events = this.sql.all<EventRow & { meta: string | null }>(
+      "SELECT * FROM events ORDER BY seq",
+    );
+    for (const e of events) {
+      lines.push(JSON.stringify({ t: "event", ...e, meta: e.meta ? JSON.parse(e.meta) : null }));
+    }
+    return lines.length ? `${lines.join("\n")}\n` : "";
+  }
+
+  /** The usage-rollup maintainer: drops read counts older than the usage window. */
+  pruneUsage(): number {
+    const before = this.sql.all<{ n: number }>("SELECT COUNT(*) AS n FROM access_log")[0]?.n ?? 0;
+    this.sql.run("DELETE FROM access_log WHERE day < ?", this.windowStart());
+    const after = this.sql.all<{ n: number }>("SELECT COUNT(*) AS n FROM access_log")[0]?.n ?? 0;
+    return before - after;
+  }
+
+  /** Maintainer bookkeeping (last run, cursors) kept in the meta table under `maint:`. */
+  maintenance(): Record<string, string> {
+    const rows = this.sql.all<{ key: string; value: string }>(
+      "SELECT key, value FROM meta WHERE key LIKE 'maint:%'",
+    );
+    return Object.fromEntries(rows.map((r) => [r.key.slice(6), r.value]));
+  }
+
+  setMaintenance(values: Record<string, string>) {
+    for (const [k, v] of Object.entries(values)) {
+      this.sql.run(
+        "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        `maint:${k}`,
+        v,
+      );
+    }
+  }
+
+  /** GET /stats (spec: Observability): sizes, counts and each maintainer's cursor lag. */
+  stats() {
+    const one = (q: string) => this.sql.all<{ n: number }>(q)[0]?.n ?? 0;
+    const seq = this.headSeq();
+    const m = this.maintenance();
+    const exportSeq = m.export_seq ? Number(m.export_seq) : 0;
+    return {
+      seq,
+      paths: one("SELECT COUNT(*) AS n FROM paths"),
+      concepts: one("SELECT COUNT(*) AS n FROM paths WHERE kind = 'concept'"),
+      attachments: one("SELECT COUNT(*) AS n FROM paths WHERE kind = 'attachment'"),
+      events: one("SELECT COUNT(*) AS n FROM events"),
+      requests: one("SELECT COUNT(DISTINCT request_id) AS n FROM events"),
+      bytes: this.size ? this.size() : null,
+      maintainers: {
+        export: {
+          cursor: exportSeq,
+          lag: seq - exportSeq,
+          last_run: m.export_at ?? null,
+          last_key: m.export_key ?? null,
+        },
+        usage: { last_run: m.usage_at ?? null, window_days: USAGE_WINDOW_DAYS },
+      },
+      next_run: m.next_run ?? null,
+    };
   }
 
   /** Counts for the MCP `start` entry point. */

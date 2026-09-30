@@ -28,7 +28,10 @@
   "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "okf-blobs" }],
 
   // OAuth clients and grants for MCP apps (Cloudflare's OAuth provider library).
-  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "0b8fe9060b9645749d11d6083793295a" }]
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "0b8fe9060b9645749d11d6083793295a" }],
+
+  // Nightly exports (exports/<library id>/<date>/) older than this are deleted; the newest stays.
+  "vars": { "EXPORT_RETENTION_DAYS": "30" }
 
   // Secrets, set per deployment (spec: Deployment): ACCESS_TEAM_DOMAIN and ACCESS_AUD, from the
   // Cloudflare Access application that covers /app/*. For local dev, see .dev.vars.example.

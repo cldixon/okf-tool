@@ -59,6 +59,12 @@ export class Urls {
   importTar() {
     return `${this.base}import`;
   }
+  maintain() {
+    return `${this.base}maintain`;
+  }
+  nightly(date: string, file: string) {
+    return `${this.base}exports/${encodeURIComponent(date)}/${encodeURIComponent(file)}`;
+  }
 }
 
 export interface LedgerFilters {
@@ -193,6 +199,7 @@ export function directoryPage(opts: {
   head: number;
   entries: TreeEntry[];
   summary?: LibrarySummary;
+  ops?: LibraryStats;
 }): string {
   const { urls, dir } = opts;
   const dirs = opts.entries.filter((e) => e.kind === "dir");
@@ -211,7 +218,8 @@ export function directoryPage(opts: {
 <div><strong>${s.attachments}</strong>attachments</div>
 <div><strong>${s.open_work}</strong>open work items</div>
 <div><strong>${s.seq}</strong>ledger sequence</div></div>
-${types ? `<div class="chips">${types}</div>` : ""}`;
+${types ? `<div class="chips">${types}</div>` : ""}
+${opts.ops ? opsLine(urls, opts.ops) : ""}`;
   }
 
   const dirRows = dirs
@@ -760,13 +768,63 @@ ${
 
 // ---------------------------------------------------------------- import and export
 
+/** What `stats` reports (spec: Observability). */
+export interface LibraryStats {
+  seq: number;
+  events: number;
+  requests: number;
+  bytes: number | null;
+  maintainers: {
+    export: { cursor: number; lag: number; last_run: string | null };
+    usage: { last_run: string | null };
+  };
+  next_run: string | null;
+}
+
+function opsLine(urls: Urls, s: LibraryStats): string {
+  const exp = s.maintainers.export;
+  const parts = [
+    `${s.events} events in ${s.requests} requests`,
+    s.bytes !== null ? `${formatSize(s.bytes)} stored` : "",
+    exp.last_run
+      ? `last nightly export ${esc(when(exp.last_run))} (seq ${exp.cursor}${exp.lag ? `, ${exp.lag} events since` : ""})`
+      : "no nightly export yet",
+    s.next_run ? `next run ${esc(when(s.next_run))} UTC` : "",
+  ].filter(Boolean);
+  return `<p class="small muted">${parts.join(" · ")} · <a href="${esc(urls.transfer())}">exports</a></p>`;
+}
+
+export interface NightlyExport {
+  /** YYYY-MM-DD, the folder under exports/<library id>/. */
+  date: string;
+  seq: number | null;
+  files: number | null;
+}
+
 export function transferPage(opts: {
   urls: Urls;
   head: number;
   result?: string;
   error?: string;
+  nightly?: NightlyExport[];
 }): string {
   const { urls } = opts;
+  const nightly = opts.nightly ?? [];
+  const nightlyRows = nightly
+    .map(
+      (
+        n,
+      ) => `<tr><td><strong>${esc(n.date)}</strong></td><td class="muted small">${n.seq !== null ? `seq ${n.seq}` : ""}${n.files !== null ? ` · ${n.files} files` : ""}</td>
+<td><a href="${esc(urls.nightly(n.date, "bundle.tar"))}">bundle.tar</a> · <a href="${esc(urls.nightly(n.date, "ledger.jsonl"))}">ledger.jsonl</a></td></tr>`,
+    )
+    .join("");
+  const nightlyBox = `<div class="panel-box"><h2 style="margin-top:0">Nightly exports</h2>
+<p>Each night the library is written to R2 (the bundle, plus the ledger as JSON lines so history can be
+rebuilt) when anything changed that day. Older exports are deleted after the retention period; the newest
+is always kept.</p>
+${nightlyRows ? `<div class="table-wrap"><table class="list"><tbody>${nightlyRows}</tbody></table></div>` : `<p class="muted small">None yet: the first runs tonight.</p>`}
+<form method="post" action="${esc(urls.maintain())}"><button type="submit">Export now</button>
+<span class="small muted">Writes tonight's export now, if anything changed since the last one.</span></form></div>`;
   return `<h1>Import &amp; export</h1>
 ${opts.result ? `<div class="notice ok">${opts.result}</div>` : ""}
 ${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
@@ -786,7 +844,8 @@ revert from the ledger. Files at the same paths are replaced; the bundle's own <
 <p><input type="file" name="bundle" accept=".tar,.tgz,.gz,application/x-tar,application/gzip" required></p>
 <p><label class="small">Leading directories to drop <input type="number" name="strip" min="0" max="10" value="0"></label></p>
 <p><input type="text" name="note" placeholder="Note (optional)" style="width:100%"></p>
-<button class="primary" type="submit">Import</button></form></div>`;
+<button class="primary" type="submit">Import</button></form></div>
+${nightlyBox}`;
 }
 
 // ---------------------------------------------------------------- tokens

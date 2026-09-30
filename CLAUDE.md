@@ -21,7 +21,7 @@ Read it with the Docs tools before starting on a feature. There is no markdown c
 | `bun run format` | Apply Biome fixes |
 | `bun run deploy` | Deploy the Worker to Cloudflare |
 | `bun run seed` | Create a local user, library (`dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
-| `bun run gate` | Gate: boots `wrangler dev` on fresh state, round-trips Google's sample bundles over HTTP, renders every UI page for them, and runs the MCP smoke flow; also runs in CI |
+| `bun run gate` | Gate: boots `wrangler dev` on fresh state, round-trips Google's sample bundles over HTTP, renders every UI page for them, runs the nightly export through the DO into local R2, and runs the MCP smoke flow; also runs in CI |
 
 After changing `worker/wrangler.jsonc`, run `bunx wrangler types` in `worker/` and commit the regenerated `worker-configuration.d.ts`.
 
@@ -37,7 +37,8 @@ worker/src/accounts.ts   Users and libraries in D1, for the consent page
 worker/src/oauth/        /app/authorize consent page and /app/grants (list, revoke)
 worker/src/ui/           Built-in UI under /app/ (behind Access): routes, views, markdown-to-HTML (no raw HTML, safe URLs only)
 worker/src/client.ts     Worker <-> DO boundary: one `call` RPC, errors as data, R2 blob checks
-worker/src/library.ts    Library DO: one per OKF library, hosts the store on its SQLite
+worker/src/library.ts    Library DO: one per OKF library, hosts the store on its SQLite; its daily alarm runs the maintainers
+worker/src/maintain.ts   Daily maintainers (nightly export to R2 with retention, usage pruning), free of Worker APIs
 worker/src/okf/          OKF semantics: parse, record, render, links, footnotes, trust, lint, index/log render, diff
 worker/src/store/        Library schema and LibraryStore (writes, ledger, snapshots, queries) against a plain SQLite handle
 worker/src/util/tar.ts   Tar reader and writer for import and export
