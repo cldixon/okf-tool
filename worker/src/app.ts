@@ -12,6 +12,7 @@ import {
 import { registerAppRoutes } from "./oauth/routes";
 import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
+import type { RestoreOutcome, RestoreRecord } from "./recovery";
 import { OkfError } from "./store/errors";
 import type { ConceptContent, RequestContext, WriteOp } from "./store/store";
 import { registerUiRoutes } from "./ui/routes";
@@ -32,6 +33,19 @@ export interface Deps {
   exports?: ExportStore;
   /** Runs a library's daily maintainers now, by its Durable Object name. */
   maintain?: (doId: string) => Promise<unknown>;
+  /** Point-in-time restore of a library, by its Durable Object name (spec: Backups and recovery). */
+  recovery?: RecoveryDeps;
+}
+
+export interface RecoveryDeps {
+  /** Arms the restore and restarts the library into it; `undo` names an earlier restore. */
+  restore(
+    doId: string,
+    target: { to: string } | { undo: string },
+    actor: string,
+  ): Promise<RestoreOutcome>;
+  /** The library's restores, newest first. */
+  list(doId: string): Promise<RestoreRecord[]>;
 }
 
 export interface ExportStore {

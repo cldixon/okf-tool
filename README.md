@@ -125,6 +125,13 @@ are protected by tokens. Once per deployment:
   `exports/<library id>/<date>/`. Exports older than `EXPORT_RETENTION_DAYS` (a var in
   `wrangler.jsonc`, default 30) are deleted; the newest is always kept. The library's **Import &
   export** page lists them for download and has **Export now**.
+- **Point-in-time restore.** A library's **Recovery** page restores the whole library, ledger
+  included, to any moment in the last 30 days (Durable Object point-in-time recovery); type the
+  library's name to confirm. It first exports the library as it stands to
+  `exports/<library id>/<date>-pre-restore-<hhmmss>/`, records the restore under
+  `restores/<library id>/`, and lists past restores with an **Undo**. To take back one change, revert
+  it from the ledger instead. `wrangler dev` has no point-in-time recovery, so there a restore is
+  refused without writing anything.
 - **Usage.** Reads of a concept's current version are counted per day; internal sources show their
   read count over the last 30 days, and the same run prunes older counts.
 - **Health and stats.** `GET /healthz` checks D1, R2 and the Durable Object namespace (503 with the

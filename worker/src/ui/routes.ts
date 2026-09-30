@@ -22,6 +22,8 @@ import {
   libNav,
   libraryList,
   type NightlyExport,
+  type RestoreRow,
+  recoveryPage,
   restorePage,
   revertPage,
   type TokenForm,
@@ -490,7 +492,7 @@ export function registerUiRoutes<E extends AppEnv>(
     };
     const type = types[file];
     const obj =
-      type && /^\d{4}-\d{2}-\d{2}$/.test(date) && p.deps.exports
+      type && /^\d{4}-\d{2}-\d{2}(-pre-restore-\d{6})?$/.test(date) && p.deps.exports
         ? await p.deps.exports.get(`exports/${ref.do_id}/${date}/${file}`)
         : null;
     if (!obj || !type) throw new OkfError(404, "not_found", "No such export.");
@@ -502,6 +504,71 @@ export function registerUiRoutes<E extends AppEnv>(
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "no-store",
       },
+    });
+  });
+
+  // Point-in-time restore (spec: Backups and recovery).
+  const recovery = async (
+    p: Page,
+    status: number,
+    extra: { result?: string; error?: string; to?: string },
+  ) => {
+    const { urls, lib, ref } = await openLibrary(p);
+    const [head, recent, restores] = await Promise.all([
+      lib.headSeq(),
+      lib.requests({ limit: 10 }),
+      p.deps.recovery ? p.deps.recovery.list(ref.do_id) : Promise.resolve([]),
+    ]);
+    const rows: RestoreRow[] = restores.map((r) => ({
+      ...r,
+      export: r.export.split("/").at(-2) ?? "",
+    }));
+    const body =
+      libNav(urls, "recovery") +
+      recoveryPage({
+        urls,
+        head,
+        recent: recent.requests as LedgerRequest[],
+        restores: rows,
+        ...extra,
+      });
+    return htmlResponse(
+      layout({ title: `Recovery · ${urls.slug}`, user: p.user.email, body }),
+      status,
+    );
+  };
+
+  get("/app/libraries/:lib/recovery", (p) => recovery(p, 200, {}));
+
+  post("/app/libraries/:lib/recovery", async (p) => {
+    const { urls, ref } = await openLibrary(p);
+    if (!p.deps.recovery) throw new OkfError(501, "unavailable", "Restore is not wired here.");
+    const form = await p.c.req.formData();
+    const undo = String(form.get("undo") ?? "");
+    const rawTo = String(form.get("to") ?? "").trim();
+    // datetime-local sends no offset (and no seconds when they are zero); the field is UTC.
+    const to =
+      rawTo && !/(Z|[+-]\d{2}:\d{2})$/.test(rawTo)
+        ? `${rawTo}${/T\d{2}:\d{2}$/.test(rawTo) ? ":00" : ""}Z`
+        : rawTo;
+    if (String(form.get("confirm") ?? "").trim() !== urls.slug) {
+      return recovery(p, 400, {
+        to: rawTo,
+        error: `Type the library's name, ${urls.slug}, to confirm.`,
+      });
+    }
+    const outcome = await p.deps.recovery.restore(
+      ref.do_id,
+      undo ? { undo } : { to },
+      p.user.actor,
+    );
+    if (!outcome.ok) return recovery(p, outcome.status, { to: rawTo, error: outcome.message });
+    const r = outcome.record;
+    return recovery(p, 200, {
+      result:
+        r.kind === "undo"
+          ? `Undone: ${esc(urls.slug)} is back to how it was before that restore.`
+          : `Restored ${esc(urls.slug)} to ${esc(r.to)}. What was there before is exported to R2 at <code>${esc(r.export)}</code>.`,
     });
   });
 

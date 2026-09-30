@@ -2,6 +2,7 @@ import { d1Accounts } from "./accounts";
 import { d1Authenticate } from "./auth";
 import { makeClient, r2BlobStore } from "./client";
 import { listExports } from "./maintain";
+import { listRestores, RESTORE_ID, restoresPrefix } from "./recovery";
 import { createWorker } from "./worker";
 
 export { Library } from "./library";
@@ -37,6 +38,30 @@ export default createWorker((env) => {
         }),
       ]);
       return { d1, r2, durable_objects: durableObjects };
+    },
+    recovery: {
+      async restore(doId, target, actor) {
+        const stub = env.LIBRARY.get(env.LIBRARY.idFromName(doId));
+        let t: Parameters<typeof stub.prepareRestore>[0];
+        if ("undo" in target) {
+          const obj = RESTORE_ID.test(target.undo)
+            ? await env.BLOBS.get(`${restoresPrefix(doId)}${target.undo}.json`)
+            : null;
+          if (!obj)
+            return { ok: false, status: 404, code: "not_found", message: "No such restore." };
+          t = { undo: await obj.json() };
+        } else {
+          t = { to: target.to };
+        }
+        const outcome = await stub.prepareRestore(t, actor);
+        if (outcome.ok) {
+          // abort() fails the call by design; the next request starts the restored library.
+          await stub.restart().catch(() => {});
+        }
+        return outcome;
+      },
+      list: (doId) =>
+        listRestores(env.BLOBS, async (k) => (await env.BLOBS.get(k))?.text() ?? null, doId),
     },
     exports: {
       async list(libraryId) {
