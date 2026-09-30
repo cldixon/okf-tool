@@ -70,6 +70,36 @@ button { font: inherit; padding: 5px 12px; border-radius: 6px; border: 1px solid
 ol.history { list-style: none; padding: 0; margin: 0; font-size: 13px; }
 ol.history li { padding: 4px 0; border-bottom: 1px solid var(--line); }
 ol.history li.current { font-weight: 600; }
+nav.libnav { font-size: 13px; margin-bottom: 6px; }
+pre.diff { font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code);
+  border-radius: 8px; padding: 8px 0; overflow-x: auto; }
+pre.diff span { display: block; padding: 0 12px; white-space: pre; }
+pre.diff .add { background: color-mix(in srgb, var(--ok) 16%, transparent); }
+pre.diff .del { background: color-mix(in srgb, var(--bad) 14%, transparent); }
+pre.diff .hunk { color: var(--accent); }
+pre.diff .meta { color: var(--muted); }
+form.filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin: 12px 0 18px;
+  font-size: 13px; }
+form.filters label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+form.filters input { width: 160px; }
+input[type=date] { padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); font: inherit; }
+ol.ledger { list-style: none; padding: 0; margin: 0; }
+ol.ledger li.request { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.req-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.req-head .revert { margin-left: auto; }
+.note { margin: 2px 0; }
+ul.events { list-style: none; padding: 0; margin: 4px 0 0; font-size: 13px; }
+ul.events li { margin: 2px 0; overflow-wrap: anywhere; }
+.op { display: inline-block; min-width: 52px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--muted); }
+.op-delete { color: var(--bad); }
+.op-revert { color: var(--warn); }
+.op-verify { color: var(--ok); }
+.panel-box { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+  padding: 12px 16px; margin: 14px 0; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.notice.ok { border-color: var(--ok); color: var(--ok); }
 .stats { display: flex; gap: 20px; flex-wrap: wrap; margin: 12px 0; }
 .stats div { font-size: 13px; color: var(--muted); }
 .stats strong { display: block; font-size: 20px; color: var(--fg); }

@@ -1671,16 +1671,46 @@ export class LibraryStore {
    * GET /requests: requests newest first, each with its events. `before` is a seq cursor for
    * paging back; `since` keeps only requests that started after that seq.
    */
-  requests(opts: { before?: number; since?: number; prefix?: string; limit?: number } = {}) {
+  /**
+   * GET /requests: requests newest first. Filters: path prefix, exact actor, and UTC dates
+   * `from` and `to` (YYYY-MM-DD, inclusive); a request matches when one of its events does.
+   */
+  requests(
+    opts: {
+      before?: number;
+      since?: number;
+      prefix?: string;
+      actor?: string;
+      from?: string;
+      to?: string;
+      limit?: number;
+    } = {},
+  ) {
     const prefix = normalizeDir(opts.prefix);
     const limit = Math.min(Math.max(opts.limit ?? 20, 1), 200);
+    for (const [name, v] of [
+      ["from", opts.from],
+      ["to", opts.to],
+    ] as const) {
+      if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        throw new OkfError(400, "bad_param", `\`${name}\` must be a date like 2026-09-30.`);
+      }
+    }
     const ids = this.sql.all<{ request_id: string; last: number }>(
       `SELECT request_id, MIN(seq) AS first, MAX(seq) AS last FROM events
        WHERE (? = '' OR path = ? OR path LIKE ? ESCAPE '\\')
+         AND (? = '' OR actor = ?)
+         AND (? = '' OR substr(ts, 1, 10) >= ?) AND (? = '' OR substr(ts, 1, 10) <= ?)
        GROUP BY request_id HAVING last < ? AND first > ? ORDER BY last DESC LIMIT ?`,
       prefix,
       prefix,
       `${escapeLike(prefix)}/%`,
+      opts.actor ?? "",
+      opts.actor ?? "",
+      opts.from ?? "",
+      opts.from ?? "",
+      opts.to ?? "",
+      opts.to ?? "",
       opts.before ?? Number.MAX_SAFE_INTEGER,
       opts.since ?? 0,
       limit,
