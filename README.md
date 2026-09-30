@@ -40,6 +40,17 @@ move), `/batch`, `/tree`, `/grep`, `/concepts`, `/search`, `/links`, `/events`, 
 `/history`, `/revert`, `/import` and `/export`; Phase 2 adds `/sources`, `/diff`, `/work`, `/verify`
 and short-lived `/dl/…` download links.
 
+## Web UI
+
+`https://<your-worker>/app` is the built-in UI, behind the same Cloudflare Access sign-in (see
+Operator setup). It lists your libraries; each library page shows its directories and concepts with
+their type, trust tier and staleness. A concept page renders the body, with the frontmatter, the
+sources (footnotes resolved, internal sources with their own trust and staleness), inbound links and
+the history beside it. Every page takes `?at=<seq>` to show the library as it was then, and a
+concept's raw markdown is one click away. Phase 3 adds the ledger, diffs, revert, verify, the work
+queue, import/export and token management in later slices; there is no editor, by design (ask an
+agent).
+
 ## Agents (MCP)
 
 The Worker serves an MCP server at `/mcp` (Streamable HTTP). Each connection reaches one library.
@@ -87,7 +98,7 @@ are protected by tokens. Once per deployment:
    bunx wrangler secret put ACCESS_AUD           # the audience tag
    ```
 
-5. Open `https://<your-worker>/app/grants`: after signing in you should see "Connected apps".
+5. Open `https://<your-worker>/app`: after signing in you should see your libraries.
 
 For local development, copy `worker/.dev.vars.example` to `worker/.dev.vars`; `/app/` then treats
 `localhost` requests as signed in with `DEV_ACCESS_EMAIL`.

@@ -21,7 +21,7 @@ Read it with the Docs tools before starting on a feature. There is no markdown c
 | `bun run format` | Apply Biome fixes |
 | `bun run deploy` | Deploy the Worker to Cloudflare |
 | `bun run seed` | Create a local user, library (`dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
-| `bun run gate` | Gate: boots `wrangler dev` on fresh state, round-trips Google's sample bundles over HTTP and runs the MCP smoke flow; also runs in CI |
+| `bun run gate` | Gate: boots `wrangler dev` on fresh state, round-trips Google's sample bundles over HTTP, renders every UI page for them, and runs the MCP smoke flow; also runs in CI |
 
 After changing `worker/wrangler.jsonc`, run `bunx wrangler types` in `worker/` and commit the regenerated `worker-configuration.d.ts`.
 
@@ -35,6 +35,7 @@ worker/src/auth.ts       Bearer tokens: hash lookup in D1, scope, prefix, expiry
 worker/src/access.ts     Cloudflare Access sign-in for /app/* (verifies the Access JWT)
 worker/src/accounts.ts   Users and libraries in D1, for the consent page
 worker/src/oauth/        /app/authorize consent page and /app/grants (list, revoke)
+worker/src/ui/           Built-in UI under /app/ (behind Access): routes, views, markdown-to-HTML (no raw HTML, safe URLs only)
 worker/src/client.ts     Worker <-> DO boundary: one `call` RPC, errors as data, R2 blob checks
 worker/src/library.ts    Library DO: one per OKF library, hosts the store on its SQLite
 worker/src/okf/          OKF semantics: parse, record, render, links, footnotes, trust, lint, index/log render, diff
@@ -63,4 +64,4 @@ fixtures/                Google's four sample OKF bundles, vendored unchanged; d
 - KV `okf-oauth` (binding `OAUTH_KV`) holds OAuth clients and grants. Secrets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` come from the Access application covering `/app/*`; never put Access on `/mcp`. Local dev uses `DEV_ACCESS_EMAIL` from `worker/.dev.vars`.
 
 ## CI
-`.github/workflows/ci.yml` runs on PRs and pushes to `main`: `bun run check`, and `bun run gate` (wrangler dev, sample-bundle round-trip, MCP smoke). Both must pass before merging.
+`.github/workflows/ci.yml` runs on PRs and pushes to `main`: `bun run check`, and `bun run gate` (wrangler dev, sample-bundle round-trip, UI pages, MCP smoke). Both must pass before merging.

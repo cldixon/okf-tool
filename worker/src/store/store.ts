@@ -1609,9 +1609,12 @@ export class LibraryStore {
     return { seq: snap.seq, matches, truncated };
   }
 
-  /** GET /links: outbound links with current targets, inbound links, and broken ones. */
-  links(input: string) {
-    const snap = this.snapshot();
+  /**
+   * GET /links: outbound links with current targets, inbound links, and broken ones. With `at`,
+   * outbound and broken are as of that sequence; inbound links are only known at head.
+   */
+  links(input: string, opts: { at?: number } = {}) {
+    const snap = this.snapshot(opts.at);
     const e = snap.lookup(normalizePath(input) ?? "");
     if (e?.kind !== "concept") throw notFound(input);
     const r = this.record(e.hash);
@@ -1622,17 +1625,20 @@ export class LibraryStore {
       if (target) outbound.push({ raw: l.raw, path: target.path, anchor: l.anchor, kind });
       else broken.push({ raw: l.raw, path: l.path, kind });
     }
-    const inbound = this.sql
-      .all<{ from_id: string; raw: string; anchor: string | null; kind: LinkKind }>(
-        "SELECT from_id, raw, anchor, kind FROM links WHERE to_id = ? AND from_id <> ?",
-        e.concept_id,
-        e.concept_id,
-      )
-      .flatMap((l) => {
-        const from = snap.byId.get(l.from_id)?.path;
-        return from ? [{ path: from, raw: l.raw, anchor: l.anchor, kind: l.kind }] : [];
-      })
-      .sort((a, b) => (a.path < b.path ? -1 : 1));
+    const inbound =
+      snap.seq !== this.headSeq()
+        ? []
+        : this.sql
+            .all<{ from_id: string; raw: string; anchor: string | null; kind: LinkKind }>(
+              "SELECT from_id, raw, anchor, kind FROM links WHERE to_id = ? AND from_id <> ?",
+              e.concept_id,
+              e.concept_id,
+            )
+            .flatMap((l) => {
+              const from = snap.byId.get(l.from_id)?.path;
+              return from ? [{ path: from, raw: l.raw, anchor: l.anchor, kind: l.kind }] : [];
+            })
+            .sort((a, b) => (a.path < b.path ? -1 : 1));
     return { path: e.path, outbound, inbound, broken };
   }
 
@@ -1747,8 +1753,8 @@ export class LibraryStore {
   // ---------------------------------------------------------------- tier 2: beyond files
 
   /** GET /sources: a concept's sources with footnote counts and internal targets' signals. */
-  sources(input: string) {
-    const snap = this.snapshot();
+  sources(input: string, opts: { at?: number } = {}) {
+    const snap = this.snapshot(opts.at);
     const e = snap.lookup(normalizePath(input) ?? "");
     if (e?.kind !== "concept") throw notFound(input);
     const r = this.record(e.hash);
