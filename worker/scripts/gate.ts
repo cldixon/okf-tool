@@ -6,7 +6,8 @@
  * sample bundle, imports each bundle as a tarball, exports it, and compares: same parsed
  * frontmatter (generated and verified included) and bodies, byte-identical attachments,
  * synthesized index.md and log.md ignored. Then renders every concept and directory of each bundle
- * in the built-in UI (signed in with the dev Access identity). Exits non-zero on any mismatch.
+ * in the built-in UI (signed in with the dev Access identity), and runs the nightly export through
+ * the Durable Object into local R2. Exits non-zero on any mismatch.
  *
  *   bun run gate [--port 8799] [--keep]
  */
@@ -97,6 +98,30 @@ async function uiPages(slug: string, paths: string[]): Promise<string[]> {
   return problems;
 }
 
+/** Runs the daily maintainers through the UI and reads the export back from R2. */
+async function nightlyExport(slug: string, originals: number): Promise<string[]> {
+  const lib = `${base}/app/libraries/${slug}`;
+  const r = await fetch(`${lib}/maintain`, { method: "POST", headers: { Origin: base } });
+  const html = await r.text();
+  if (r.status !== 200 || !html.includes("Exported to R2")) {
+    return [`export now: ${r.status} ${html.slice(0, 200)}`];
+  }
+  const date = new Date().toISOString().slice(0, 10);
+  const tar = await fetch(`${lib}/exports/${date}/bundle.tar`);
+  if (!tar.ok) return [`nightly bundle.tar: ${tar.status}`];
+  const files = readTar(new Uint8Array(await tar.arrayBuffer()));
+  // The originals' own index.md and log.md are replaced by synthesized ones, so at least as many.
+  if (files.length < originals) return [`nightly bundle has ${files.length} files`];
+  const ledger = await fetch(`${lib}/exports/${date}/ledger.jsonl`);
+  if (!ledger.ok || !(await ledger.text()).includes('"t":"event"')) {
+    return [`nightly ledger.jsonl: ${ledger.status}`];
+  }
+  // The daily alarm was set when the library was first used.
+  const home = await (await fetch(`${lib}/`)).text();
+  if (!home.includes("next run")) return ["no daily maintenance alarm scheduled"];
+  return [];
+}
+
 let failed = false;
 try {
   await waitForHealth();
@@ -136,6 +161,12 @@ try {
     console.log(`${uiProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: UI pages render`);
     for (const p of uiProblems) console.log(`  - ${p}`);
     if (uiProblems.length > 0) failed = true;
+    const exportProblems = await nightlyExport(t.slug, original.length);
+    console.log(
+      `${exportProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: nightly export to R2 via the Durable Object`,
+    );
+    for (const p of exportProblems) console.log(`  - ${p}`);
+    if (exportProblems.length > 0) failed = true;
   }
   const mcpOk = await mcpSmoke({ url: base, token: mcpToken });
   console.log(`${mcpOk ? "PASS" : "FAIL"} MCP smoke on an empty library`);

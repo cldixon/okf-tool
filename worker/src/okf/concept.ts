@@ -32,7 +32,13 @@ import type {
 /** Keys the server owns: taken from the writer only on import (spec: OKF conformance). */
 export const SERVER_OWNED = new Set(["generated", "verified"]);
 /** Keys the server computes at read time; never stored, ignored on write. */
-export const COMPUTED = new Set(["trust_tier", "stale", "effective_status", "inbound_links"]);
+export const COMPUTED = new Set([
+  "trust_tier",
+  "stale",
+  "effective_status",
+  "inbound_links",
+  "usage_count",
+]);
 /** OKF fields render first, in this order; other keys follow in arrival order. */
 const OKF_ORDER = [
   "type",

@@ -117,6 +117,21 @@ are protected by tokens. Once per deployment:
 
 5. Open `https://<your-worker>/app`: after signing in you should see your libraries.
 
+## Operations
+
+- **Nightly export.** Each library's Durable Object wakes once a day at about 03:00 UTC. If anything
+  changed since the last run, it writes `bundle.tar` (a conformant bundle), `ledger.jsonl` (every
+  event and blob, so history can be rebuilt) and `manifest.json` to the R2 bucket under
+  `exports/<library id>/<date>/`. Exports older than `EXPORT_RETENTION_DAYS` (a var in
+  `wrangler.jsonc`, default 30) are deleted; the newest is always kept. The library's **Import &
+  export** page lists them for download and has **Export now**.
+- **Usage.** Reads of a concept's current version are counted per day; internal sources show their
+  read count over the last 30 days, and the same run prunes older counts.
+- **Health and stats.** `GET /healthz` checks D1, R2 and the Durable Object namespace (503 with the
+  failing one otherwise). `GET /api/v1/libraries/<lib>/stats` reports paths, events, requests,
+  storage bytes, the export cursor and lag, and the last and next maintenance run; the library's
+  home page shows the same.
+
 For local development, copy `worker/.dev.vars.example` to `worker/.dev.vars`; `/app/` then treats
 `localhost` requests as signed in with `DEV_ACCESS_EMAIL`.
 

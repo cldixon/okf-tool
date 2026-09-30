@@ -2,6 +2,7 @@ import { sha256Hex } from "./okf/hash";
 import { normalizePath } from "./okf/paths";
 import { OkfError } from "./store/errors";
 import type { BlobRef, ImportFile, LibraryStore, WriteOp } from "./store/store";
+import { writeTar } from "./util/tar";
 
 /** Store methods the Worker may call on a library, over DO RPC or in process. */
 export const LIBRARY_METHODS = [
@@ -27,6 +28,11 @@ export const LIBRARY_METHODS = [
   "summary",
   "signDownload",
   "openDownload",
+  "dump",
+  "pruneUsage",
+  "maintenance",
+  "setMaintenance",
+  "stats",
 ] as const;
 
 export type LibraryMethod = (typeof LIBRARY_METHODS)[number];
@@ -199,4 +205,31 @@ export async function bundleFiles(
   }
   if (files.length === 0) throw new OkfError(400, "empty_import", "No files found to import.");
   return files;
+}
+
+/** A library's bundle as tar bytes, attachments read from blob storage (spec: Reads and export). */
+export async function bundleTar(
+  lib: { exportBundle(at?: number): unknown },
+  blobs: BlobStore,
+  at?: number,
+): Promise<{ seq: number; bytes: Uint8Array; files: number }> {
+  const bundle = (await lib.exportBundle(at)) as {
+    seq: number;
+    files: { path: string; text?: string; blob?: { hash: string } }[];
+  };
+  const enc = new TextEncoder();
+  const files: { path: string; bytes: Uint8Array }[] = [];
+  for (const f of bundle.files) {
+    if (f.text !== undefined) files.push({ path: f.path, bytes: enc.encode(f.text) });
+    else if (f.blob) {
+      const obj = await blobs.get(f.blob.hash);
+      if (!obj) throw new OkfError(500, "blob_missing", `Bytes for ${f.path} are missing.`);
+      const bytes =
+        obj.body instanceof Uint8Array
+          ? obj.body
+          : new Uint8Array(await new Response(obj.body).arrayBuffer());
+      files.push({ path: f.path, bytes });
+    }
+  }
+  return { seq: bundle.seq, bytes: writeTar(files), files: files.length };
 }

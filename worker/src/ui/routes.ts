@@ -16,10 +16,12 @@ import {
   directoryPage,
   type LedgerFilters,
   type LedgerRequest,
+  type LibraryStats,
   type LibrarySummary,
   ledgerPage,
   libNav,
   libraryList,
+  type NightlyExport,
   restorePage,
   revertPage,
   type TokenForm,
@@ -205,10 +207,10 @@ export function registerUiRoutes<E extends AppEnv>(
       lib.tree({ prefix: dir, depth: 1, at: urls.at }),
       lib.headSeq(),
     ]);
-    const summary =
-      dir === "" && urls.at === undefined
-        ? { slug: urls.slug, ...(await lib.summary()) }
-        : undefined;
+    const atRoot = dir === "" && urls.at === undefined;
+    const [summary, ops] = atRoot
+      ? await Promise.all([lib.summary(), lib.stats()])
+      : [undefined, undefined];
     if (dir !== "" && tree.entries.length === 0) {
       throw new OkfError(404, "not_found", `There is no directory ${dir}/ in ${urls.slug}.`);
     }
@@ -219,7 +221,8 @@ export function registerUiRoutes<E extends AppEnv>(
         dir,
         head,
         entries: tree.entries as TreeEntry[],
-        summary,
+        summary: summary ? { slug: urls.slug, ...summary } : undefined,
+        ops: ops as LibraryStats | undefined,
       });
     return show(p, dir === "" ? urls.slug : `${dir}/ · ${urls.slug}`, body);
   };
@@ -445,9 +448,17 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   const transfer = async (p: Page, status: number, extra: { result?: string; error?: string }) => {
-    const { urls, lib } = await openLibrary(p);
-    const head = await lib.headSeq();
-    const body = libNav(urls, "transfer") + transferPage({ urls, head, ...extra });
+    const { urls, lib, ref } = await openLibrary(p);
+    const [head, exports] = await Promise.all([
+      lib.headSeq(),
+      p.deps.exports ? p.deps.exports.list(ref.do_id) : Promise.resolve([]),
+    ]);
+    const nightly: NightlyExport[] = exports.map((e) => ({
+      date: e.folder.split("/").at(-2) ?? "",
+      seq: typeof e.manifest?.seq === "number" ? e.manifest.seq : null,
+      files: typeof e.manifest?.files === "number" ? e.manifest.files : null,
+    }));
+    const body = libNav(urls, "transfer") + transferPage({ urls, head, nightly, ...extra });
     return htmlResponse(
       layout({ title: `Import & export · ${urls.slug}`, user: p.user.email, body }),
       status,
@@ -455,6 +466,44 @@ export function registerUiRoutes<E extends AppEnv>(
   };
 
   get("/app/libraries/:lib/transfer", (p) => transfer(p, 200, {}));
+
+  post("/app/libraries/:lib/maintain", async (p) => {
+    const { ref } = await openLibrary(p);
+    if (!p.deps.maintain) throw new OkfError(501, "unavailable", "Maintenance is not wired here.");
+    const res = (await p.deps.maintain(ref.do_id)) as { export: { key?: string } };
+    return transfer(p, 200, {
+      result: res.export.key
+        ? `Exported to R2 at <code>${esc(res.export.key)}</code>.`
+        : "Nothing changed since the last export, so none was written.",
+    });
+  });
+
+  // A nightly export's files, streamed from R2 (spec: Backups and recovery).
+  get("/app/libraries/:lib/exports/:date/:file", async (p) => {
+    const { ref } = await openLibrary(p);
+    const date = p.c.req.param("date") ?? "";
+    const file = p.c.req.param("file") ?? "";
+    const types: Record<string, string> = {
+      "bundle.tar": "application/x-tar",
+      "ledger.jsonl": "application/x-ndjson",
+      "manifest.json": "application/json",
+    };
+    const type = types[file];
+    const obj =
+      type && /^\d{4}-\d{2}-\d{2}$/.test(date) && p.deps.exports
+        ? await p.deps.exports.get(`exports/${ref.do_id}/${date}/${file}`)
+        : null;
+    if (!obj || !type) throw new OkfError(404, "not_found", "No such export.");
+    return new Response(obj.body as BodyInit, {
+      headers: {
+        "Content-Type": type,
+        "Content-Disposition": `attachment; filename="${ref.slug}-${date}-${file}"`,
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+      },
+    });
+  });
 
   // Export: a redirect to a signed download, like the API's and MCP's export links.
   get("/app/libraries/:lib/export", async (p) => {
