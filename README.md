@@ -53,8 +53,18 @@ The **ledger** lists every change request newest first (who, when, their note, t
 filtered by directory, actor and date. Each change has a diff, each concept links to "changes since
 human verification", and any request can be **reverted** (or one file restored to an earlier
 version) after a confirmation page; reverts are recorded as your own requests, so they can be undone
-too. Verify, the work queue, import/export and token management come in the next slice. There is no
-editor, by design: ask an agent.
+too.
+
+**Verify** on a concept records that you checked its current version: the trust tier becomes
+human-reviewed until the next edit lapses it. The **work queue** lists stale concepts, broken links and
+lint, most linked-to first. **Import & export** downloads a library as a conformant bundle (at any
+sequence) and imports a `.tar` or `.tar.gz` as one revertible request. The **Libraries** page creates
+libraries, and **Tokens** mints, lists and revokes bearer tokens. There is no editor, by design: ask an
+agent.
+
+The same management is available over REST with a `human:` token (mint one for your own actor on the
+Tokens page): `GET/POST /api/v1/libraries`, `GET/POST /api/v1/tokens` and
+`DELETE /api/v1/tokens/{id}`.
 
 ## Agents (MCP)
 
@@ -66,8 +76,10 @@ what the app may do: which library (or a new one), read only or read and write, 
 directory, the name its changes carry in the ledger (e.g. `claude-ai/connector`), and all tools or
 file tools only. `/app/grants` lists connected apps and revokes them.
 
-**Claude Code, scripts and scheduled tasks (bearer token).** Mint a token with
-`bun run seed --remote --slug <library> --actor <app>/<label>` from `worker/`, then:
+**Claude Code, scripts and scheduled tasks (bearer token).** Mint a token on the **Tokens** page
+(`/app/tokens`): pick the library, an actor such as `claude-code/laptop` (or `process:<name>` for a
+scheduled job that may verify), read or write, and optionally a directory, an expiry and file tools
+only. The secret is shown once, with the command to paste:
 
 ```sh
 claude mcp add --transport http okf https://<your-worker>/mcp \

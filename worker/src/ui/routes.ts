@@ -1,10 +1,11 @@
 import type { Context, Hono } from "hono";
-import type { LibraryRef, User } from "../accounts";
+import { checkNewToken, type LibraryRef, type User } from "../accounts";
 import type { Deps } from "../app";
-import type { LibraryClient } from "../client";
+import { bundleFiles, type LibraryClient } from "../client";
 import { signedIn } from "../oauth/routes";
 import { basename, dirname } from "../okf/paths";
 import { OkfError } from "../store/errors";
+import { maybeGunzip, readTar } from "../util/tar";
 import { esc, htmlResponse, layout } from "./layout";
 import { linkTarget } from "./markdown";
 import {
@@ -21,8 +22,15 @@ import {
   libraryList,
   restorePage,
   revertPage,
+  type TokenForm,
+  type TokenListRow,
   type TreeEntry,
+  tokenCreatedPage,
+  tokensPage,
+  transferPage,
   Urls,
+  type WorkItem,
+  workPage,
 } from "./views";
 
 type AppEnv = { Bindings: Cloudflare.Env };
@@ -88,6 +96,16 @@ async function humanContext(p: Page) {
   const form = await p.c.req.formData();
   const note = String(form.get("note") ?? "").trim();
   return { actor: p.user.actor, request_id: crypto.randomUUID(), note: note || null };
+}
+
+/** The confirmation shown after a write redirects back to a concept page. */
+function doneNotice(done: string | undefined, actor: string): string {
+  const text: Record<string, string> = {
+    restore: `Restored. The ledger records it as a revert by ${actor}.`,
+    verify: `Verified as ${actor}. The trust tier is human-reviewed until the next edit.`,
+  };
+  const t = done ? text[done] : undefined;
+  return t ? `<div class="notice ok">${esc(t)}</div>` : "";
 }
 
 function plural(n: number, word: string) {
@@ -157,7 +175,7 @@ export function registerUiRoutes<E extends AppEnv>(
   const get = (path: string, handler: (p: Page) => Promise<Response>) =>
     app.get(path, ui(deps, handler) as never);
 
-  get("/app", async (p) => {
+  const listLibraries = async (p: Page, error?: string) => {
     const refs = await p.deps.accounts.libraries();
     const libs = await Promise.all(
       refs.map(async (ref): Promise<LibrarySummary | null> => {
@@ -165,8 +183,16 @@ export function registerUiRoutes<E extends AppEnv>(
         return lib ? { slug: ref.slug, ...(await lib.summary()) } : null;
       }),
     );
-    return show(p, "Libraries", libraryList(libs.filter((l): l is LibrarySummary => l !== null)));
-  });
+    const body = libraryList(
+      libs.filter((l): l is LibrarySummary => l !== null),
+      error,
+    );
+    return htmlResponse(
+      layout({ title: "Libraries", user: p.user.email, body }),
+      error ? 400 : 200,
+    );
+  };
+  get("/app", (p) => listLibraries(p));
   app.get("/app/", (c) => c.redirect("/app", 301));
   app.get("/app/libraries", (c) => c.redirect("/app", 301));
   app.get("/app/libraries/:lib", (c) =>
@@ -236,9 +262,7 @@ export function registerUiRoutes<E extends AppEnv>(
       p,
       `${title} · ${urls.slug}`,
       libNav(urls, "files") +
-        (p.c.req.query("done") === "restore"
-          ? `<div class="notice ok">Restored. The ledger records it as a revert by ${esc(p.user.actor)}.</div>`
-          : "") +
+        doneNotice(p.c.req.query("done"), p.user.actor) +
         conceptPage({
           urls,
           head,
@@ -384,5 +408,173 @@ export function registerUiRoutes<E extends AppEnv>(
     const ctx = await humanContext(p);
     await lib.revert(ctx, { path, to_seq: to });
     return p.c.redirect(`${urls.pinned(undefined).file(path)}?done=restore`, 303);
+  });
+
+  // ---------------------------------------------------------------- slice 3: verify, work, transfer
+
+  post("/app/libraries", async (p) => {
+    const slug = String((await p.c.req.formData()).get("slug") ?? "");
+    try {
+      const lib = await p.deps.accounts.createLibrary(slug, p.user.id);
+      return p.c.redirect(new Urls(lib.slug).tree(""), 303);
+    } catch (e) {
+      if (e instanceof OkfError && e.status < 500) return listLibraries(p, e.message);
+      throw e;
+    }
+  });
+
+  // Human verification of the current version (spec: OKF conformance, What the service stamps).
+  post("/app/libraries/:lib/verify/*", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const path = tail(p.c, "/verify/");
+    const res = await lib.verify(await humanContext(p), path);
+    const verified = res.results[0]?.path ?? path;
+    return p.c.redirect(`${urls.pinned(undefined).file(verified)}?done=verify`, 303);
+  });
+
+  get("/app/libraries/:lib/work", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const kind = p.c.req.query("kind") || undefined;
+    const res = await lib.work({ kind, limit: 200 });
+    return show(
+      p,
+      `Work queue · ${urls.slug}`,
+      libNav(urls, "work") +
+        workPage({ urls, items: res.items as WorkItem[], total: res.total, kind }),
+    );
+  });
+
+  const transfer = async (p: Page, status: number, extra: { result?: string; error?: string }) => {
+    const { urls, lib } = await openLibrary(p);
+    const head = await lib.headSeq();
+    const body = libNav(urls, "transfer") + transferPage({ urls, head, ...extra });
+    return htmlResponse(
+      layout({ title: `Import & export · ${urls.slug}`, user: p.user.email, body }),
+      status,
+    );
+  };
+
+  get("/app/libraries/:lib/transfer", (p) => transfer(p, 200, {}));
+
+  // Export: a redirect to a signed download, like the API's and MCP's export links.
+  get("/app/libraries/:lib/export", async (p) => {
+    const { urls, lib, ref } = await openLibrary(p);
+    const at = intParam(p.c, "at") ?? (await lib.headSeq());
+    const token = await lib.signDownload({ k: "export", at, name: urls.slug });
+    return p.c.redirect(`/dl/${encodeURIComponent(ref.do_id)}/${token}`, 302);
+  });
+
+  post("/app/libraries/:lib/import", async (p) => {
+    const { lib } = await openLibrary(p);
+    const form = await p.c.req.formData();
+    const file = form.get("bundle");
+    const strip = Number(form.get("strip") ?? 0) || 0;
+    const note = String(form.get("note") ?? "").trim();
+    if (!file || typeof file === "string") {
+      return transfer(p, 400, { error: "Choose a .tar or .tar.gz file to import." });
+    }
+    let raw: { path: string; bytes: Uint8Array }[];
+    try {
+      raw = readTar(await maybeGunzip(new Uint8Array(await (file as Blob).arrayBuffer())));
+    } catch {
+      return transfer(p, 400, { error: "That file is not a readable tar or tar.gz archive." });
+    }
+    try {
+      const files = await bundleFiles(p.deps.blobs, raw, strip);
+      const name = (file as File).name || "upload";
+      const ctx = {
+        actor: p.user.actor,
+        request_id: crypto.randomUUID(),
+        note: note || `Import ${name}`,
+      };
+      const res = await lib.import(ctx, files, `upload:${name}`);
+      const linted = res.warnings.length;
+      return transfer(p, 200, {
+        result: `Imported ${esc(plural(res.files, "file"))} from ${esc(name)} as one request (up to seq ${res.seq})${linted ? `; ${esc(plural(linted, "file"))} with lint, see the <a href="work">work queue</a>` : ""}. <a href="ledger">See it in the ledger</a>.`,
+      });
+    } catch (e) {
+      if (e instanceof OkfError && e.status < 500)
+        return transfer(p, e.status, { error: e.message });
+      throw e;
+    }
+  });
+
+  // ---------------------------------------------------------------- tokens (spec: Auth, identity and actors)
+
+  const tokens = async (
+    p: Page,
+    opts: { form?: TokenForm; error?: string; notice?: string } = {},
+  ) => {
+    const [rows, libs] = await Promise.all([p.deps.accounts.tokens(), p.deps.accounts.libraries()]);
+    const body = tokensPage({
+      tokens: rows as TokenListRow[],
+      libraries: libs.map((l) => l.slug),
+      human: p.user.actor,
+      form: opts.form ?? {
+        library: libs[0]?.slug ?? "",
+        actor: "",
+        scope: "write",
+        prefix: "",
+        expires: "",
+        tiers: "all",
+      },
+      error: opts.error,
+      notice: opts.notice,
+    });
+    return htmlResponse(
+      layout({ title: "Tokens", user: p.user.email, body }),
+      opts.error ? 400 : 200,
+    );
+  };
+
+  get("/app/tokens", (p) =>
+    tokens(p, { notice: p.c.req.query("done") === "revoke" ? "Token revoked." : undefined }),
+  );
+
+  post("/app/tokens", async (p) => {
+    const f = await p.c.req.formData();
+    const s = (k: string) => String(f.get(k) ?? "").trim();
+    const form: TokenForm = {
+      library: s("library"),
+      actor: s("actor"),
+      scope: s("scope") === "read" ? "read" : "write",
+      prefix: s("prefix"),
+      expires: s("expires"),
+      tiers: s("tiers") === "files" ? "files" : "all",
+    };
+    try {
+      const lib = (await p.deps.accounts.libraries()).find((l) => l.slug === form.library);
+      if (!lib) throw new OkfError(400, "no_library", "Pick a library.");
+      const fields = checkNewToken(
+        {
+          actor: form.actor,
+          scope: form.scope,
+          prefix: form.prefix,
+          expires: form.expires,
+          mcpTiers: form.tiers,
+        },
+        p.user.actor,
+      );
+      const minted = await p.deps.accounts.createToken({
+        ...fields,
+        libraryId: lib.id,
+        createdBy: p.user.id,
+      });
+      const body = tokenCreatedPage({
+        origin: new URL(p.c.req.url).origin,
+        secret: minted.secret,
+        actor: fields.actor,
+        library: lib.slug,
+      });
+      return htmlResponse(layout({ title: "Token created", user: p.user.email, body }));
+    } catch (e) {
+      if (e instanceof OkfError && e.status < 500) return tokens(p, { form, error: e.message });
+      throw e;
+    }
+  });
+
+  post("/app/tokens/:id/revoke", async (p) => {
+    await p.deps.accounts.revokeToken(p.c.req.param("id") ?? "");
+    return p.c.redirect("/app/tokens?done=revoke", 303);
   });
 }

@@ -630,6 +630,17 @@ export class LibraryStore {
         ? { generated: this.record(curConcept.hash).generated, verified: storedVerified }
         : null,
     });
+    // An ordinary write lapses every earlier verification (spec: What the service derives); with
+    // one-second timestamps, keep the new stamp strictly after the latest one.
+    const generated = built.record.generated;
+    if (w.mode !== "import" && generated && typeof generated.at === "string") {
+      const latest = Math.max(
+        ...storedVerified.map((v) => Date.parse(v.at)).filter(Number.isFinite),
+      );
+      if (Date.parse(generated.at) <= latest) {
+        built.record.generated = { ...generated, at: iso(new Date(latest + 1000)) };
+      }
+    }
     this.resolveTargets(built.record, path, w);
     const verified = w.mode === "import" ? built.verified : storedVerified;
     const size = utf8Length(renderConcept(built.record, { verified }));
@@ -2030,7 +2041,7 @@ export class LibraryStore {
 
 export type DownloadPayload =
   | { k: "file"; path: string; hash: string; media: string | null }
-  | { k: "export"; at: number };
+  | { k: "export"; at: number; name?: string };
 
 export interface WorkItem {
   kind: string;

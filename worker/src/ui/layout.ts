@@ -98,6 +98,12 @@ ul.events li { margin: 2px 0; overflow-wrap: anywhere; }
 .op-verify { color: var(--ok); }
 .panel-box { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
   padding: 12px 16px; margin: 14px 0; }
+pre.wrap { white-space: pre-wrap; word-break: break-all; }
+.choice { display: inline-flex; gap: 6px; align-items: center; margin-right: 16px; }
+select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+  color: var(--fg); font: inherit; }
+form.token label { margin-right: 16px; }
+form.token input[type=text] { width: 180px; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .notice.ok { border-color: var(--ok); color: var(--ok); }
 .stats { display: flex; gap: 20px; flex-wrap: wrap; margin: 12px 0; }
@@ -118,7 +124,7 @@ export function layout(s: Shell): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(s.title)}</title><style>${STYLE}</style></head>
 <body><header class="top"><div><a class="brand" href="/app">OKF</a>
-<a href="/app">Libraries</a><a href="/app/grants">Connected apps</a>
+<a href="/app">Libraries</a><a href="/app/tokens">Tokens</a><a href="/app/grants">Connected apps</a>
 <span class="who">${esc(s.user)}</span></div></header>
 <main>${s.body}</main></body></html>`;
 }

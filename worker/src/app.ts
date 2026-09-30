@@ -1,12 +1,12 @@
 import { type Context, Hono } from "hono";
-import type { Accounts } from "./accounts";
+import { type Accounts, checkNewToken } from "./accounts";
 import type { Authenticate, TokenInfo } from "./auth";
-import { type BlobStore, type LibraryClient, mediaFor, putBlob } from "./client";
+import { type BlobStore, bundleFiles, type LibraryClient, mediaFor, putBlob } from "./client";
 import { registerAppRoutes } from "./oauth/routes";
 import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
 import { OkfError } from "./store/errors";
-import type { ConceptContent, ImportFile, RequestContext, WriteOp } from "./store/store";
+import type { ConceptContent, RequestContext, WriteOp } from "./store/store";
 import { registerUiRoutes } from "./ui/routes";
 import { maybeGunzip, readTar, writeTar } from "./util/tar";
 
@@ -394,14 +394,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     } else {
       raw = readTar(await maybeGunzip(new Uint8Array(await c.req.arrayBuffer())));
     }
-    const files: ImportFile[] = [];
-    for (const f of raw) {
-      const path = normalizePath(f.path.split("/").slice(strip).join("/"));
-      if (!path || path.split("/").some((s) => s.startsWith("."))) continue; // .git, .obsidian, ...
-      if (path.endsWith(".md")) files.push({ path, markdown: new TextDecoder().decode(f.bytes) });
-      else files.push({ path, blob: await putBlob(c.var.deps.blobs, f.bytes, mediaFor(path)) });
-    }
-    if (files.length === 0) throw new OkfError(400, "empty_import", "No files found to import.");
+    const files = await bundleFiles(c.var.deps.blobs, raw, strip);
     requireWrite(c, ...files.map((f) => f.path));
     const source = c.req.query("source") ?? "upload";
     const res = await c.var.lib.import(requestContext(c), files, source);
@@ -445,7 +438,8 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     const bad = new OkfError(403, "bad_download", "This download link is invalid or has expired.");
     if (!lib) throw bad;
     const payload = await lib.openDownload(c.req.param("token"));
-    if (payload.k === "export") return exportTar(lib, d.blobs, payload.at, "library");
+    if (payload.k === "export")
+      return exportTar(lib, d.blobs, payload.at, payload.name ?? "library");
     const obj = await d.blobs.get(payload.hash);
     if (!obj) throw new OkfError(404, "not_found", "The file's bytes are missing.");
     return c.body(obj.body as ReadableStream, 200, {
@@ -454,6 +448,78 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       "Content-Security-Policy": "default-src 'none'; sandbox",
       "X-Content-Type-Options": "nosniff",
     });
+  });
+
+  // ------------------------------------------------------------------ libraries and tokens
+
+  /** Management routes are human-only (spec: HTTP API): a human: bearer token. */
+  const human = async (c: C) => {
+    const d = deps(c.env);
+    const token = await d.authenticate(bearer(c));
+    if (!token.actor.startsWith("human:")) {
+      throw new OkfError(403, "human_only", "Library and token management needs a human: token.");
+    }
+    return { d, token };
+  };
+
+  app.get("/api/v1/libraries", async (c) => {
+    const { d } = await human(c);
+    return c.json({
+      libraries: (await d.accounts.libraries()).map(({ id, slug }) => ({ id, slug })),
+    });
+  });
+
+  app.post("/api/v1/libraries", async (c) => {
+    const { d, token } = await human(c);
+    const body = await c.req.json<{ slug?: string }>().catch(() => ({}) as { slug?: string });
+    const lib = await d.accounts.createLibrary(body.slug ?? "", token.created_by ?? null);
+    return c.json({ id: lib.id, slug: lib.slug }, 201);
+  });
+
+  app.get("/api/v1/tokens", async (c) => {
+    const { d } = await human(c);
+    return c.json({ tokens: await d.accounts.tokens() });
+  });
+
+  app.post("/api/v1/tokens", async (c) => {
+    const { d, token } = await human(c);
+    const body = await c.req
+      .json<{
+        library?: string;
+        actor?: string;
+        scope?: string;
+        prefix?: string | null;
+        expires?: string | null;
+        mcp_tiers?: string;
+      }>()
+      .catch(() => ({}) as Record<string, undefined>);
+    const lib = (await d.accounts.libraries()).find(
+      (l) => l.slug === body.library || l.id === body.library,
+    );
+    if (!lib) throw new OkfError(404, "no_library", `There is no library ${body.library ?? ""}.`);
+    // human: tokens are minted only in the UI, so none is anyone's own actor here.
+    const fields = checkNewToken(
+      {
+        actor: body.actor ?? "",
+        scope: body.scope ?? "",
+        prefix: body.prefix,
+        expires: body.expires,
+        mcpTiers: body.mcp_tiers,
+      },
+      null,
+    );
+    const minted = await d.accounts.createToken({
+      ...fields,
+      libraryId: lib.id,
+      createdBy: token.created_by ?? null,
+    });
+    return c.json({ id: minted.id, secret: minted.secret, library: lib.slug, ...fields }, 201);
+  });
+
+  app.delete("/api/v1/tokens/:id", async (c) => {
+    const { d } = await human(c);
+    await d.accounts.revokeToken(c.req.param("id"));
+    return c.body(null, 204);
   });
 
   // ------------------------------------------------------------------ MCP

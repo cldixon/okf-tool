@@ -11,7 +11,7 @@ Object.assign(globalThis, {
   Cloudflare: { compatibilityFlags: { global_fetch_strictly_public: true } },
 });
 
-import type { Accounts, LibraryRef, User } from "../src/accounts";
+import type { Accounts, LibraryRef, TokenRow, User } from "../src/accounts";
 import { checkSlug, humanActor } from "../src/accounts";
 import type { Deps } from "../src/app";
 import type { TokenInfo } from "../src/auth";
@@ -131,6 +131,15 @@ export const TOKENS: Record<string, TokenInfo> = {
     mcp_tiers: "all",
     library: LIB,
   },
+  human: {
+    id: "t6",
+    actor: "human:owner",
+    scope: "write",
+    prefix: null,
+    mcp_tiers: "all",
+    library: LIB,
+    created_by: "user_1",
+  },
   files: {
     id: "t5",
     actor: "claude-code/files-only",
@@ -141,12 +150,45 @@ export const TOKENS: Record<string, TokenInfo> = {
   },
 };
 
-export function memoryAccounts(): Accounts & { users: Map<string, User>; libs: LibraryRef[] } {
+export function memoryAccounts(): Accounts & {
+  users: Map<string, User>;
+  libs: LibraryRef[];
+  minted: Map<string, TokenRow & { secret: string }>;
+} {
   const users = new Map<string, User>();
   const libs: LibraryRef[] = [LIB];
+  const minted = new Map<string, TokenRow & { secret: string }>();
   return {
     users,
     libs,
+    minted,
+    async tokens() {
+      return [...minted.values()].reverse().map(({ secret: _, ...row }) => row);
+    },
+    async createToken(t) {
+      const id = `tok_${minted.size + 1}`;
+      const secret = `okf_test_${minted.size + 1}`;
+      const lib = libs.find((l) => l.id === t.libraryId);
+      const email = [...users.values()].find((u) => u.id === t.createdBy)?.email ?? null;
+      minted.set(id, {
+        id,
+        secret,
+        library: lib?.slug ?? "",
+        actor: t.actor,
+        scope: t.scope,
+        prefix: t.prefix,
+        expires: t.expires,
+        mcp_tiers: t.mcpTiers,
+        created_by: email,
+        revoked: null,
+      });
+      return { id, secret };
+    },
+    async revokeToken(id) {
+      const t = minted.get(id);
+      if (!t || t.revoked) throw new OkfError(404, "not_found", "No such active token.");
+      t.revoked = new Date().toISOString();
+    },
     async user(email) {
       let u = users.get(email);
       if (!u) {
@@ -191,8 +233,19 @@ export function setup() {
   const deps: Deps = {
     authenticate: async (secret) => {
       const t = TOKENS[secret];
-      if (!t) throw new OkfError(401, "bad_token", "Unknown bearer token.");
-      return t;
+      if (t) return t;
+      const m = [...accounts.minted.values()].find((x) => x.secret === secret);
+      if (!m) throw new OkfError(401, "bad_token", "Unknown bearer token.");
+      if (m.revoked) throw new OkfError(401, "token_revoked", "This token has been revoked.");
+      const lib = accounts.libs.find((l) => l.slug === m.library) as LibraryRef;
+      return {
+        id: m.id,
+        actor: m.actor,
+        scope: m.scope,
+        prefix: m.prefix,
+        mcp_tiers: m.mcp_tiers,
+        library: { id: lib.id, slug: lib.slug, do_id: lib.do_id },
+      };
     },
     accounts,
     blobs,
