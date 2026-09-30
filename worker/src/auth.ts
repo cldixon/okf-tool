@@ -10,6 +10,8 @@ export interface TokenInfo {
   prefix: string | null;
   mcp_tiers: string;
   library: { id: string; slug: string; do_id: string };
+  /** The users row id of the human who minted the token, when known. */
+  created_by?: string | null;
 }
 
 export type Authenticate = (secret: string) => Promise<TokenInfo>;
@@ -29,6 +31,7 @@ interface TokenRow {
   mcp_tiers: string;
   expires: string | null;
   revoked: string | null;
+  created_by: string | null;
   library_id: string;
   slug: string;
   do_id: string;
@@ -45,7 +48,7 @@ export function d1Authenticate(db: D1Database, now = () => Date.now()): Authenti
     if (!hit || now() - hit.at > CACHE_MS) {
       const row = await db
         .prepare(
-          `SELECT t.id, t.actor, t.scope, t.prefix, t.mcp_tiers, t.expires, t.revoked,
+          `SELECT t.id, t.actor, t.scope, t.prefix, t.mcp_tiers, t.expires, t.revoked, t.created_by,
                   l.id AS library_id, l.slug, l.do_id
            FROM tokens t JOIN libraries l ON l.id = t.library WHERE t.hash = ?`,
         )
@@ -68,6 +71,7 @@ export function d1Authenticate(db: D1Database, now = () => Date.now()): Authenti
       prefix: row.prefix || null,
       mcp_tiers: row.mcp_tiers,
       library: { id: row.library_id, slug: row.slug, do_id: row.do_id },
+      created_by: row.created_by,
     };
   };
 }

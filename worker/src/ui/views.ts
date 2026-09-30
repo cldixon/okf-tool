@@ -44,6 +44,21 @@ export class Urls {
   restore(path: string, to: number) {
     return `${this.base}restore/${enc(path)}${query({ to })}`;
   }
+  verify(path: string) {
+    return `${this.base}verify/${enc(path)}`;
+  }
+  work(kind?: string) {
+    return `${this.base}work${query({ kind })}`;
+  }
+  transfer() {
+    return `${this.base}transfer`;
+  }
+  exportTar(at?: number) {
+    return `${this.base}export${query({ at })}`;
+  }
+  importTar() {
+    return `${this.base}import`;
+  }
 }
 
 export interface LedgerFilters {
@@ -64,10 +79,18 @@ function query(params: Record<string, string | number | undefined>): string {
 }
 
 /** The library's section tabs: its files and its ledger. */
-export function libNav(urls: Urls, active: "files" | "ledger"): string {
-  const tab = (name: string, href: string, on: boolean) =>
-    on ? `<strong>${name}</strong>` : `<a href="${esc(href)}">${name}</a>`;
-  return `<nav class="libnav"><span class="muted">${esc(urls.slug)}:</span> ${tab("Files", urls.pinned(undefined).tree(""), active === "files")} · ${tab("Ledger", urls.ledger(), active === "ledger")}</nav>`;
+export type LibTab = "files" | "ledger" | "work" | "transfer";
+
+export function libNav(urls: Urls, active: LibTab): string {
+  const tab = (name: string, href: string, key: LibTab) =>
+    key === active ? `<strong>${name}</strong>` : `<a href="${esc(href)}">${name}</a>`;
+  const tabs = [
+    tab("Files", urls.pinned(undefined).tree(""), "files"),
+    tab("Ledger", urls.ledger(), "ledger"),
+    tab("Work queue", urls.work(), "work"),
+    tab("Import &amp; export", urls.transfer(), "transfer"),
+  ];
+  return `<nav class="libnav"><span class="muted">${esc(urls.slug)}:</span> ${tabs.join(" · ")}</nav>`;
 }
 
 /**
@@ -124,9 +147,15 @@ export interface LibrarySummary {
   types: Record<string, number>;
 }
 
-export function libraryList(libs: LibrarySummary[]): string {
+const NEW_LIBRARY = `<form class="inline" method="post" action="/app/libraries">
+<label class="small" for="slug">New library</label>
+<input id="slug" name="slug" type="text" placeholder="team-notes" required pattern="[a-z0-9][a-z0-9-]{0,62}" style="width:200px">
+<button type="submit">Create</button></form>`;
+
+export function libraryList(libs: LibrarySummary[], error?: string): string {
+  const err = error ? `<div class="notice">${esc(error)}</div>` : "";
   if (libs.length === 0) {
-    return `<h1>Libraries</h1><p class="muted">No libraries yet. One is created when you connect an app and choose a new library, or with <code>bun run seed</code>.</p>`;
+    return `<h1>Libraries</h1>${err}<p class="muted">No libraries yet. Create one here, or when you connect an app.</p>${NEW_LIBRARY}`;
   }
   const rows = libs
     .map(
@@ -136,9 +165,10 @@ export function libraryList(libs: LibrarySummary[]): string {
 <td>${l.concepts}</td><td>${l.attachments}</td><td>${l.open_work ? chip(`${l.open_work} open`, "warn") : chip("none", "ok")}</td><td class="muted">${l.seq}</td></tr>`,
     )
     .join("");
-  return `<h1>Libraries</h1>
+  return `<h1>Libraries</h1>${err}
 <div class="table-wrap"><table class="list"><thead><tr><th>Library</th><th>Concepts</th><th>Attachments</th><th>Work queue</th><th>Seq</th></tr></thead>
-<tbody>${rows}</tbody></table></div>`;
+<tbody>${rows}</tbody></table></div>
+${NEW_LIBRARY}`;
 }
 
 // ---------------------------------------------------------------- directory
@@ -314,6 +344,7 @@ ${lint}`;
     frontmatterPanel(fm),
     sourcesPanel(urls, opts.sources, rendered.footnotes),
     linksPanel(urls, opts.links, opts.head),
+    verifyPanel(urls, c, opts.head),
     historyPanel(urls, c, opts.head, opts.history),
   ].join("");
 
@@ -649,4 +680,203 @@ revert by <strong>${esc(opts.actor)}</strong>. Nothing is lost: the current vers
 <p><button class="primary" type="submit">Restore</button> <a href="${esc(urls.pinned(to).file(path))}">Cancel</a></p></form></div>
 <p class="small muted">Current version → version at seq ${to}:</p>
 ${diffHtml(opts.diff)}`;
+}
+
+// ---------------------------------------------------------------- verify
+
+/**
+ * Human verification (spec: OKF conformance, What the service stamps): shown on the current
+ * version only. A later ordinary write lapses it, so the panel says what it covers.
+ */
+function verifyPanel(urls: Urls, c: ConceptData, head: number): string {
+  if (urls.at !== undefined && urls.at < head) return "";
+  const list = Array.isArray(c.frontmatter.verified)
+    ? (c.frontmatter.verified as JsonObject[])
+    : [];
+  const human = [...list].reverse().find((v) => String(v.by ?? "").startsWith("human:"));
+  const status =
+    c.trust_tier === "human-reviewed" && human
+      ? `<p class="small">${chip("human-reviewed", "ok")} by ${esc(String(human.by))}, ${esc(when(String(human.at ?? "")))}.</p>`
+      : human
+        ? `<p class="small">Last verified by ${esc(String(human.by))} on ${esc(when(String(human.at ?? "")))}, but the content has changed since.</p>`
+        : `<p class="small muted">No human has verified this concept.</p>`;
+  const form =
+    c.trust_tier === "human-reviewed"
+      ? ""
+      : `<form method="post" action="${esc(urls.verify(c.path))}">
+<input type="text" name="note" placeholder="Note (optional)" style="width:100%;margin-bottom:8px">
+<button class="primary" type="submit">Verify this version</button></form>
+<p class="small muted">Records that you checked this version. The next edit by anyone lapses it.</p>`;
+  return `<section><h2>Verification</h2>${status}${form}</section>`;
+}
+
+// ---------------------------------------------------------------- work queue
+
+export interface WorkItem {
+  kind: string;
+  path: string;
+  since: string;
+  detail: string;
+  suggested_action: string;
+  inbound_links: number;
+}
+
+export function workPage(opts: {
+  urls: Urls;
+  items: WorkItem[];
+  total: number;
+  kind?: string;
+}): string {
+  const { urls } = opts;
+  const kinds: [string | undefined, string][] = [
+    [undefined, "All"],
+    ["stale", "Stale"],
+    ["broken_link", "Broken links"],
+    ["lint", "Lint"],
+  ];
+  const filter = kinds
+    .map(([k, label]) =>
+      k === opts.kind ? `<strong>${label}</strong>` : `<a href="${esc(urls.work(k))}">${label}</a>`,
+    )
+    .join(" · ");
+  const tone = (k: string) => (k === "lint" ? "warn" : "bad");
+  const rows = opts.items
+    .map(
+      (i) => `<tr><td>${chip(i.kind.replace("_", " "), tone(i.kind))}</td>
+<td class="name"><a href="${esc(urls.file(i.path))}">${esc(i.path)}</a><div class="small muted">${esc(i.detail)}</div>
+<div class="small">→ ${esc(i.suggested_action)}</div></td>
+<td class="muted small">${i.inbound_links} inbound</td><td class="muted small">${esc(when(i.since))}</td></tr>`,
+    )
+    .join("");
+  return `<h1>Work queue</h1>
+<p class="muted">What needs fixing in ${esc(urls.slug)}, most linked-to first. Agents see the same list through the <code>work</code> tool; fix things by asking one.</p>
+<p class="small">${filter}</p>
+${
+  rows
+    ? `<div class="table-wrap"><table class="list"><tbody>${rows}</tbody></table></div>${opts.total > opts.items.length ? `<p class="small muted">${opts.total - opts.items.length} more not shown.</p>` : ""}`
+    : `<p>${chip("nothing to do", "ok")}</p>`
+}`;
+}
+
+// ---------------------------------------------------------------- import and export
+
+export function transferPage(opts: {
+  urls: Urls;
+  head: number;
+  result?: string;
+  error?: string;
+}): string {
+  const { urls } = opts;
+  return `<h1>Import &amp; export</h1>
+${opts.result ? `<div class="notice ok">${opts.result}</div>` : ""}
+${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
+<div class="panel-box"><h2 style="margin-top:0">Export</h2>
+<p>Download ${esc(urls.slug)} as a conformant OKF bundle: a tarball of every concept and attachment, with
+<code>index.md</code> and <code>log.md</code> written out.</p>
+<form class="inline" method="get" action="${esc(urls.exportTar())}">
+<label class="small" for="at">As of sequence</label>
+<input id="at" name="at" type="number" min="0" max="${opts.head}" placeholder="${opts.head} (now)">
+<button class="primary" type="submit">Download .tar</button></form></div>
+<div class="panel-box"><h2 style="margin-top:0">Import</h2>
+<p>Upload a bundle as a <code>.tar</code> or <code>.tar.gz</code>. Every file lands in one request you can
+revert from the ledger. Files at the same paths are replaced; the bundle's own <code>generated</code> and
+<code>verified</code> are kept, and the import is recorded under your name. <code>index.md</code> and
+<code>log.md</code> are skipped: the server writes its own.</p>
+<form method="post" action="${esc(urls.importTar())}" enctype="multipart/form-data">
+<p><input type="file" name="bundle" accept=".tar,.tgz,.gz,application/x-tar,application/gzip" required></p>
+<p><label class="small">Leading directories to drop <input type="number" name="strip" min="0" max="10" value="0"></label></p>
+<p><input type="text" name="note" placeholder="Note (optional)" style="width:100%"></p>
+<button class="primary" type="submit">Import</button></form></div>`;
+}
+
+// ---------------------------------------------------------------- tokens
+
+export interface TokenListRow {
+  id: string;
+  library: string;
+  actor: string;
+  scope: string;
+  prefix: string | null;
+  expires: string | null;
+  mcp_tiers: string;
+  created_by: string | null;
+  revoked: string | null;
+}
+
+export interface TokenForm {
+  library: string;
+  actor: string;
+  scope: string;
+  prefix: string;
+  expires: string;
+  tiers: string;
+}
+
+export function tokensPage(opts: {
+  tokens: TokenListRow[];
+  libraries: string[];
+  human: string;
+  form: TokenForm;
+  error?: string;
+  notice?: string;
+}): string {
+  const now = Date.now();
+  const rows = opts.tokens
+    .map((t) => {
+      const expired = t.expires !== null && Date.parse(t.expires) <= now;
+      const state = t.revoked
+        ? chip("revoked", "bad")
+        : expired
+          ? chip("expired", "warn")
+          : chip("active", "ok");
+      const revoke =
+        t.revoked || expired
+          ? ""
+          : `<form method="post" action="/app/tokens/${esc(encodeURIComponent(t.id))}/revoke"><button type="submit">Revoke</button></form>`;
+      return `<tr><td class="name"><strong>${esc(t.actor)}</strong><div class="small muted">${esc(t.library)}${t.prefix ? ` · ${esc(t.prefix)}/ only` : ""}${t.mcp_tiers === "files" ? " · file tools only" : ""}</div></td>
+<td>${esc(t.scope)}</td><td class="small muted">${t.expires ? `expires ${esc(when(t.expires))}` : "no expiry"}${t.created_by ? `<br>by ${esc(t.created_by)}` : ""}</td>
+<td>${state}</td><td>${revoke}</td></tr>`;
+    })
+    .join("");
+  const f = opts.form;
+  const libOptions = opts.libraries
+    .map((l) => `<option value="${esc(l)}"${l === f.library ? " selected" : ""}>${esc(l)}</option>`)
+    .join("");
+  const radio = (name: string, value: string, label: string) =>
+    `<label class="choice"><input type="radio" name="${name}" value="${value}"${(name === "scope" ? f.scope : f.tiers) === value ? " checked" : ""}> ${label}</label>`;
+  return `<h1>Tokens</h1>
+<p class="muted">Bearer tokens for Claude Code, scripts and scheduled agents. Apps like claude.ai connect with OAuth instead (see Connected apps). Each token reaches one library and signs every change it makes with its actor.</p>
+${opts.notice ? `<div class="notice ok">${esc(opts.notice)}</div>` : ""}
+${rows ? `<div class="table-wrap"><table class="list"><thead><tr><th>Actor</th><th>Access</th><th></th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted">No tokens yet.</p>`}
+<div class="panel-box"><h2 style="margin-top:0">New token</h2>
+${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
+${
+  libOptions
+    ? `<form class="token" method="post" action="/app/tokens">
+<p><label>Library <select name="library">${libOptions}</select></label></p>
+<p><label>Actor <input type="text" name="actor" value="${esc(f.actor)}" placeholder="claude-code/laptop" required style="width:260px"></label>
+<span class="small muted">app/label for an agent, process:name for a scheduled job (it may verify), or your own ${esc(opts.human)}</span></p>
+<p>${radio("scope", "write", "Read and write")} ${radio("scope", "read", "Read only")}</p>
+<p><label>Directory <input type="text" name="prefix" value="${esc(f.prefix)}" placeholder="whole library"></label>
+<label>Expires <input type="date" name="expires" value="${esc(f.expires)}"></label></p>
+<p>${radio("tiers", "all", "All MCP tools")} ${radio("tiers", "files", "File tools only")}</p>
+<button class="primary" type="submit">Create token</button></form>`
+    : `<p class="muted">Create a library first.</p>`
+}</div>`;
+}
+
+export function tokenCreatedPage(opts: {
+  origin: string;
+  secret: string;
+  actor: string;
+  library: string;
+}): string {
+  const cmd = `claude mcp add --transport http ${opts.library} ${opts.origin}/mcp --header "Authorization: Bearer ${opts.secret}"`;
+  return `<h1>Token created</h1>
+<div class="notice">Copy it now: this is the only time it is shown. Only a hash is stored.</div>
+<p>For <strong>${esc(opts.actor)}</strong> on <strong>${esc(opts.library)}</strong>:</p>
+<pre class="src wrap">${esc(opts.secret)}</pre>
+<p class="small muted">Claude Code:</p>
+<pre class="src wrap">${esc(cmd)}</pre>
+<p><a href="/app/tokens">Back to tokens</a></p>`;
 }

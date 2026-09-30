@@ -1,4 +1,5 @@
 import { sha256Hex } from "./okf/hash";
+import { normalizePath } from "./okf/paths";
 import { OkfError } from "./store/errors";
 import type { BlobRef, ImportFile, LibraryStore, WriteOp } from "./store/store";
 
@@ -177,4 +178,25 @@ export function mediaFor(path: string, header?: string | null): string | null {
   if (header && header !== "application/octet-stream") return header.split(";")[0]?.trim() ?? null;
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   return MEDIA[ext] ?? null;
+}
+
+/**
+ * Turns uploaded bundle files into import files: markdown as concepts, everything else stored in
+ * the blob store first. `strip` drops leading directories; dot-directories (.git, .obsidian) are
+ * skipped.
+ */
+export async function bundleFiles(
+  blobs: BlobStore,
+  raw: { path: string; bytes: Uint8Array }[],
+  strip = 0,
+): Promise<ImportFile[]> {
+  const files: ImportFile[] = [];
+  for (const f of raw) {
+    const path = normalizePath(f.path.split("/").slice(strip).join("/"));
+    if (!path || path.split("/").some((s) => s.startsWith("."))) continue;
+    if (path.endsWith(".md")) files.push({ path, markdown: new TextDecoder().decode(f.bytes) });
+    else files.push({ path, blob: await putBlob(blobs, f.bytes, mediaFor(path)) });
+  }
+  if (files.length === 0) throw new OkfError(400, "empty_import", "No files found to import.");
+  return files;
 }
