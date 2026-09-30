@@ -82,6 +82,7 @@ async function uiPages(slug: string, paths: string[]): Promise<string[]> {
   }
   const urls = [
     `${lib}/`,
+    `${lib}/ledger`,
     ...[...dirs].map((d) => `${lib}/tree/${enc(d)}/`),
     ...concepts.map((p) => `${lib}/files/${enc(p)}`),
   ];

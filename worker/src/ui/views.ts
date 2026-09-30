@@ -31,6 +31,53 @@ export class Urls {
   download(path: string) {
     return `${this.base}download/${enc(path)}${this.q()}`;
   }
+  /** A diff of a concept between two sequences; either end may be left to the server. */
+  diff(path: string, from?: number, to?: number) {
+    return `${this.base}diff/${enc(path)}${query({ from, to })}`;
+  }
+  ledger(filters: LedgerFilters = {}) {
+    return `${this.base}ledger${query({ ...filters })}`;
+  }
+  revert(requestId: string) {
+    return `${this.base}revert/${encodeURIComponent(requestId)}`;
+  }
+  restore(path: string, to: number) {
+    return `${this.base}restore/${enc(path)}${query({ to })}`;
+  }
+}
+
+export interface LedgerFilters {
+  prefix?: string;
+  actor?: string;
+  from?: string;
+  to?: string;
+  before?: number;
+}
+
+function query(params: Record<string, string | number | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+/** The library's section tabs: its files and its ledger. */
+export function libNav(urls: Urls, active: "files" | "ledger"): string {
+  const tab = (name: string, href: string, on: boolean) =>
+    on ? `<strong>${name}</strong>` : `<a href="${esc(href)}">${name}</a>`;
+  return `<nav class="libnav"><span class="muted">${esc(urls.slug)}:</span> ${tab("Files", urls.pinned(undefined).tree(""), active === "files")} · ${tab("Ledger", urls.ledger(), active === "ledger")}</nav>`;
+}
+
+/**
+ * The body without a leading `# Heading` that repeats the title: agents often open a body with
+ * the title, and the page already shows it. Display only; the stored body is unchanged.
+ */
+export function withoutTitleHeading(body: string, title: string): string {
+  const m = /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(body);
+  if (!m || m[1]?.trim().toLowerCase() !== title.trim().toLowerCase()) return body;
+  return body.slice(m[0].length);
 }
 
 const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
@@ -230,7 +277,8 @@ export function conceptPage(opts: {
   const sourceIds = new Set(
     opts.sources.sources.map((s) => s.id).filter((id): id is string => typeof id === "string"),
   );
-  const rendered = renderBody(c.body, {
+  const title = typeof fm.title === "string" && fm.title ? fm.title : baseName(c.path);
+  const rendered = renderBody(withoutTitleHeading(c.body, title), {
     url: opts.url,
     footnote: (label, defined) =>
       sourceIds.has(label)
@@ -240,7 +288,6 @@ export function conceptPage(opts: {
           : null,
   });
 
-  const title = typeof fm.title === "string" && fm.title ? fm.title : baseName(c.path);
   const status = typeof fm.status === "string" ? fm.status : "stable";
   const chips = [
     typeof fm.type === "string" && fm.type ? chip(fm.type) : chip("no type", "bad"),
@@ -367,18 +414,23 @@ function linksPanel(urls: Urls, data: LinksData, head: number): string {
   return `<section><h2>Linked from</h2>${inbound}${broken}</section>`;
 }
 
+/** Ops that change a file's content (or remove it), and so have a diff. */
+const CONTENT_OPS = new Set(["put", "import", "revert", "delete", "attach"]);
+
 function historyPanel(urls: Urls, c: ConceptData, head: number, events: HistoryEvent[]): string {
   const shown = [...events].reverse().slice(0, 50);
   const items = shown
     .map((e) => {
       const note = typeof e.meta?.note === "string" ? ` · ${esc(e.meta.note)}` : "";
       const from = typeof e.meta?.from_path === "string" ? ` from ${esc(e.meta.from_path)}` : "";
-      const label = `<strong>${e.seq}</strong> ${esc(e.op)}${from} · ${esc(e.actor)} · ${esc(when(e.ts))}${note}`;
-      const viewable = e.op !== "delete";
+      const head = `<strong>${e.seq}</strong> ${esc(e.op)}`;
+      const seqLink =
+        e.op === "delete" ? head : `<a href="${esc(urls.pinned(e.seq).file(e.path))}">${head}</a>`;
+      const diff = CONTENT_OPS.has(e.op)
+        ? ` · <a href="${esc(urls.diff(e.path, undefined, e.seq))}">diff</a>`
+        : "";
       const cls = e.seq === c.seq ? ' class="current"' : "";
-      return viewable
-        ? `<li${cls}><a href="${esc(urls.pinned(e.seq).file(e.path))}">${label}</a></li>`
-        : `<li${cls}>${label}</li>`;
+      return `<li${cls}>${seqLink}${from} · ${esc(e.actor)} · ${esc(when(e.ts))}${note}${diff}</li>`;
     })
     .join("");
   const more =
@@ -389,8 +441,22 @@ function historyPanel(urls: Urls, c: ConceptData, head: number, events: HistoryE
 <label class="small" for="at">View at sequence</label>
 <input id="at" name="at" type="number" min="1" max="${head}" value="${urls.at ?? head}">
 <button type="submit">View</button></form>`;
-  return `<section><h2>History</h2>${picker}<ol class="history">${items}</ol>${more}
-<p class="small"><a href="${esc(urls.raw(c.path))}">Raw source</a>${urls.at !== undefined ? ` · <a href="${esc(urls.pinned(undefined).file(c.path))}">Current version</a>` : ""}</p></section>`;
+
+  // Time travel shortcuts (spec: Time travel in the UI).
+  const verified = [...events]
+    .reverse()
+    .find((e) => e.op === "verify" && e.actor.startsWith("human:"));
+  let sinceHuman: string;
+  if (!verified) sinceHuman = "Never verified by a human.";
+  else if (events.some((e) => e.seq > verified.seq && CONTENT_OPS.has(e.op))) {
+    sinceHuman = `<a href="${esc(urls.diff(c.path, verified.seq))}">Changes since human verification</a> (seq ${verified.seq}, ${esc(verified.actor)})`;
+  } else sinceHuman = `No changes since ${esc(verified.actor)} verified it at seq ${verified.seq}.`;
+  const pinnedOld = urls.at !== undefined && urls.at < head;
+  const restore = pinnedOld
+    ? ` · <a href="${esc(urls.restore(c.path, urls.at as number))}">Restore this version…</a>`
+    : "";
+  return `<section><h2>History</h2>${picker}<p class="small">${sinceHuman}</p><ol class="history">${items}</ol>${more}
+<p class="small"><a href="${esc(urls.raw(c.path))}">Raw source</a>${pinnedOld ? ` · <a href="${esc(urls.pinned(undefined).file(c.path))}">Current version</a>` : ""}${restore}</p></section>`;
 }
 
 // ---------------------------------------------------------------- attachment and derived files
@@ -431,3 +497,156 @@ ${atNotice(urls, opts.head, urls.pinned(undefined).file(opts.path))}
 }
 
 export { dirOf };
+
+// ---------------------------------------------------------------- diffs
+
+/** A unified diff as HTML, one line per row, colored by kind. */
+export function diffHtml(diff: string): string {
+  if (diff.trim() === "") return `<p class="muted">No differences.</p>`;
+  const lines = diff.replace(/\n$/, "").split("\n");
+  const rows = lines.map((line) => {
+    let cls = "ctx";
+    if (line.startsWith("+++") || line.startsWith("---")) cls = "meta";
+    else if (line.startsWith("@@")) cls = "hunk";
+    else if (line.startsWith("+")) cls = "add";
+    else if (line.startsWith("-")) cls = "del";
+    else if (line.startsWith("\\")) cls = "meta";
+    return `<span class="${cls}">${esc(line) || " "}</span>`;
+  });
+  return `<pre class="diff">${rows.join("")}</pre>`;
+}
+
+export function diffPage(opts: {
+  urls: Urls;
+  head: number;
+  path: string;
+  from: number;
+  to: number;
+  diff: string;
+}): string {
+  const { urls, path, from, to } = opts;
+  const at = (seq: number) =>
+    `<a href="${esc(urls.pinned(seq >= opts.head ? undefined : seq).file(path))}">seq ${seq}</a>`;
+  const form = `<form class="inline" method="get" action="${esc(urls.diff(path))}">
+<label class="small" for="from">From</label><input id="from" name="from" type="number" min="0" max="${opts.head}" value="${from}">
+<label class="small" for="to">to</label><input id="to" name="to" type="number" min="0" max="${opts.head}" value="${to}">
+<button type="submit">Compare</button></form>`;
+  return `${crumbs(urls, path, true)}
+<h1>Changes to ${esc(baseName(path))}</h1>
+<p class="muted">From ${at(from)} to ${at(to)}, as rendered markdown.</p>
+${form}
+${diffHtml(opts.diff)}`;
+}
+
+// ---------------------------------------------------------------- ledger
+
+export interface LedgerEvent {
+  seq: number;
+  op: string;
+  path: string;
+  meta: JsonObject | null;
+}
+
+export interface LedgerRequest {
+  request_id: string;
+  ts: string;
+  actor: string;
+  note: string | null;
+  events: LedgerEvent[];
+}
+
+function eventLine(urls: Urls, e: LedgerEvent): string {
+  const from =
+    typeof e.meta?.from_path === "string"
+      ? ` <span class="muted">from ${esc(e.meta.from_path)}</span>`
+      : "";
+  // A deleted file is shown as it was just before.
+  const view = urls.pinned(e.op === "delete" ? e.seq - 1 : e.seq).file(e.path);
+  const diff = CONTENT_OPS.has(e.op)
+    ? ` · <a class="small" href="${esc(urls.diff(e.path, undefined, e.seq))}">diff</a>`
+    : "";
+  return `<li><span class="op op-${esc(e.op)}">${esc(e.op)}</span> <a href="${esc(view)}">${esc(e.path)}</a>${from}${diff}</li>`;
+}
+
+export function ledgerPage(opts: {
+  urls: Urls;
+  filters: LedgerFilters;
+  requests: LedgerRequest[];
+  next: number | null;
+  notice?: string;
+}): string {
+  const { urls, filters: f } = opts;
+  const form = `<form class="filters" method="get" action="${esc(urls.ledger())}">
+<label>Directory <input type="text" name="prefix" value="${esc(f.prefix ?? "")}" placeholder="all"></label>
+<label>Actor <input type="text" name="actor" value="${esc(f.actor ?? "")}" placeholder="anyone"></label>
+<label>From <input type="date" name="from" value="${esc(f.from ?? "")}"></label>
+<label>To <input type="date" name="to" value="${esc(f.to ?? "")}"></label>
+<button type="submit">Filter</button> <a class="small" href="${esc(urls.ledger())}">Clear</a></form>`;
+  const items = opts.requests
+    .map((r) => {
+      const shown = r.events.slice(0, 12);
+      const more = r.events.length - shown.length;
+      const revertible = r.events.some((e) => e.op !== "verify");
+      const actorLink = `<a href="${esc(urls.ledger({ ...f, actor: r.actor, before: undefined }))}">${esc(r.actor)}</a>`;
+      return `<li class="request"><div class="req-head"><span class="muted small">${esc(when(r.ts))}</span> ${actorLink}
+<span class="muted small">seq ${r.events[0]?.seq}${r.events.length > 1 ? `–${r.events.at(-1)?.seq}` : ""}</span>
+${revertible ? `<a class="small revert" href="${esc(urls.revert(r.request_id))}">Revert…</a>` : ""}</div>
+${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}
+<ul class="events">${shown.map((e) => eventLine(urls, e)).join("")}</ul>
+${more > 0 ? `<p class="small muted">… and ${more} more</p>` : ""}</li>`;
+    })
+    .join("");
+  const older = opts.next
+    ? `<p><a href="${esc(urls.ledger({ ...f, before: opts.next }))}">Older requests →</a></p>`
+    : "";
+  return `<h1>Ledger</h1>
+<p class="muted">Every change to ${esc(urls.slug)}, newest first, one entry per request.</p>
+${opts.notice ? `<div class="notice ok">${esc(opts.notice)}</div>` : ""}
+${form}
+${items ? `<ol class="ledger">${items}</ol>` : `<p class="muted">No requests match.</p>`}
+${older}`;
+}
+
+// ---------------------------------------------------------------- revert and restore
+
+export function revertPage(opts: {
+  urls: Urls;
+  request: LedgerRequest;
+  diffs: { path: string; diff: string }[];
+  actor: string;
+}): string {
+  const { urls, request: r } = opts;
+  const diffs = opts.diffs.map((d) => `<h2>${esc(d.path)}</h2>${diffHtml(d.diff)}`).join("");
+  return `<h1>Revert this request?</h1>
+<p>${esc(when(r.ts))} by <strong>${esc(r.actor)}</strong>${r.note ? `: ${esc(r.note)}` : ""}</p>
+<ul class="events">${r.events.map((e) => eventLine(urls, e)).join("")}</ul>
+<div class="panel-box">
+<p>Reverting puts every file this request touched back as it was just before it: edits are undone,
+created files are removed, deleted files come back and moves go back. It is recorded in the ledger
+as a new request by <strong>${esc(opts.actor)}</strong>, so it can itself be reverted.</p>
+<form method="post" action="${esc(urls.revert(r.request_id))}">
+<label>Note <input type="text" name="note" value="Revert: ${esc(r.note ?? r.request_id)}" style="width:100%"></label>
+<p><button class="primary" type="submit">Revert</button> <a href="${esc(urls.ledger())}">Cancel</a></p></form></div>
+<p class="small muted">What this request changed:</p>
+${diffs}`;
+}
+
+export function restorePage(opts: {
+  urls: Urls;
+  path: string;
+  to: number;
+  diff: string;
+  actor: string;
+}): string {
+  const { urls, path, to } = opts;
+  return `${crumbs(urls, path, true)}
+<h1>Restore ${esc(baseName(path))} as of seq ${to}?</h1>
+<div class="panel-box">
+<p>This writes the version from seq ${to} back as the current version, recorded in the ledger as a
+revert by <strong>${esc(opts.actor)}</strong>. Nothing is lost: the current version stays in the history.</p>
+<form method="post" action="${esc(urls.restore(path, to))}">
+<label>Note <input type="text" name="note" value="Restore ${esc(path)} to seq ${to}" style="width:100%"></label>
+<p><button class="primary" type="submit">Restore</button> <a href="${esc(urls.pinned(to).file(path))}">Cancel</a></p></form></div>
+<p class="small muted">Current version → version at seq ${to}:</p>
+${diffHtml(opts.diff)}`;
+}

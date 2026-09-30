@@ -11,9 +11,16 @@ import {
   attachmentPage,
   conceptPage,
   derivedPage,
+  diffPage,
   directoryPage,
+  type LedgerFilters,
+  type LedgerRequest,
   type LibrarySummary,
+  ledgerPage,
+  libNav,
   libraryList,
+  restorePage,
+  revertPage,
   type TreeEntry,
   Urls,
 } from "./views";
@@ -53,6 +60,38 @@ function atParam(c: C): number | undefined {
     throw new OkfError(400, "bad_param", "`at` must be a sequence number.");
   }
   return n;
+}
+
+function intParam(c: C, name: string): number | undefined {
+  const v = c.req.query(name);
+  if (v === undefined || v === "") return undefined;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new OkfError(400, "bad_param", `\`${name}\` must be a sequence number.`);
+  }
+  return n;
+}
+
+/** Access cookies ride along on cross-site form posts, so writes insist on a same-origin request. */
+function requireSameOrigin(c: C) {
+  if (c.req.header("Origin") !== new URL(c.req.url).origin) {
+    throw new OkfError(
+      403,
+      "cross_origin",
+      "Changes must be submitted from this site's own pages.",
+    );
+  }
+}
+
+/** A write from the UI: attributed to the signed-in human, with the note from the form. */
+async function humanContext(p: Page) {
+  const form = await p.c.req.formData();
+  const note = String(form.get("note") ?? "").trim();
+  return { actor: p.user.actor, request_id: crypto.randomUUID(), note: note || null };
+}
+
+function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
 function errorPage(user: User | null, status: number, message: string): Response {
@@ -147,13 +186,15 @@ export function registerUiRoutes<E extends AppEnv>(
     if (dir !== "" && tree.entries.length === 0) {
       throw new OkfError(404, "not_found", `There is no directory ${dir}/ in ${urls.slug}.`);
     }
-    const body = directoryPage({
-      urls,
-      dir,
-      head,
-      entries: tree.entries as TreeEntry[],
-      summary,
-    });
+    const body =
+      libNav(urls, "files") +
+      directoryPage({
+        urls,
+        dir,
+        head,
+        entries: tree.entries as TreeEntry[],
+        summary,
+      });
     return show(p, dir === "" ? urls.slug : `${dir}/ · ${urls.slug}`, body);
   };
 
@@ -194,15 +235,19 @@ export function registerUiRoutes<E extends AppEnv>(
     return show(
       p,
       `${title} · ${urls.slug}`,
-      conceptPage({
-        urls,
-        head,
-        concept: view,
-        sources,
-        links,
-        history: history.events,
-        url: bodyUrl(urls, view.path),
-      }),
+      libNav(urls, "files") +
+        (p.c.req.query("done") === "restore"
+          ? `<div class="notice ok">Restored. The ledger records it as a revert by ${esc(p.user.actor)}.</div>`
+          : "") +
+        conceptPage({
+          urls,
+          head,
+          concept: view,
+          sources,
+          links,
+          history: history.events,
+          url: bodyUrl(urls, view.path),
+        }),
     );
   });
 
@@ -233,5 +278,111 @@ export function registerUiRoutes<E extends AppEnv>(
       media: view.media ?? null,
     });
     return p.c.redirect(`/dl/${encodeURIComponent(ref.do_id)}/${token}`, 302);
+  });
+
+  // ---------------------------------------------------------------- history and the ledger
+
+  get("/app/libraries/:lib/diff/*", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const path = tail(p.c, "/diff/");
+    const [d, head] = await Promise.all([
+      lib.diff(path, { from: intParam(p.c, "from"), to: intParam(p.c, "to") }),
+      lib.headSeq(),
+    ]);
+    return show(
+      p,
+      `Changes to ${d.path} · ${urls.slug}`,
+      libNav(urls, "files") +
+        diffPage({ urls, head, path: d.path, from: d.from, to: d.to, diff: d.diff }),
+    );
+  });
+
+  get("/app/libraries/:lib/ledger", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const q = (k: string) => p.c.req.query(k)?.trim() || undefined;
+    const filters: LedgerFilters = {
+      prefix: q("prefix"),
+      actor: q("actor"),
+      from: q("from"),
+      to: q("to"),
+      before: intParam(p.c, "before"),
+    };
+    const res = await lib.requests({ ...filters, limit: 30 });
+    let notice: string | undefined;
+    if (p.c.req.query("done") === "revert") {
+      notice = `Reverted: ${plural(Number(p.c.req.query("n") ?? 0), "change")}, recorded as a new request by ${p.user.actor}.`;
+    }
+    return show(
+      p,
+      `Ledger · ${urls.slug}`,
+      libNav(urls, "ledger") +
+        ledgerPage({
+          urls,
+          filters,
+          requests: res.requests as LedgerRequest[],
+          next: res.next,
+          notice,
+        }),
+    );
+  });
+
+  // Revert a request (spec: The ledger): a confirmation page, then a same-origin POST.
+  get("/app/libraries/:lib/revert/:request", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const request = (await lib.request(p.c.req.param("request") ?? "")) as LedgerRequest;
+    const content = request.events.filter((e) => e.op !== "verify" && e.op !== "move").slice(0, 20);
+    const diffs = await Promise.all(
+      content.map(async (e) => ({
+        path: e.path,
+        diff: (await lib.diff(e.path, { to: e.seq })).diff,
+      })),
+    );
+    return show(
+      p,
+      `Revert · ${urls.slug}`,
+      libNav(urls, "ledger") + revertPage({ urls, request, diffs, actor: p.user.actor }),
+    );
+  });
+
+  const post = (path: string, handler: (p: Page) => Promise<Response>) =>
+    app.post(
+      path,
+      ui(deps, async (p) => {
+        requireSameOrigin(p.c);
+        return handler(p);
+      }) as never,
+    );
+
+  post("/app/libraries/:lib/revert/:request", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const ctx = await humanContext(p);
+    const res = await lib.revert(ctx, { request_id: p.c.req.param("request") ?? "" });
+    return p.c.redirect(`${urls.ledger()}?done=revert&n=${res.results.length}`, 303);
+  });
+
+  // Restore one file to an earlier version: the same revert, for a path.
+  get("/app/libraries/:lib/restore/*", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const path = tail(p.c, "/restore/");
+    const to = intParam(p.c, "to");
+    if (to === undefined) throw new OkfError(400, "bad_param", "`to` is required.");
+    const head = await lib.headSeq();
+    const d = await lib.diff(path, { from: head, to });
+    return show(
+      p,
+      `Restore ${d.path} · ${urls.slug}`,
+      libNav(urls, "files") +
+        restorePage({ urls, path: d.path, to, diff: d.diff, actor: p.user.actor }),
+    );
+  });
+
+  post("/app/libraries/:lib/restore/*", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    const path = tail(p.c, "/restore/");
+    const to = intParam(p.c, "to");
+    if (to === undefined) throw new OkfError(400, "bad_param", "`to` is required.");
+    const ctx = await humanContext(p);
+    await lib.revert(ctx, { path, to_seq: to });
+    return p.c.redirect(`${urls.pinned(undefined).file(path)}?done=restore`, 303);
   });
 }

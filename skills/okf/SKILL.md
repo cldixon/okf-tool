@@ -49,7 +49,7 @@ Gross margin equals recognized [revenue](/metrics/revenue.md) minus full COGS.[^
 [^margin-standard]: Cost Allocation & Margin Standard (FY2026)
 ```
 
-- A non-empty `type` that says what kind of thing this is (`Metric`, `BigQuery Table`, `Decision`, `Playbook`). Reuse the types already in the library (`start` lists them).
+- A non-empty `type` that says what kind of thing this is (`Metric`, `BigQuery Table`, `Decision`, `Playbook`). Every file is a concept, so `concept`, `page`, `note` or `doc` tell a reader nothing: pick the kind a reader would filter by. Reuse the types already in the library (`start` lists them).
 - A `description` of one sentence: it is what `browse` and indexes show.
 - Absolute links (`/dir/file.md`). A link to a concept that does not exist yet is allowed; it shows up in `work` as a broken link until someone writes it.
 - Every footnote label matches a `sources[].id`, and every `[^id]` in the text has a `[^id]: …` definition line at the end of the body (without one, renderers show it as literal text).

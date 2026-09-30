@@ -191,3 +191,142 @@ describe("built-in UI pages", () => {
     expect((await s.app.request(`${LIB}/files/a.md`)).status).toBe(403);
   });
 });
+
+async function json<T>(r: Response): Promise<T> {
+  return (await r.json()) as T;
+}
+
+async function hashOf(s: S, path: string) {
+  const r = await s.req(`/files/${path}`, { headers: { Accept: "application/json" } });
+  return (await json<{ hash: string; seq: number }>(r)).hash;
+}
+
+async function submit(
+  s: S,
+  path: string,
+  fields: Record<string, string>,
+  origin = "http://localhost",
+) {
+  return s.app.request(path, {
+    method: "POST",
+    headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(fields),
+    redirect: "manual",
+  });
+}
+
+describe("history, ledger and revert (Phase 3, slice 2)", () => {
+  test("a leading heading that repeats the title is not shown twice", async () => {
+    const s = setup();
+    await put(
+      s,
+      "a.md",
+      "---\ntype: Note\ntitle: Alpha\n---\n# Alpha\n\nBody text.\n\n# Alpha again\n",
+    );
+    const c = await page(s, `${LIB}/files/a.md`);
+    expect(c.html).toContain("<h1>Alpha</h1>");
+    expect(c.html).not.toContain('<h1 id="alpha">');
+    expect(c.html).toContain("Alpha again");
+    expect(c.html).toContain("Body text.");
+  });
+
+  test("diffs between versions, and since the last human verification", async () => {
+    const s = setup();
+    await put(s, "a.md", "---\ntype: Note\n---\nOne.\n", "first");
+    const first = (
+      await json<{ seq: number }>(
+        await s.req("/files/a.md", { headers: { Accept: "application/json" } }),
+      )
+    ).seq;
+    await s.store().verify({ actor: "human:owner", request_id: "v1" }, "a.md");
+    await s.req("/files/a.md", {
+      method: "PUT",
+      headers: { "Content-Type": "text/markdown", "If-Match": `"${await hashOf(s, "a.md")}"` },
+      body: "---\ntype: Note\n---\nTwo.\n",
+    });
+    const c = await page(s, `${LIB}/files/a.md`);
+    expect(c.html).toContain("Changes since human verification");
+    expect(c.html).toContain(`${LIB}/diff/a.md?to=${first}`);
+    const d = await page(s, `${LIB}/diff/a.md`);
+    expect(d.status).toBe(200);
+    expect(d.html).toContain('<span class="del">-One.</span>');
+    expect(d.html).toContain('<span class="add">+Two.</span>');
+    const since = /href="([^"]*diff\/a\.md\?from=\d+)"/.exec(c.html)?.[1] ?? "";
+    expect((await page(s, since.replace(/&amp;/g, "&"))).html).toContain("+Two.");
+  });
+
+  test("the ledger lists requests with filters and pages", async () => {
+    const s = setup();
+    await put(s, "notes/a.md", "---\ntype: Note\n---\nA\n", "add a");
+    await put(s, "other/b.md", "---\ntype: Note\n---\nB\n", "add b");
+    const all = await page(s, `${LIB}/ledger`);
+    expect(all.html).toContain("add a");
+    expect(all.html).toContain("add b");
+    expect(all.html.indexOf("add b")).toBeLessThan(all.html.indexOf("add a"));
+    const scoped = await page(s, `${LIB}/ledger?prefix=notes`);
+    expect(scoped.html).toContain("add a");
+    expect(scoped.html).not.toContain("add b");
+    expect((await page(s, `${LIB}/ledger?actor=someone/else`)).html).toContain("No requests match");
+    const today = new Date().toISOString().slice(0, 10);
+    expect((await page(s, `${LIB}/ledger?from=${today}&to=${today}`)).html).toContain("add a");
+    expect((await page(s, `${LIB}/ledger?to=2000-01-01`)).html).toContain("No requests match");
+    expect((await page(s, `${LIB}/ledger?from=yesterday`)).status).toBe(400);
+  });
+
+  test("revert a request from the ledger, attributed to the signed-in human", async () => {
+    const s = setup();
+    await put(s, "a.md", "---\ntype: Note\n---\nGood.\n", "good version");
+    await s.req("/files/a.md", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "text/markdown",
+        "If-Match": `"${await hashOf(s, "a.md")}"`,
+        "X-Note": "bad edit",
+      },
+      body: "---\ntype: Note\n---\nBad.\n",
+    });
+    const ledger = await page(s, `${LIB}/ledger`);
+    const revertUrl = /href="([^"]*\/revert\/[^"]+)"/.exec(ledger.html)?.[1] ?? "";
+    const confirm = await page(s, revertUrl);
+    expect(confirm.html).toContain("Revert this request?");
+    expect(confirm.html).toContain("bad edit");
+    expect(confirm.html).toContain('<span class="add">+Bad.</span>');
+
+    const forged = await submit(s, revertUrl, { note: "x" }, "https://evil.example");
+    expect(forged.status).toBe(403);
+    expect(await s.store().read("a.md")).toMatchObject({ body: "Bad.\n" });
+
+    const done = await submit(s, revertUrl, { note: "undo the bad edit" });
+    expect(done.status).toBe(303);
+    expect(done.headers.get("Location")).toContain("done=revert");
+    const r = s.store().read("a.md");
+    expect(r).toMatchObject({ body: "Good.\n" });
+    const after = await page(s, done.headers.get("Location") ?? "");
+    expect(after.html).toContain("Reverted: 1 change");
+    expect(after.html).toContain("human:owner");
+    expect(after.html).toContain("undo the bad edit");
+  });
+
+  test("restore one file to an earlier version", async () => {
+    const s = setup();
+    await put(s, "a.md", "---\ntype: Note\n---\nFirst.\n");
+    const first = (
+      await json<{ seq: number }>(
+        await s.req("/files/a.md", { headers: { Accept: "application/json" } }),
+      )
+    ).seq;
+    await s.req("/files/a.md", {
+      method: "PUT",
+      headers: { "Content-Type": "text/markdown", "If-Match": `"${await hashOf(s, "a.md")}"` },
+      body: "---\ntype: Note\n---\nSecond.\n",
+    });
+    const pinned = await page(s, `${LIB}/files/a.md?at=${first}`);
+    expect(pinned.html).toContain(`${LIB}/restore/a.md?to=${first}`);
+    const confirm = await page(s, `${LIB}/restore/a.md?to=${first}`);
+    expect(confirm.html).toContain('<span class="add">+First.</span>');
+    const done = await submit(s, `${LIB}/restore/a.md?to=${first}`, { note: "back to first" });
+    expect(done.status).toBe(303);
+    expect(s.store().read("a.md")).toMatchObject({ body: "First.\n" });
+    expect((await page(s, done.headers.get("Location") ?? "")).html).toContain("Restored.");
+  });
+});

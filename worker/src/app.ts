@@ -342,6 +342,9 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       await c.var.lib.requests({
         before: num(c, "before"),
         prefix: c.req.query("prefix"),
+        actor: c.req.query("actor"),
+        from: c.req.query("from"),
+        to: c.req.query("to"),
         limit: num(c, "limit"),
       }),
     ),

@@ -47,9 +47,14 @@ Operator setup). It lists your libraries; each library page shows its directorie
 their type, trust tier and staleness. A concept page renders the body, with the frontmatter, the
 sources (footnotes resolved, internal sources with their own trust and staleness), inbound links and
 the history beside it. Every page takes `?at=<seq>` to show the library as it was then, and a
-concept's raw markdown is one click away. Phase 3 adds the ledger, diffs, revert, verify, the work
-queue, import/export and token management in later slices; there is no editor, by design (ask an
-agent).
+concept's raw markdown is one click away.
+
+The **ledger** lists every change request newest first (who, when, their note, the files touched),
+filtered by directory, actor and date. Each change has a diff, each concept links to "changes since
+human verification", and any request can be **reverted** (or one file restored to an earlier
+version) after a confirmation page; reverts are recorded as your own requests, so they can be undone
+too. Verify, the work queue, import/export and token management come in the next slice. There is no
+editor, by design: ask an agent.
 
 ## Agents (MCP)
 
