@@ -62,6 +62,9 @@ export class Urls {
   maintain() {
     return `${this.base}maintain`;
   }
+  recovery() {
+    return `${this.base}recovery`;
+  }
   nightly(date: string, file: string) {
     return `${this.base}exports/${encodeURIComponent(date)}/${encodeURIComponent(file)}`;
   }
@@ -85,7 +88,7 @@ function query(params: Record<string, string | number | undefined>): string {
 }
 
 /** The library's section tabs: its files and its ledger. */
-export type LibTab = "files" | "ledger" | "work" | "transfer";
+export type LibTab = "files" | "ledger" | "work" | "transfer" | "recovery";
 
 export function libNav(urls: Urls, active: LibTab): string {
   const tab = (name: string, href: string, key: LibTab) =>
@@ -95,6 +98,7 @@ export function libNav(urls: Urls, active: LibTab): string {
     tab("Ledger", urls.ledger(), "ledger"),
     tab("Work queue", urls.work(), "work"),
     tab("Import &amp; export", urls.transfer(), "transfer"),
+    tab("Recovery", urls.recovery(), "recovery"),
   ];
   return `<nav class="libnav"><span class="muted">${esc(urls.slug)}:</span> ${tabs.join(" · ")}</nav>`;
 }
@@ -795,10 +799,16 @@ function opsLine(urls: Urls, s: LibraryStats): string {
 }
 
 export interface NightlyExport {
-  /** YYYY-MM-DD, the folder under exports/<library id>/. */
+  /** The folder under exports/<library id>/: YYYY-MM-DD, or YYYY-MM-DD-pre-restore-HHMMSS. */
   date: string;
   seq: number | null;
   files: number | null;
+}
+
+/** "2026-09-30", or "2026-09-30 18:02:11 UTC, before a restore" for a pre-restore export. */
+function exportLabel(folder: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2})-pre-restore-(\d{2})(\d{2})(\d{2})$/.exec(folder);
+  return m ? `${m[1]} ${m[2]}:${m[3]}:${m[4]} UTC, before a restore` : folder;
 }
 
 export function transferPage(opts: {
@@ -814,7 +824,7 @@ export function transferPage(opts: {
     .map(
       (
         n,
-      ) => `<tr><td><strong>${esc(n.date)}</strong></td><td class="muted small">${n.seq !== null ? `seq ${n.seq}` : ""}${n.files !== null ? ` · ${n.files} files` : ""}</td>
+      ) => `<tr><td><strong>${esc(exportLabel(n.date))}</strong></td><td class="muted small">${n.seq !== null ? `seq ${n.seq}` : ""}${n.files !== null ? ` · ${n.files} files` : ""}</td>
 <td><a href="${esc(urls.nightly(n.date, "bundle.tar"))}">bundle.tar</a> · <a href="${esc(urls.nightly(n.date, "ledger.jsonl"))}">ledger.jsonl</a></td></tr>`,
     )
     .join("");
@@ -846,6 +856,74 @@ revert from the ledger. Files at the same paths are replaced; the bundle's own <
 <p><input type="text" name="note" placeholder="Note (optional)" style="width:100%"></p>
 <button class="primary" type="submit">Import</button></form></div>
 ${nightlyBox}`;
+}
+
+// ---------------------------------------------------------------- recovery
+
+/** A restore as the recovery page lists it (spec: Backups and recovery). */
+export interface RestoreRow {
+  id: string;
+  kind: "restore" | "undo";
+  to: string;
+  requested_at: string;
+  actor: string;
+  seq_before: number;
+  /** The pre-restore export's folder name under exports/<library id>/. */
+  export: string;
+  undoes?: string;
+}
+
+export function recoveryPage(opts: {
+  urls: Urls;
+  head: number;
+  recent: LedgerRequest[];
+  restores: RestoreRow[];
+  /** The value to put back in the time field after an error. */
+  to?: string;
+  result?: string;
+  error?: string;
+}): string {
+  const { urls } = opts;
+  const confirm = (id: string) =>
+    `<label class="small">Type <code>${esc(urls.slug)}</code> to confirm <input type="text" name="confirm" id="${id}" autocomplete="off" required></label>`;
+  const recent = opts.recent
+    .map(
+      (r) =>
+        `<li><span class="muted">${esc(when(r.ts))}</span> ${esc(r.actor)}${r.note ? ` · ${esc(r.note)}` : ""} <span class="muted">(${r.events.length} change${r.events.length === 1 ? "" : "s"})</span></li>`,
+    )
+    .join("");
+  const rows = opts.restores
+    .map((r) => {
+      const what =
+        r.kind === "undo"
+          ? `Undid the restore made ${esc(when(r.undoes ? restoreTime(r.undoes) : r.to))} UTC`
+          : `Restored to ${esc(when(r.to))} UTC`;
+      return `<tr><td><strong>${what}</strong><div class="small muted">${esc(when(r.requested_at))} UTC by ${esc(r.actor)} · ledger was at seq ${r.seq_before}</div></td>
+<td class="small"><a href="${esc(urls.nightly(r.export, "bundle.tar"))}">bundle.tar</a> · <a href="${esc(urls.nightly(r.export, "ledger.jsonl"))}">ledger.jsonl</a></td>
+<td><form class="inline" method="post" action="${esc(urls.recovery())}"><input type="hidden" name="undo" value="${esc(r.id)}">${confirm(`undo-${esc(r.id)}`)}<button type="submit">Undo</button></form></td></tr>`;
+    })
+    .join("");
+  return `<h1>Recovery</h1>
+${opts.result ? `<div class="notice ok">${opts.result}</div>` : ""}
+${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
+<div class="panel-box"><h2 style="margin-top:0">Restore this library to a point in time</h2>
+<p>Rewinds all of ${esc(urls.slug)}, ledger included, to how it was at a moment in the last 30 days.
+Everything after that moment is removed from the library. Before restoring, the current library is exported
+to R2 (the bundle and the full ledger), and you can undo the restore below.</p>
+<p class="small muted">To take back a single change, revert it from the <a href="${esc(urls.ledger())}">ledger</a>
+instead: that keeps history and touches nothing else.</p>
+<form method="post" action="${esc(urls.recovery())}">
+<p><label class="small">Time (UTC) <input type="datetime-local" name="to" step="1" required value="${esc(opts.to ?? "")}"></label></p>
+<p>${confirm("confirm")}</p>
+<button class="primary" type="submit">Restore</button></form>
+${recent ? `<h2>Recent requests</h2><p class="small muted">The ledger is at seq ${opts.head}. Pick a time just before the change you want gone.</p><ul class="small">${recent}</ul>` : ""}</div>
+<div class="panel-box"><h2 style="margin-top:0">Past restores</h2>
+${rows ? `<p class="small">Undo returns the library to how it was just before that restore. It is a restore too: it writes its own export first and can itself be undone.</p><div class="table-wrap"><table class="list"><tbody>${rows}</tbody></table></div>` : `<p class="muted small">None.</p>`}</div>`;
+}
+
+/** A restore id (20260930T180211Z) as an ISO time. */
+function restoreTime(id: string): string {
+  return id.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, "$1-$2-$3T$4:$5:$6Z");
 }
 
 // ---------------------------------------------------------------- tokens

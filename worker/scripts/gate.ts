@@ -122,6 +122,33 @@ async function nightlyExport(slug: string, originals: number): Promise<string[]>
   return [];
 }
 
+/**
+ * The Recovery page renders, and a restore in wrangler dev (no point-in-time recovery there)
+ * fails cleanly: a 501 naming the reason, no pre-restore export, the library still answering.
+ */
+async function restoreUnavailable(slug: string): Promise<string[]> {
+  const lib = `${base}/app/libraries/${slug}`;
+  const page = await fetch(`${lib}/recovery`);
+  if (!page.ok || !(await page.text()).includes("Restore this library to a point in time")) {
+    return [`recovery page: ${page.status}`];
+  }
+  const to = new Date(Date.now() - 60_000).toISOString().slice(0, 19);
+  const r = await fetch(`${lib}/recovery`, {
+    method: "POST",
+    headers: { Origin: base },
+    body: new URLSearchParams({ to, confirm: slug }),
+  });
+  const html = await r.text();
+  if (r.status !== 501 || !html.includes("point-in-time recovery")) {
+    return [`restore in wrangler dev: ${r.status} ${html.slice(0, 200)}`];
+  }
+  const transfer = await (await fetch(`${lib}/transfer`)).text();
+  if (transfer.includes("before a restore")) return ["a pre-restore export was written"];
+  const home = await fetch(`${lib}/`);
+  if (!home.ok) return [`library after a refused restore: ${home.status}`];
+  return [];
+}
+
 let failed = false;
 try {
   await waitForHealth();
@@ -167,6 +194,12 @@ try {
     );
     for (const p of exportProblems) console.log(`  - ${p}`);
     if (exportProblems.length > 0) failed = true;
+    const restoreProblems = await restoreUnavailable(t.slug);
+    console.log(
+      `${restoreProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: restore refused cleanly without point-in-time recovery`,
+    );
+    for (const p of restoreProblems) console.log(`  - ${p}`);
+    if (restoreProblems.length > 0) failed = true;
   }
   const mcpOk = await mcpSmoke({ url: base, token: mcpToken });
   console.log(`${mcpOk ? "PASS" : "FAIL"} MCP smoke on an empty library`);

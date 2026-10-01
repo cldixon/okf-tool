@@ -6,6 +6,7 @@ import {
   nextRun,
   runMaintenance,
 } from "./maintain";
+import { prepareRestore, type RestoreOutcome, type RestoreTarget } from "./recovery";
 import { doSqlHandle } from "./store/sql";
 import { LibraryStore } from "./store/store";
 
@@ -13,6 +14,8 @@ import { LibraryStore } from "./store/store";
 export class Library extends DurableObject<Env> {
   private readonly store: LibraryStore;
   private alarmChecked = false;
+  /** Set once a restore is armed: the object refuses work until it restarts into the restore. */
+  private restarting = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -23,6 +26,7 @@ export class Library extends DurableObject<Env> {
 
   /** The single RPC entry point: runs a store method and returns its result or error as data. */
   async call(method: LibraryMethod, args: unknown[]): Promise<CallResult> {
+    if (this.restarting) return RESTARTING;
     if (!this.alarmChecked) await this.ensureAlarm();
     return callStore(this.store, r2BlobStore(this.env.BLOBS), method, args);
   }
@@ -55,6 +59,7 @@ export class Library extends DurableObject<Env> {
 
   /** Runs the daily maintainers now ("Export now" in the UI); the alarm keeps its schedule. */
   async maintain(): Promise<MaintenanceResult> {
+    if (this.restarting) throw new Error("The library is restarting after a restore.");
     if (!this.alarmChecked) await this.ensureAlarm();
     return runMaintenance({
       store: this.store,
@@ -66,7 +71,40 @@ export class Library extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Arms a point-in-time restore (spec: Backups and recovery). Nothing else runs while it
+   * prepares, so the pre-restore export holds every write the restore discards. The caller then
+   * calls restart(), and the next request sees the restored library.
+   */
+  async prepareRestore(target: RestoreTarget, actor: string): Promise<RestoreOutcome> {
+    if (this.restarting) return RESTARTING;
+    return this.ctx.blockConcurrencyWhile(async () => {
+      const outcome = await prepareRestore({
+        store: this.store,
+        blobs: r2BlobStore(this.env.BLOBS),
+        bucket: this.env.BLOBS,
+        recovery: {
+          bookmarkForTime: (t) => this.ctx.storage.getBookmarkForTime(t),
+          currentBookmark: () => this.ctx.storage.getCurrentBookmark(),
+          restoreOnNextSession: (b) => this.ctx.storage.onNextSessionRestoreBookmark(b),
+        },
+        libraryId: this.libraryId(),
+        target,
+        actor,
+        now: new Date(),
+      });
+      if (outcome.ok) this.restarting = true;
+      return outcome;
+    });
+  }
+
+  /** Restarts the object so an armed restore takes effect; the call itself always fails. */
+  async restart(): Promise<void> {
+    this.ctx.abort("Restarting into a point-in-time restore.");
+  }
+
   override async alarm() {
+    if (this.restarting) return;
     try {
       const result = await this.maintain();
       console.log(JSON.stringify({ maintenance: this.libraryId(), ...result }));
@@ -77,3 +115,11 @@ export class Library extends DurableObject<Env> {
     await this.schedule();
   }
 }
+
+const RESTARTING = {
+  ok: false,
+  status: 503,
+  code: "restarting",
+  message: "The library is restarting after a point-in-time restore; try again in a moment.",
+  extra: {},
+} satisfies CallResult;

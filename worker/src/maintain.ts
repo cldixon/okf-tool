@@ -61,19 +61,9 @@ export async function runMaintenance(opts: {
   let exported: MaintenanceResult["export"] = { skipped: "unchanged" };
   if (seq > 0 && seq !== Number(state.export_seq ?? -1)) {
     const folder = `${exportsPrefix(opts.libraryId)}${day(now)}/`;
-    const tar = await bundleTar(store, opts.blobs, seq);
-    await bucket.put(`${folder}bundle.tar`, tar.bytes, {
-      httpMetadata: { contentType: "application/x-tar" },
-    });
-    await bucket.put(`${folder}ledger.jsonl`, store.dump(), {
-      httpMetadata: { contentType: "application/x-ndjson" },
-    });
-    const manifest = { library_id: opts.libraryId, seq, created: stamp, files: tar.files };
-    await bucket.put(`${folder}manifest.json`, JSON.stringify(manifest, null, 2), {
-      httpMetadata: { contentType: "application/json" },
-    });
+    const files = await writeExport({ ...opts, folder, stamp });
     store.setMaintenance({ export_seq: String(seq), export_at: stamp, export_key: folder });
-    exported = { key: folder, seq, files: tar.files };
+    exported = { key: folder, seq, files };
   }
 
   const deleted = await pruneExports(
@@ -85,6 +75,41 @@ export async function runMaintenance(opts: {
   const pruned = store.pruneUsage();
   store.setMaintenance({ usage_at: stamp });
   return { export: exported, deleted, pruned };
+}
+
+/**
+ * Writes one export folder: the bundle at head, the ledger dump and a manifest. Returns the
+ * bundle's file count. Used by the nightly run and before a point-in-time restore.
+ */
+export async function writeExport(opts: {
+  store: MaintainedStore;
+  blobs: BlobStore;
+  bucket: ExportBucket;
+  libraryId: string;
+  folder: string;
+  stamp: string;
+  kind?: string;
+}): Promise<number> {
+  const { store, bucket, folder } = opts;
+  const seq = store.headSeq();
+  const tar = await bundleTar(store, opts.blobs, seq);
+  await bucket.put(`${folder}bundle.tar`, tar.bytes, {
+    httpMetadata: { contentType: "application/x-tar" },
+  });
+  await bucket.put(`${folder}ledger.jsonl`, store.dump(), {
+    httpMetadata: { contentType: "application/x-ndjson" },
+  });
+  const manifest = {
+    library_id: opts.libraryId,
+    seq,
+    created: opts.stamp,
+    files: tar.files,
+    ...(opts.kind ? { kind: opts.kind } : {}),
+  };
+  await bucket.put(`${folder}manifest.json`, JSON.stringify(manifest, null, 2), {
+    httpMetadata: { contentType: "application/json" },
+  });
+  return tar.files;
 }
 
 /** Export folders for a library, oldest first. */

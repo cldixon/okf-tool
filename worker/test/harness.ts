@@ -16,6 +16,7 @@ import { checkSlug, humanActor } from "../src/accounts";
 import type { Deps } from "../src/app";
 import type { TokenInfo } from "../src/auth";
 import { type BlobStore, callStore, type LibraryClient, makeClient } from "../src/client";
+import type { RestoreRecord } from "../src/recovery";
 import { OkfError } from "../src/store/errors";
 import { LibraryStore } from "../src/store/store";
 import { bunSqlHandle } from "./sqlite";
@@ -36,6 +37,31 @@ export function memoryBlobs(): BlobStore & { map: Map<string, Uint8Array> } {
     async head(hash) {
       const b = map.get(hash);
       return b ? { size: b.length } : null;
+    },
+  };
+}
+
+/**
+ * Durable Object point-in-time recovery stand-in: records what was armed. The rewind itself is
+ * the platform's; wrangler dev does not implement it either.
+ */
+export function fakeRecovery(opts: { unsupported?: boolean } = {}) {
+  const armed: string[] = [];
+  return {
+    armed,
+    async bookmarkForTime(t: Date) {
+      if (opts.unsupported) {
+        throw new Error(
+          "This Durable Object's storage back-end does not implement point-in-time recovery.",
+        );
+      }
+      return `bookmark@${t.toISOString()}`;
+    },
+    async currentBookmark() {
+      return `undo@${new Date().toISOString()}`;
+    },
+    async restoreOnNextSession(bookmark: string) {
+      armed.push(bookmark);
     },
   };
 }
@@ -265,6 +291,7 @@ export function setup() {
   clientFor(LIB.do_id);
   const accounts = memoryAccounts();
   const bucket = memoryBucket();
+  const pitr = fakeRecovery();
   const deps: Deps = {
     health: async () => ({ d1: "ok", r2: "ok", durable_objects: "ok" }),
     maintain: async (doId) => {
@@ -277,6 +304,42 @@ export function setup() {
         libraryId: doId,
         now: new Date(),
       });
+    },
+    recovery: {
+      async restore(doId, target, actor) {
+        clientFor(doId);
+        const { prepareRestore, restoresPrefix } = await import("../src/recovery");
+        let t: { to: string } | { undo: RestoreRecord };
+        if ("undo" in target) {
+          const obj = await bucket.get(`${restoresPrefix(doId)}${target.undo}.json`);
+          if (!obj)
+            return { ok: false, status: 404, code: "not_found", message: "No such restore." };
+          t = { undo: JSON.parse(new TextDecoder().decode(obj.body)) as RestoreRecord };
+        } else {
+          t = target;
+        }
+        return prepareRestore({
+          store: stores.get(doId) as LibraryStore,
+          blobs,
+          bucket,
+          recovery: pitr,
+          libraryId: doId,
+          target: t,
+          actor,
+          now: new Date(),
+        });
+      },
+      async list(doId) {
+        const { listRestores } = await import("../src/recovery");
+        return listRestores(
+          bucket,
+          async (k) => {
+            const o = await bucket.get(k);
+            return o ? new TextDecoder().decode(o.body) : null;
+          },
+          doId,
+        );
+      },
     },
     exports: {
       async list(libraryId) {
@@ -345,5 +408,5 @@ export function setup() {
     return app.request(`/api/v1/libraries/demo${path}`, { ...init, headers });
   };
   const store = () => stores.get(LIB.do_id) as LibraryStore;
-  return { app, req, store, blobs, kv, env, accounts, deps, bucket };
+  return { app, req, store, blobs, kv, env, accounts, deps, bucket, pitr };
 }
