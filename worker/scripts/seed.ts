@@ -10,7 +10,8 @@ import { parseArgs } from "node:util";
 import { hashToken, newTokenSecret } from "../src/auth";
 
 const WORKER_DIR = new URL("..", import.meta.url).pathname;
-const DB = "okf-accounts";
+// The binding name, so it works whatever the deployment named its database.
+const DB = "DB";
 
 export interface SeedOptions {
   slug?: string;

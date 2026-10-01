@@ -34,5 +34,5 @@
   "vars": { "EXPORT_RETENTION_DAYS": "30" }
 
   // Secrets, set per deployment (spec: Deployment): ACCESS_TEAM_DOMAIN and ACCESS_AUD, from the
-  // Cloudflare Access application that covers /app/*. For local dev, see .dev.vars.example.
+  // Cloudflare Access application that covers /app/*. For local dev, copy .dev.vars.sample to .dev.vars.
 }
