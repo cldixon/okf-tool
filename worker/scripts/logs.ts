@@ -37,7 +37,9 @@ const body = {
   limit: Number(values.limit ?? 50),
   parameters: { filters },
 };
-const out = JSON.parse(cf(["observability", "telemetry", "query", "--body", JSON.stringify(body)]));
+const out = JSON.parse(
+  await cf(["observability", "telemetry", "query", "--body", JSON.stringify(body)]),
+);
 const events: Record<string, Record<string, unknown>>[] = out?.events?.events ?? [];
 if (values.json) {
   console.log(JSON.stringify(events, null, 2));

@@ -11,7 +11,7 @@ const args = process.argv.slice(2);
 if (!args.includes("--dry-run")) {
   const db = accountsDb();
   console.log(`D1 migrations for ${db.name} (${db.id}):`);
-  console.log(applyMigrations().trim());
+  console.log((await applyMigrations()).trim());
 }
 const deploy = Bun.spawn(["bunx", "cf", "deploy", ...args], {
   cwd: WORKER_DIR,

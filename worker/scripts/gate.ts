@@ -45,11 +45,11 @@ writeFileSync(join(project, ".dev.vars"), "DEV_ACCESS_EMAIL=gate@localhost\n");
 const state = join(project, ".wrangler/state");
 
 console.log(`project: ${project}`);
-const tokens = BUNDLES.map((b) => ({
-  bundle: b,
-  ...seed({ slug: b.replace(/_/g, "-"), persistTo: state }),
-}));
-const mcpToken = seed({ slug: "mcp", actor: "claude-code/gate", persistTo: state }).token;
+const tokens: ({ bundle: string } & Awaited<ReturnType<typeof seed>>)[] = [];
+for (const b of BUNDLES) {
+  tokens.push({ bundle: b, ...(await seed({ slug: b.replace(/_/g, "-"), persistTo: state })) });
+}
+const mcpToken = (await seed({ slug: "mcp", actor: "claude-code/gate", persistTo: state })).token;
 
 const dev = Bun.spawn(["bunx", "cf", "dev", "--port", String(port)], {
   cwd: project,

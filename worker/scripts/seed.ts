@@ -37,13 +37,13 @@ function where(opts: SeedOptions): CfOptions {
 
 const q = (s: string | null | undefined) => (s == null ? "NULL" : `'${s.replace(/'/g, "''")}'`);
 
-export function seed(opts: SeedOptions = {}): Seeded {
+export async function seed(opts: SeedOptions = {}): Promise<Seeded> {
   const slug = opts.slug ?? "dev";
   const actor = opts.actor ?? "claude-code/local";
   const human = opts.human ?? "human:dev";
   const scope = opts.scope ?? "write";
   const now = new Date().toISOString();
-  applyMigrations(where(opts));
+  await applyMigrations(where(opts));
 
   const secret = newTokenSecret();
   const libraryId = `lib_${crypto.randomUUID()}`;
@@ -52,8 +52,8 @@ export function seed(opts: SeedOptions = {}): Seeded {
     `INSERT OR IGNORE INTO libraries (id, slug, owner, visibility, created, do_id) VALUES (${q(libraryId)}, ${q(slug)}, 'user_dev', 'private', ${q(now)}, ${q(libraryId)});`,
     `INSERT OR IGNORE INTO tokens (id, hash, library, actor, scope, prefix, created_by) VALUES (${q(`tok_${crypto.randomUUID()}`)}, ${q(hashToken(secret))}, (SELECT id FROM libraries WHERE slug = ${q(slug)}), ${q(actor)}, ${q(scope)}, ${q(opts.prefix ?? null)}, 'user_dev');`,
   ].join(" ");
-  d1Sql(sql, where(opts));
-  const rows = d1Sql(`SELECT id FROM libraries WHERE slug = ${q(slug)}`, where(opts));
+  await d1Sql(sql, where(opts));
+  const rows = await d1Sql(`SELECT id FROM libraries WHERE slug = ${q(slug)}`, where(opts));
   const id = (rows[0]?.[0] as string | undefined) ?? libraryId;
   return { token: secret, slug, library_id: id, actor, scope };
 }
@@ -70,7 +70,7 @@ if (import.meta.main) {
       json: { type: "boolean" },
     },
   });
-  const s = seed({
+  const s = await seed({
     slug: values.slug,
     actor: values.actor,
     scope: values.scope === "read" ? "read" : "write",
