@@ -1,5 +1,10 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": { "types": ["bun"] },
-  "include": ["../worker-configuration.d.ts", "../src/**/*.ts", "../scripts/**/*.ts", "./**/*.ts"]
+  "include": [
+    "../.cloudflare/types/index.d.ts",
+    "../src/**/*.ts",
+    "../scripts/**/*.ts",
+    "./**/*.ts"
+  ]
 }

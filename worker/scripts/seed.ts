@@ -5,13 +5,12 @@
  *
  *   bun run seed [--slug dev] [--actor claude-code/local] [--scope write] [--prefix notes]
  *                [--persist-to .wrangler/state] [--remote] [--json]
+ *
+ * Local runs use the state `cf dev` uses (worker/.wrangler/state) unless --persist-to says otherwise.
  */
 import { parseArgs } from "node:util";
 import { hashToken, newTokenSecret } from "../src/auth";
-
-const WORKER_DIR = new URL("..", import.meta.url).pathname;
-// The binding name, so it works whatever the deployment named its database.
-const DB = "DB";
+import { applyMigrations, type CfOptions, d1Sql } from "./cf";
 
 export interface SeedOptions {
   slug?: string;
@@ -32,19 +31,8 @@ export interface Seeded {
   scope: string;
 }
 
-function wrangler(args: string[], opts: SeedOptions): string {
-  const full = ["bunx", "wrangler", ...args, opts.remote ? "--remote" : "--local"];
-  if (opts.persistTo && !opts.remote) full.push("--persist-to", opts.persistTo);
-  const p = Bun.spawnSync(full, {
-    cwd: WORKER_DIR,
-    env: { ...process.env, WRANGLER_SEND_METRICS: "false", CI: "1" },
-  });
-  if (p.exitCode !== 0) {
-    throw new Error(
-      `wrangler ${args.join(" ")} failed:\n${p.stderr.toString()}${p.stdout.toString()}`,
-    );
-  }
-  return p.stdout.toString();
+function where(opts: SeedOptions): CfOptions {
+  return opts.remote ? {} : { local: true, persistTo: opts.persistTo };
 }
 
 const q = (s: string | null | undefined) => (s == null ? "NULL" : `'${s.replace(/'/g, "''")}'`);
@@ -55,7 +43,7 @@ export function seed(opts: SeedOptions = {}): Seeded {
   const human = opts.human ?? "human:dev";
   const scope = opts.scope ?? "write";
   const now = new Date().toISOString();
-  wrangler(["d1", "migrations", "apply", DB], opts);
+  applyMigrations(where(opts));
 
   const secret = newTokenSecret();
   const libraryId = `lib_${crypto.randomUUID()}`;
@@ -64,19 +52,9 @@ export function seed(opts: SeedOptions = {}): Seeded {
     `INSERT OR IGNORE INTO libraries (id, slug, owner, visibility, created, do_id) VALUES (${q(libraryId)}, ${q(slug)}, 'user_dev', 'private', ${q(now)}, ${q(libraryId)});`,
     `INSERT INTO tokens (id, hash, library, actor, scope, prefix, created_by) VALUES (${q(`tok_${crypto.randomUUID()}`)}, ${q(hashToken(secret))}, (SELECT id FROM libraries WHERE slug = ${q(slug)}), ${q(actor)}, ${q(scope)}, ${q(opts.prefix ?? null)}, 'user_dev');`,
   ].join(" ");
-  wrangler(["d1", "execute", DB, "--command", sql], opts);
-  const out = wrangler(
-    [
-      "d1",
-      "execute",
-      DB,
-      "--json",
-      "--command",
-      `SELECT id FROM libraries WHERE slug = ${q(slug)}`,
-    ],
-    opts,
-  );
-  const id = (JSON.parse(out) as { results: { id: string }[] }[])[0]?.results[0]?.id ?? libraryId;
+  d1Sql(sql, where(opts));
+  const rows = d1Sql(`SELECT id FROM libraries WHERE slug = ${q(slug)}`, where(opts));
+  const id = (rows[0]?.[0] as string | undefined) ?? libraryId;
   return { token: secret, slug, library_id: id, actor, scope };
 }
 

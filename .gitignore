@@ -16,8 +16,10 @@ coverage/
 *.tsbuildinfo
 .cache/
 
-# Cloudflare / wrangler (local D1, R2, DO state; generated types are committed)
+# Cloudflare: local dev state (cf dev runs the Wrangler bundler, which keeps it in .wrangler/)
 .wrangler/
+# bun run gate: a throwaway cf dev project per run (worker/.gate/run-*)
+.gate/
 .dev.vars
 .dev.vars.*
 !.dev.vars.sample
@@ -31,3 +33,6 @@ coverage/
 *.log
 npm-debug.log*
 bun-debug.log*
+
+# cf CLI: build output and generated types (`cf workers types`, run by `bun run typecheck`)
+.cloudflare/
