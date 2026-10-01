@@ -42,3 +42,26 @@ jobs:
       - run: bun run gate
         env:
           WRANGLER_SEND_METRICS: "false"
+
+  # The Deploy to Cloudflare button copies worker/ alone into a new repository, so worker/ must
+  # install and build with nothing from the rest of this one.
+  standalone:
+    name: worker/ builds on its own (Deploy button)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Copy worker/ alone, install, build
+        run: |
+          dest="$RUNNER_TEMP/worker"
+          mkdir -p "$dest"
+          git ls-files worker | sed 's#^worker/##' | (cd worker && tar -cf - -T -) | tar -xf - -C "$dest"
+          cd "$dest"
+          bun install
+          bunx wrangler deploy --dry-run --outdir dist
+          bun run typecheck
+        env:
+          WRANGLER_SEND_METRICS: "false"

@@ -7,6 +7,67 @@ The spec lives in a Claude Doc, not in this repo:
 
 The live doc is the source of truth. Do not add a markdown copy of the spec here; read and edit the doc instead.
 
+## Deploy your own
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cldixon/okf-tool/tree/main/worker)
+
+Everything runs in your own Cloudflare account; the Workers Free plan is enough to start.
+
+### 1. Deploy
+
+**With the button.** It copies `worker/` into a new repository on your GitHub or GitLab account and
+creates the Worker with its Durable Objects, a D1 database, an R2 bucket and a KV namespace. Each
+push to that repository then redeploys. Accept the suggested deploy command
+(`wrangler d1 migrations apply DB --remote && wrangler deploy`): it sets up the database before
+each deploy. The button asks for no secrets; those come in step 2.
+
+**Or from a clone**, with [bun](https://bun.sh) and a Cloudflare login (`bunx wrangler login`):
+
+```sh
+git clone https://github.com/cldixon/okf-tool && cd okf-tool && bun install
+cd worker
+bunx wrangler d1 create okf-accounts        # paste the database_id into wrangler.jsonc
+bunx wrangler kv namespace create OAUTH_KV  # paste the id into wrangler.jsonc
+bunx wrangler r2 bucket create okf-blobs
+bun run deploy                              # applies D1 migrations, then deploys
+```
+
+Either way you get `https://okf-service.<your-subdomain>.workers.dev` (the name is yours to change).
+`https://<your-worker>/healthz` should answer `{"ok":true,...}`, and `https://<your-worker>/app`
+says "Sign-in is not set up" until step 2.
+
+### 2. Put Cloudflare Access in front of `/app/`
+
+The web UI and the page where you approve apps sit behind
+[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/).
+Access covers only `/app/`; `/mcp`, the OAuth endpoints and the REST API stay reachable by apps and
+are protected by tokens.
+
+1. In the Cloudflare dashboard, open **Zero Trust** (create the free organization if asked) and
+   make sure a login method is available: **One-time PIN** (email codes) works with no setup.
+2. **Access → Applications → Add an application → Self-hosted.** Add a public hostname: your
+   Worker's host (e.g. `okf-service.<subdomain>.workers.dev`) with path `app`. Add a policy that
+   allows the people who may use the UI and connect apps, e.g. **Include → Emails →
+   you@example.com**. Do not use the Worker's one-click **Enable Cloudflare Access** toggle: it
+   protects the whole hostname, including `/mcp`.
+3. From the application's **Overview**, copy the **Application Audience (AUD) Tag**. Your team
+   domain (`https://<team>.cloudflareaccess.com`) is shown in the Zero Trust **Settings**.
+4. Set them as two secrets on the Worker: in the dashboard under **Workers & Pages → your Worker →
+   Settings → Variables and Secrets**, add `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` as type
+   **Secret**. Or, from `worker/` in a clone:
+
+   ```sh
+   bunx wrangler secret put ACCESS_TEAM_DOMAIN   # https://<team>.cloudflareaccess.com
+   bunx wrangler secret put ACCESS_AUD           # the audience tag
+   ```
+
+### 3. Create a library and connect an agent
+
+Open `https://<your-worker>/app` and sign in. **New library** creates one (to start from a bundle,
+use its **Import & export** page). Then connect an agent as described under
+[Agents (MCP)](#agents-mcp): add `https://<your-worker>/mcp` as a connector in claude.ai, or mint a
+token on the **Tokens** page for Claude Code.
+
 ## Development
 
 Requires [bun](https://bun.sh).
@@ -43,7 +104,7 @@ and short-lived `/dl/…` download links.
 ## Web UI
 
 `https://<your-worker>/app` is the built-in UI, behind the same Cloudflare Access sign-in (see
-Operator setup). It lists your libraries; each library page shows its directories and concepts with
+[Deploy your own](#deploy-your-own), step 2). It lists your libraries; each library page shows its directories and concepts with
 their type, trust tier and staleness. A concept page renders the body, with the frontmatter, the
 sources (footnotes resolved, internal sources with their own trust and staleness), inbound links and
 the history beside it. Every page takes `?at=<seq>` to show the library as it was then, and a
@@ -92,31 +153,6 @@ Tier 1 tools mirror file work (`start`, `browse`, `read`, `write`, `edit`, `grep
 connection limited to file tools sees tier 1 only. [`skills/okf/SKILL.md`](skills/okf/SKILL.md)
 teaches the workflow to agents that load skills.
 
-## Operator setup: sign-in for connecting apps
-
-Connecting an app is approved by a person signed in through
-[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/).
-Access covers only `/app/`; `/mcp`, the OAuth endpoints and the REST API stay reachable by apps and
-are protected by tokens. Once per deployment:
-
-1. In the Cloudflare dashboard, open **Zero Trust** (create the free organization if asked) and
-   make sure a login method is available: **One-time PIN** (email codes) works with no setup.
-2. **Access → Applications → Add an application → Self-hosted.** Add a public hostname: your
-   Worker's host (e.g. `okf-service.<subdomain>.workers.dev`) with path `app`. Add a policy that
-   allows the people who may connect apps, e.g. **Include → Emails → you@example.com**.
-   Do not use the Worker's one-click **Enable Cloudflare Access** toggle: it protects the whole
-   hostname, including `/mcp`.
-3. From the application's **Overview**, copy the **Application Audience (AUD) Tag**. Your team
-   domain (`https://<team>.cloudflareaccess.com`) is shown in the Zero Trust **Settings**.
-4. From `worker/`:
-
-   ```sh
-   bunx wrangler secret put ACCESS_TEAM_DOMAIN   # https://<team>.cloudflareaccess.com
-   bunx wrangler secret put ACCESS_AUD           # the audience tag
-   ```
-
-5. Open `https://<your-worker>/app`: after signing in you should see your libraries.
-
 ## Operations
 
 - **Nightly export.** Each library's Durable Object wakes once a day at about 03:00 UTC. If anything
@@ -144,7 +180,7 @@ are protected by tokens. Once per deployment:
   storage bytes, the export cursor and lag, and the last and next maintenance run; the library's
   home page shows the same.
 
-For local development, copy `worker/.dev.vars.example` to `worker/.dev.vars`; `/app/` then treats
+For local development, copy `worker/.dev.vars.sample` to `worker/.dev.vars`; `/app/` then treats
 `localhost` requests as signed in with `DEV_ACCESS_EMAIL`.
 
 `fixtures/` holds Google's sample OKF bundles (Apache 2.0), vendored for the round-trip tests.

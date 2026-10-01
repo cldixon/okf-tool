@@ -19,7 +19,7 @@ Read it with the Docs tools before starting on a feature. There is no markdown c
 | `bun run dev` | `wrangler dev` for the Worker (local D1, R2 and DO state in `worker/.wrangler/`) |
 | `bun run check` | Lint + typecheck + tests; run before every commit |
 | `bun run format` | Apply Biome fixes |
-| `bun run deploy` | Deploy the Worker to Cloudflare |
+| `bun run deploy` | Apply D1 migrations (by binding), then deploy the Worker to Cloudflare |
 | `bun run seed` | Create a local user, library (`dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
 | `bun run gate` | Gate: boots `wrangler dev` on fresh state, round-trips Google's sample bundles over HTTP, renders every UI page for them, runs the nightly export through the DO into local R2, checks a restore is refused cleanly (no PITR locally), and runs the MCP smoke flow; also runs in CI |
 
@@ -63,7 +63,8 @@ fixtures/                Google's four sample OKF bundles, vendored unchanged; d
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set in the cloud environment; wrangler reads them automatically.
 - Remote resources: D1 `okf-accounts` (id in `wrangler.jsonc`) and R2 bucket `okf-blobs`. Do not create or delete remote resources without asking.
 - Tokens and libraries are managed at `/app/tokens` and `/app` (or `/api/v1/tokens` and `/api/v1/libraries` with a `human:` token). `bun run seed --remote` (from `worker/`) still creates a library and token directly in the deployed D1.
-- KV `okf-oauth` (binding `OAUTH_KV`) holds OAuth clients and grants. Secrets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` come from the Access application covering `/app/*`; never put Access on `/mcp`. Local dev uses `DEV_ACCESS_EMAIL` from `worker/.dev.vars`.
+- KV `okf-oauth` (binding `OAUTH_KV`) holds OAuth clients and grants. Secrets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` come from the Access application covering `/app/*`; never put Access on `/mcp`. Local dev uses `DEV_ACCESS_EMAIL` from `worker/.dev.vars` (copy `worker/.dev.vars.sample`; it is not named `.dev.vars.example` because the Deploy button would prompt for its entries as secrets).
+- The README's Deploy button points at `worker/`, which must stay self-contained: its own `package.json` with every dependency, nothing imported from outside `worker/` at build time. Wrangler commands in scripts name the D1 database by binding (`DB`), since deployments name it differently.
 
 ## CI
-`.github/workflows/ci.yml` runs on PRs and pushes to `main`: `bun run check`, and `bun run gate` (wrangler dev, sample-bundle round-trip, UI pages, MCP smoke). Both must pass before merging.
+`.github/workflows/ci.yml` runs on PRs and pushes to `main`: `bun run check`, `bun run gate` (wrangler dev, sample-bundle round-trip, UI pages, MCP smoke), and a standalone build of `worker/` copied alone (what the Deploy button does). All must pass before merging.
