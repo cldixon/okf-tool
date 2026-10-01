@@ -1,5 +1,5 @@
 /**
- * `bun run gate`: the Phase 1 gate against `wrangler dev` (spec: Phase 1 in detail, Gate), plus
+ * `bun run gate`: the Phase 1 gate against `cf dev` (spec: Phase 1 in detail, Gate), plus
  * the MCP smoke flow on a fresh, empty library.
  *
  * Starts the Worker with fresh local D1, R2 and DO state, seeds one library and write token per
@@ -11,54 +11,52 @@
  *
  *   bun run gate [--port 8799] [--keep]
  */
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { readTar, writeTar } from "../src/util/tar";
 import { compareBundle } from "../test/compare";
 import { BUNDLES, loadBundle } from "../test/fixtures";
+import { WORKER_DIR } from "./cf";
 import { mcpSmoke } from "./mcp-smoke";
 import { seed } from "./seed";
-
-const WORKER_DIR = new URL("..", import.meta.url).pathname;
 
 const { values } = parseArgs({
   options: { port: { type: "string" }, keep: { type: "boolean" } },
 });
 const port = Number(values.port ?? 8799);
 const base = `http://127.0.0.1:${port}`;
-const state = mkdtempSync(join(tmpdir(), "okf-gate-"));
 
-console.log(`state: ${state}`);
-const tokens = BUNDLES.map((b) => ({
-  bundle: b,
-  ...seed({ slug: b.replace(/_/g, "-"), persistTo: state }),
-}));
-const mcpToken = seed({ slug: "mcp", actor: "claude-code/gate", persistTo: state }).token;
+/**
+ * `cf dev` keeps local state in .wrangler/state beside cloudflare.config.ts and takes no state
+ * directory, so the gate runs it from a throwaway project under worker/.gate/: the config files
+ * copied, src/, migrations/ and node_modules/ linked, and a .dev.vars
+ * with the dev Access identity, honored only on loopback when no Access team is configured.
+ */
+mkdirSync(join(WORKER_DIR, ".gate"), { recursive: true });
+const project = mkdtempSync(join(WORKER_DIR, ".gate", "run-"));
+for (const f of ["cloudflare.config.ts", "wrangler.config.ts", "package.json", "tsconfig.json"]) {
+  copyFileSync(join(WORKER_DIR, f), join(project, f));
+}
+for (const d of ["src", "migrations", "node_modules"]) {
+  symlinkSync(join(WORKER_DIR, d), join(project, d));
+}
+writeFileSync(join(project, ".dev.vars"), "DEV_ACCESS_EMAIL=gate@localhost\n");
+const state = join(project, ".wrangler/state");
 
-const dev = Bun.spawn(
-  [
-    "bunx",
-    "wrangler",
-    "dev",
-    "--port",
-    String(port),
-    "--ip",
-    "127.0.0.1",
-    "--persist-to",
-    state,
-    // The dev Access identity, honored only on loopback when no Access team is configured.
-    "--var",
-    "DEV_ACCESS_EMAIL:gate@localhost",
-  ],
-  {
-    cwd: WORKER_DIR,
-    env: { ...process.env, WRANGLER_SEND_METRICS: "false", CI: "1" },
-    stdout: "pipe",
-    stderr: "pipe",
-  },
-);
+console.log(`project: ${project}`);
+const tokens: ({ bundle: string } & Awaited<ReturnType<typeof seed>>)[] = [];
+for (const b of BUNDLES) {
+  tokens.push({ bundle: b, ...(await seed({ slug: b.replace(/_/g, "-"), persistTo: state })) });
+}
+const mcpToken = (await seed({ slug: "mcp", actor: "claude-code/gate", persistTo: state })).token;
+
+const dev = Bun.spawn(["bunx", "cf", "dev", "--port", String(port)], {
+  cwd: project,
+  env: { ...process.env, CF_SEND_TELEMETRY: "false", CI: "1" },
+  stdout: "pipe",
+  stderr: "pipe",
+});
 
 async function waitForHealth() {
   for (let i = 0; i < 120; i++) {
@@ -68,7 +66,7 @@ async function waitForHealth() {
     } catch {}
     await Bun.sleep(500);
   }
-  throw new Error("wrangler dev did not become healthy");
+  throw new Error("cf dev did not become healthy");
 }
 
 /** Fetches the library page, every directory page and every concept page of a library. */
@@ -123,7 +121,7 @@ async function nightlyExport(slug: string, originals: number): Promise<string[]>
 }
 
 /**
- * The Recovery page renders, and a restore in wrangler dev (no point-in-time recovery there)
+ * The Recovery page renders, and a restore in cf dev (no point-in-time recovery there)
  * fails cleanly: a 501 naming the reason, no pre-restore export, the library still answering.
  */
 async function restoreUnavailable(slug: string): Promise<string[]> {
@@ -140,7 +138,7 @@ async function restoreUnavailable(slug: string): Promise<string[]> {
   });
   const html = await r.text();
   if (r.status !== 501 || !html.includes("point-in-time recovery")) {
-    return [`restore in wrangler dev: ${r.status} ${html.slice(0, 200)}`];
+    return [`restore in cf dev: ${r.status} ${html.slice(0, 200)}`];
   }
   const transfer = await (await fetch(`${lib}/transfer`)).text();
   if (transfer.includes("before a restore")) return ["a pre-restore export was written"];
@@ -211,7 +209,7 @@ try {
 } finally {
   dev.kill();
   await dev.exited;
-  if (!values.keep) rmSync(state, { recursive: true, force: true });
+  if (!values.keep) rmSync(project, { recursive: true, force: true });
 }
 console.log(failed ? "Gate FAILED" : "Gate passed");
 process.exit(failed ? 1 : 0);

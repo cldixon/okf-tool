@@ -1,25 +1,35 @@
 import { d1Accounts } from "./accounts";
 import { d1Authenticate } from "./auth";
 import { makeClient, r2BlobStore } from "./client";
+import type { Library } from "./library";
 import { listExports } from "./maintain";
 import { listRestores, RESTORE_ID, restoresPrefix } from "./recovery";
 import { createWorker } from "./worker";
 
 export { Library } from "./library";
 
+/**
+ * A library's Durable Object by name. cloudflare.config.ts binds LIBRARY by Worker name, which
+ * cf/config cannot type, so the stub's RPC methods are typed here.
+ */
+function libraryStub(env: Env, name: string): DurableObjectStub<Library> {
+  const ns = env.LIBRARY as DurableObjectNamespace<Library>;
+  return ns.get(ns.idFromName(name));
+}
+
 let authenticate: ReturnType<typeof d1Authenticate> | undefined;
 
 export default createWorker((env) => {
   authenticate ??= d1Authenticate(env.DB);
   const client = (doId: string) => {
-    const stub = env.LIBRARY.get(env.LIBRARY.idFromName(doId));
+    const stub = libraryStub(env, doId);
     return makeClient((method, args) => stub.call(method, args));
   };
   return {
     authenticate,
     accounts: d1Accounts(env.DB),
     blobs: r2BlobStore(env.BLOBS),
-    maintain: (doId) => env.LIBRARY.get(env.LIBRARY.idFromName(doId)).maintain(),
+    maintain: (doId) => libraryStub(env, doId).maintain(),
     health: async () => {
       const check = async (fn: () => Promise<unknown>) => {
         try {
@@ -33,7 +43,7 @@ export default createWorker((env) => {
         check(() => env.DB.prepare("SELECT 1").first()),
         check(() => env.BLOBS.list({ limit: 1 })),
         check(async () => {
-          const r = await env.LIBRARY.get(env.LIBRARY.idFromName("_healthz")).ping();
+          const r = await libraryStub(env, "_healthz").ping();
           if (r !== "ok") throw new Error("unexpected reply");
         }),
       ]);
@@ -41,7 +51,7 @@ export default createWorker((env) => {
     },
     recovery: {
       async restore(doId, target, actor) {
-        const stub = env.LIBRARY.get(env.LIBRARY.idFromName(doId));
+        const stub = libraryStub(env, doId);
         let t: Parameters<typeof stub.prepareRestore>[0];
         if ("undo" in target) {
           const obj = RESTORE_ID.test(target.undo)

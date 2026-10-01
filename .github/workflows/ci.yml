@@ -19,6 +19,8 @@ jobs:
     name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      CF_SEND_TELEMETRY: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -28,9 +30,9 @@ jobs:
       - run: bun run check
 
   # The Phase 1 gate (import and export Google's sample bundles) and the MCP smoke flow,
-  # both over HTTP against `wrangler dev` with local D1, R2 and Durable Object state.
+  # both over HTTP against `cf dev` with local D1, R2 and Durable Object state.
   gate:
-    name: Gate (wrangler dev)
+    name: Gate (cf dev)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -41,12 +43,12 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run gate
         env:
-          WRANGLER_SEND_METRICS: "false"
+          CF_SEND_TELEMETRY: "false"
 
-  # The Deploy to Cloudflare button copies worker/ alone into a new repository, so worker/ must
-  # install and build with nothing from the rest of this one.
+  # worker/ is the deployable project: it must install and build with nothing from the rest of
+  # this repository. `cf deploy --dry-run` builds and validates without credentials.
   standalone:
-    name: worker/ builds on its own (Deploy button)
+    name: worker/ builds on its own
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -61,7 +63,7 @@ jobs:
           git ls-files worker | sed 's#^worker/##' | (cd worker && tar -cf - -T -) | tar -xf - -C "$dest"
           cd "$dest"
           bun install
-          bunx wrangler deploy --dry-run --outdir dist
+          bunx cf deploy --dry-run
           bun run typecheck
         env:
-          WRANGLER_SEND_METRICS: "false"
+          CF_SEND_TELEMETRY: "false"

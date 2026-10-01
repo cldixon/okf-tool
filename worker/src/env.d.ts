@@ -1,6 +1,6 @@
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 
-/** Secrets and injected helpers that `wrangler types` does not know about. */
+/** Secrets and injected helpers that `cf workers types` does not know about (they are not in cloudflare.config.ts). */
 interface AuthEnv {
   /** The Access team domain, e.g. https://<team>.cloudflareaccess.com (secret). */
   ACCESS_TEAM_DOMAIN?: string;

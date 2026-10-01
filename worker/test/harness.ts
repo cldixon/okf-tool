@@ -6,7 +6,7 @@ import { mock } from "bun:test";
 
 // `cloudflare:workers` only exists inside workerd; the OAuth library imports WorkerEntrypoint.
 mock.module("cloudflare:workers", () => ({ DurableObject: class {}, WorkerEntrypoint: class {} }));
-// As in wrangler.jsonc: the OAuth library enables CIMD only under global_fetch_strictly_public.
+// As in cloudflare.config.ts: the OAuth library enables CIMD only under global_fetch_strictly_public.
 Object.assign(globalThis, {
   Cloudflare: { compatibilityFlags: { global_fetch_strictly_public: true } },
 });
@@ -43,7 +43,7 @@ export function memoryBlobs(): BlobStore & { map: Map<string, Uint8Array> } {
 
 /**
  * Durable Object point-in-time recovery stand-in: records what was armed. The rewind itself is
- * the platform's; wrangler dev does not implement it either.
+ * the platform's; local dev (cf dev) does not implement it either.
  */
 export function fakeRecovery(opts: { unsupported?: boolean } = {}) {
   const armed: string[] = [];

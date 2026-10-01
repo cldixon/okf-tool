@@ -10,7 +10,7 @@ import { type ExportBucket, exportsPrefix, type MaintainedStore, writeExport } f
 
 /** The storage calls a restore needs; the DO passes ctx.storage's PITR methods. */
 export interface Recovery {
-  /** A bookmark for a moment in the past; throws where the backend has no PITR (wrangler dev). */
+  /** A bookmark for a moment in the past; throws where the backend has no PITR (local dev). */
   bookmarkForTime(t: Date): Promise<string>;
   /** The object's state now: with nothing else running, the bookmark that undoes a restore. */
   currentBookmark(): Promise<string>;
@@ -56,7 +56,7 @@ export const restoresPrefix = (libraryId: string) => `restores/${libraryId}/`;
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-/** Maps the storage's PITR errors (as seen from Cloudflare and wrangler dev) to answers. */
+/** Maps the storage's PITR errors (as seen on Cloudflare and in local dev) to answers. */
 export function bookmarkError(message: string): { status: number; code: string; message: string } {
   if (/before this database existed/i.test(message)) {
     return {
@@ -133,10 +133,12 @@ export async function prepareRestore(opts: {
   }
 
   const stamp = iso(now);
-  // Millisecond ids, so a restore and a quick undo never share a record or an export folder.
+  // The request time to the millisecond plus a random suffix, so a restore and an undo made in
+  // the same millisecond never share a record or an export folder.
   const ms = now.toISOString();
-  const id = ms.replace(/[-:.]/g, "");
-  const folder = `${exportsPrefix(opts.libraryId)}${ms.slice(0, 10)}-pre-restore-${ms.slice(11, 23).replace(/[:.]/g, "")}/`;
+  const suffix = crypto.randomUUID().slice(0, 4);
+  const id = `${ms.replace(/[-:.]/g, "")}-${suffix}`;
+  const folder = `${exportsPrefix(opts.libraryId)}${ms.slice(0, 10)}-pre-restore-${ms.slice(11, 23).replace(/[:.]/g, "")}-${suffix}/`;
   const seqBefore = opts.store.headSeq();
   await writeExport({ ...opts, folder, stamp, kind: "pre-restore" });
 
@@ -167,8 +169,11 @@ export async function prepareRestore(opts: {
   return { ok: true, record };
 }
 
-/** Restore records are named by their request time to the millisecond, e.g. 20260930T180211042Z. */
-export const RESTORE_ID = /^\d{8}T\d{9}Z$/;
+/**
+ * Restore records are named by their request time to the millisecond and a random suffix, e.g.
+ * 20260930T180211042Z-3f9a (earlier records have no suffix).
+ */
+export const RESTORE_ID = /^\d{8}T\d{9}Z(-[0-9a-f]{4})?$/;
 
 /** A library's restores, newest first; `read` returns an R2 object's text or null. */
 export async function listRestores(

@@ -2,7 +2,7 @@
  * `bun scripts/mcp-smoke.ts --url <base> --token <token> [--read-only]`: exercises the MCP server
  * with the SDK client, like an agent would. Without --read-only it writes, edits, moves and
  * deletes a scratch concept under `_smoke/` and leaves the library's files as it found them
- * (the ledger keeps the events). `bun run gate` runs it against `wrangler dev`.
+ * (the ledger keeps the events). `bun run gate` runs it against `cf dev`.
  */
 import { parseArgs } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
