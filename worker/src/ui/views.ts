@@ -799,7 +799,7 @@ function opsLine(urls: Urls, s: LibraryStats): string {
 }
 
 export interface NightlyExport {
-  /** The folder under exports/<library id>/: YYYY-MM-DD, or YYYY-MM-DD-pre-restore-HHMMSSmmm. */
+  /** The folder under exports/<library id>/: YYYY-MM-DD, or YYYY-MM-DD-pre-restore-HHMMSSmmm-xxxx. */
   date: string;
   seq: number | null;
   files: number | null;
@@ -807,7 +807,9 @@ export interface NightlyExport {
 
 /** "2026-09-30", or "2026-09-30 18:02:11 UTC, before a restore" for a pre-restore export. */
 function exportLabel(folder: string): string {
-  const m = /^(\d{4}-\d{2}-\d{2})-pre-restore-(\d{2})(\d{2})(\d{2})\d{3}$/.exec(folder);
+  const m = /^(\d{4}-\d{2}-\d{2})-pre-restore-(\d{2})(\d{2})(\d{2})\d{3}(-[0-9a-f]{4})?$/.exec(
+    folder,
+  );
   return m ? `${m[1]} ${m[2]}:${m[3]}:${m[4]} UTC, before a restore` : folder;
 }
 
@@ -924,7 +926,10 @@ ${rows ? `<p class="small">Undo returns the library to how it was just before th
 
 /** A restore id (20260930T180211042Z) as an ISO time, to the second. */
 function restoreTime(id: string): string {
-  return id.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\d{3}Z$/, "$1-$2-$3T$4:$5:$6Z");
+  return id.replace(
+    /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\d{3}Z(-[0-9a-f]{4})?$/,
+    "$1-$2-$3T$4:$5:$6Z",
+  );
 }
 
 // ---------------------------------------------------------------- tokens

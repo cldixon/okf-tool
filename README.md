@@ -163,7 +163,7 @@ teaches the workflow to agents that load skills.
   recovery, whose history trails live writes by about a minute; a new library has none for its
   first minute or two); type the
   library's name to confirm. It first exports the library as it stands to
-  `exports/<library id>/<date>-pre-restore-<hhmmssmmm>/`, records the restore under
+  `exports/<library id>/<date>-pre-restore-<hhmmssmmm>-<suffix>/`, records the restore under
   `restores/<library id>/`, and lists past restores with an **Undo**. To take back one change, revert
   it from the ledger instead. Local dev (`cf dev`) has no point-in-time recovery, so there a restore is
   refused without writing anything. Over REST, with a `human:` token for the library:

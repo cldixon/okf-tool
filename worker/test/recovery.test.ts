@@ -76,20 +76,23 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
       actor: "human:owner",
       now,
     });
+    if (!out.ok) throw new Error(out.message);
+    const { id } = out.record;
+    expect(id).toMatch(/^20260930T180211000Z-[0-9a-f]{4}$/);
+    const suffix = id.slice(-4);
     expect(out).toMatchObject({
       ok: true,
       record: {
-        id: "20260930T180211000Z",
         kind: "restore",
         to: "2026-09-30T17:00:00Z",
         actor: "human:owner",
         seq_before: 1,
-        export: "exports/lib-x/2026-09-30-pre-restore-180211000/",
+        export: `exports/lib-x/2026-09-30-pre-restore-180211000-${suffix}/`,
         bookmark: "bookmark@2026-09-30T17:00:00.000Z",
       },
     });
     expect(recovery.armed).toEqual(["bookmark@2026-09-30T17:00:00.000Z"]);
-    const folder = "exports/lib-x/2026-09-30-pre-restore-180211000/";
+    const folder = `exports/lib-x/2026-09-30-pre-restore-180211000-${suffix}/`;
     const tar = readTar(bucket.objects.get(`${folder}bundle.tar`) as Uint8Array);
     expect(tar.map((f) => f.path)).toContain("a.md");
     expect(bucket.objects.has(`${folder}ledger.jsonl`)).toBe(true);
@@ -97,7 +100,7 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
       new TextDecoder().decode(bucket.objects.get(`${folder}manifest.json`)),
     );
     expect(manifest).toMatchObject({ kind: "pre-restore", seq: 1 });
-    expect(bucket.objects.has("restores/lib-x/20260930T180211000Z.json")).toBe(true);
+    expect(bucket.objects.has(`restores/lib-x/${id}.json`)).toBe(true);
 
     // The nightly export still sorts after a same-day pre-restore folder, so it counts as newest.
     const nightly = await runMaintenance({
@@ -109,6 +112,29 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
       retentionDays: 0,
     });
     expect(nightly.deleted).toEqual([]);
+  });
+
+  test("two restores in the same millisecond get their own records and folders", async () => {
+    const store = new LibraryStore(bunSqlHandle());
+    const bucket = memoryBucket();
+    const now = new Date("2026-09-30T18:02:11.042Z");
+    const run = () =>
+      prepareRestore({
+        store,
+        blobs: memoryBlobs(),
+        bucket,
+        recovery: fakeRecovery(),
+        libraryId: "lib-x",
+        target: { to: "2026-09-30T17:00:00Z" },
+        actor: "human:owner",
+        now,
+      });
+    const [a, b] = [await run(), await run()];
+    if (!a.ok || !b.ok) throw new Error("restore refused");
+    expect(a.record.id).not.toBe(b.record.id);
+    expect(a.record.export).not.toBe(b.record.export);
+    const records = [...bucket.objects.keys()].filter((k) => k.startsWith("restores/"));
+    expect(records).toHaveLength(2);
   });
 
   test("without point-in-time recovery, nothing is written", async () => {
@@ -156,10 +182,12 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
     expect(s.pitr.armed).toEqual([`bookmark@${to}.000Z`]);
     expect(okHtml).toContain("Undo");
     const id = /name="undo" value="([^"]+)"/.exec(okHtml)?.[1] as string;
-    expect(id).toMatch(/^\d{8}T\d{9}Z$/);
+    expect(id).toMatch(/^\d{8}T\d{9}Z-[0-9a-f]{4}$/);
 
     // The pre-restore export downloads like a nightly one.
-    const folder = /exports\/(\d{4}-\d{2}-\d{2}-pre-restore-\d{9})\/bundle\.tar/.exec(okHtml)?.[1];
+    const folder = /exports\/(\d{4}-\d{2}-\d{2}-pre-restore-\d{9}-[0-9a-f]{4})\/bundle\.tar/.exec(
+      okHtml,
+    )?.[1];
     expect(folder).toBeDefined();
     const dl = await s.app.request(`${LIB}/exports/${folder}/bundle.tar`);
     expect(dl.status).toBe(200);
@@ -218,7 +246,7 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
     expect(undo.status).toBe(201);
     const undone = (await undo.json()) as Record<string, unknown>;
     expect(undone).toMatchObject({ kind: "undo", undoes: record.id });
-    // Even within the same second, the undo gets its own record and export folder.
+    // Even within the same millisecond, the undo gets its own record and export folder.
     expect(undone.id).not.toBe(record.id);
     expect(undone.export).not.toBe(record.export);
     expect(
