@@ -126,7 +126,9 @@ are protected by tokens. Once per deployment:
   `wrangler.jsonc`, default 30) are deleted; the newest is always kept. The library's **Import &
   export** page lists them for download and has **Export now**.
 - **Point-in-time restore.** A library's **Recovery** page restores the whole library, ledger
-  included, to any moment in the last 30 days (Durable Object point-in-time recovery); type the
+  included, to any moment in the last 30 days and at least 2 minutes ago (Durable Object point-in-time
+  recovery, whose history trails live writes by about a minute; a new library has none for its
+  first minute or two); type the
   library's name to confirm. It first exports the library as it stands to
   `exports/<library id>/<date>-pre-restore-<hhmmssmmm>/`, records the restore under
   `restores/<library id>/`, and lists past restores with an **Undo**. To take back one change, revert

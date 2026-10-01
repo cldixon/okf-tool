@@ -907,7 +907,8 @@ export function recoveryPage(opts: {
 ${opts.result ? `<div class="notice ok">${opts.result}</div>` : ""}
 ${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
 <div class="panel-box"><h2 style="margin-top:0">Restore this library to a point in time</h2>
-<p>Rewinds all of ${esc(urls.slug)}, ledger included, to how it was at a moment in the last 30 days.
+<p>Rewinds all of ${esc(urls.slug)}, ledger included, to how it was at a moment in the last 30 days and at least 2 minutes ago (recoverable history trails
+live writes by about a minute).
 Everything after that moment is removed from the library. Before restoring, the current library is exported
 to R2 (the bundle and the full ledger), and you can undo the restore below.</p>
 <p class="small muted">To take back a single change, revert it from the <a href="${esc(urls.ledger())}">ledger</a>

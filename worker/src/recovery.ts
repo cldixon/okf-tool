@@ -21,6 +21,13 @@ export interface Recovery {
 /** How far back Durable Object point-in-time recovery reaches. */
 export const PITR_WINDOW_DAYS = 30;
 
+/**
+ * How recent a restore point may be. The recoverable history trails live writes by about a
+ * minute (seen on Cloudflare: a restore to 6 s ago landed before writes made a minute earlier),
+ * so a more recent time could silently land earlier than asked.
+ */
+export const PITR_MIN_AGE_MINUTES = 2;
+
 export interface RestoreRecord {
   id: string;
   library_id: string;
@@ -49,6 +56,30 @@ export const restoresPrefix = (libraryId: string) => `restores/${libraryId}/`;
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
+/** Maps the storage's PITR errors (as seen from Cloudflare and wrangler dev) to answers. */
+export function bookmarkError(message: string): { status: number; code: string; message: string } {
+  if (/before this database existed/i.test(message)) {
+    return {
+      status: 400,
+      code: "before_history",
+      message: "That time is before this library's recoverable history begins; pick a later time.",
+    };
+  }
+  if (/no history/i.test(message)) {
+    return {
+      status: 409,
+      code: "no_history",
+      message:
+        "This library has no recoverable history yet: a new library gains it a minute or two after it is first used.",
+    };
+  }
+  return {
+    status: 501,
+    code: "no_pitr",
+    message: `Point-in-time recovery is not available here: ${message}`,
+  };
+}
+
 /** Checks a requested restore time: a real instant, in the past, inside the PITR window. */
 export function checkRestoreTime(to: string, now: Date): Date | string {
   const t = new Date(to);
@@ -57,6 +88,9 @@ export function checkRestoreTime(to: string, now: Date): Date | string {
   }
   if (Number.isNaN(t.getTime())) return "That is not a valid time.";
   if (t.getTime() >= now.getTime()) return "The time must be in the past.";
+  if (t.getTime() > now.getTime() - PITR_MIN_AGE_MINUTES * 60_000) {
+    return `Restore points must be at least ${PITR_MIN_AGE_MINUTES} minutes old: recoverable history trails live writes by about a minute. To undo a change just made, revert it from the ledger.`;
+  }
   if (t.getTime() < now.getTime() - PITR_WINDOW_DAYS * 86_400_000) {
     return `Point-in-time recovery reaches back ${PITR_WINDOW_DAYS} days; pick a later time.`;
   }
@@ -88,12 +122,7 @@ export async function prepareRestore(opts: {
     try {
       bookmark = await opts.recovery.bookmarkForTime(t);
     } catch (e) {
-      return {
-        ok: false,
-        status: 501,
-        code: "no_pitr",
-        message: `Point-in-time recovery is not available here: ${e instanceof Error ? e.message : String(e)}`,
-      };
+      return { ok: false, ...bookmarkError(e instanceof Error ? e.message : String(e)) };
     }
   } else {
     if (target.undo.library_id !== opts.libraryId) {

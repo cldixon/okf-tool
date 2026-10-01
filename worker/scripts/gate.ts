@@ -132,7 +132,7 @@ async function restoreUnavailable(slug: string): Promise<string[]> {
   if (!page.ok || !(await page.text()).includes("Restore this library to a point in time")) {
     return [`recovery page: ${page.status}`];
   }
-  const to = new Date(Date.now() - 60_000).toISOString().slice(0, 19);
+  const to = new Date(Date.now() - 5 * 60_000).toISOString().slice(0, 19);
   const r = await fetch(`${lib}/recovery`, {
     method: "POST",
     headers: { Origin: base },
