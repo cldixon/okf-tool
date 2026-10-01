@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { runMaintenance } from "../src/maintain";
-import { checkRestoreTime, prepareRestore } from "../src/recovery";
+import { bookmarkError, checkRestoreTime, prepareRestore } from "../src/recovery";
 import { LibraryStore } from "../src/store/store";
 import { readTar } from "../src/util/tar";
 import { fakeRecovery, memoryBlobs, memoryBucket, setup } from "./harness";
@@ -39,6 +39,25 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
     expect(checkRestoreTime("2026-09-30", now)).toContain("full ISO 8601 datetime");
     expect(checkRestoreTime("2026-09-30T19:00:00Z", now)).toContain("in the past");
     expect(checkRestoreTime("2026-08-01T00:00:00Z", now)).toContain("30 days");
+    // Recoverable history trails live writes by about a minute.
+    expect(checkRestoreTime("2026-09-30T17:59:00Z", now)).toContain("at least 2 minutes old");
+    expect(checkRestoreTime("2026-09-30T17:58:00Z", now)).toBeInstanceOf(Date);
+  });
+
+  test("the storage's PITR errors become clear answers", () => {
+    expect(bookmarkError("Requested time is before this database existed.")).toMatchObject({
+      status: 400,
+      code: "before_history",
+    });
+    expect(bookmarkError("This database has no history.")).toMatchObject({
+      status: 409,
+      code: "no_history",
+    });
+    expect(
+      bookmarkError(
+        "This Durable Object's storage back-end does not implement point-in-time recovery.",
+      ),
+    ).toMatchObject({ status: 501, code: "no_pitr" });
   });
 
   test("a restore exports first, arms the bookmark and records itself in R2", async () => {
@@ -101,7 +120,7 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
       bucket,
       recovery: fakeRecovery({ unsupported: true }),
       libraryId: "lib-x",
-      target: { to: new Date(Date.now() - 60_000).toISOString() },
+      target: { to: new Date(Date.now() - 5 * 60_000).toISOString() },
       actor: "human:owner",
       now: new Date(),
     });
@@ -175,13 +194,13 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
         body: JSON.stringify(body),
       });
 
-    expect((await json("writer", { to: new Date(Date.now() - 60_000).toISOString() })).status).toBe(
-      403,
-    );
+    expect(
+      (await json("writer", { to: new Date(Date.now() - 5 * 60_000).toISOString() })).status,
+    ).toBe(403);
     expect((await json("human", {})).status).toBe(400);
     expect((await json("human", { to: "2020-01-01T00:00:00Z" })).status).toBe(400);
 
-    const to = new Date(Date.now() - 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const to = new Date(Date.now() - 5 * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
     const res = await json("human", { to });
     expect(res.status).toBe(201);
     const record = (await res.json()) as Record<string, unknown>;
