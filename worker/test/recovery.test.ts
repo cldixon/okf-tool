@@ -60,17 +60,17 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
     expect(out).toMatchObject({
       ok: true,
       record: {
-        id: "20260930T180211Z",
+        id: "20260930T180211000Z",
         kind: "restore",
         to: "2026-09-30T17:00:00Z",
         actor: "human:owner",
         seq_before: 1,
-        export: "exports/lib-x/2026-09-30-pre-restore-180211/",
+        export: "exports/lib-x/2026-09-30-pre-restore-180211000/",
         bookmark: "bookmark@2026-09-30T17:00:00.000Z",
       },
     });
     expect(recovery.armed).toEqual(["bookmark@2026-09-30T17:00:00.000Z"]);
-    const folder = "exports/lib-x/2026-09-30-pre-restore-180211/";
+    const folder = "exports/lib-x/2026-09-30-pre-restore-180211000/";
     const tar = readTar(bucket.objects.get(`${folder}bundle.tar`) as Uint8Array);
     expect(tar.map((f) => f.path)).toContain("a.md");
     expect(bucket.objects.has(`${folder}ledger.jsonl`)).toBe(true);
@@ -78,7 +78,7 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
       new TextDecoder().decode(bucket.objects.get(`${folder}manifest.json`)),
     );
     expect(manifest).toMatchObject({ kind: "pre-restore", seq: 1 });
-    expect(bucket.objects.has("restores/lib-x/20260930T180211Z.json")).toBe(true);
+    expect(bucket.objects.has("restores/lib-x/20260930T180211000Z.json")).toBe(true);
 
     // The nightly export still sorts after a same-day pre-restore folder, so it counts as newest.
     const nightly = await runMaintenance({
@@ -137,10 +137,10 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
     expect(s.pitr.armed).toEqual([`bookmark@${to}.000Z`]);
     expect(okHtml).toContain("Undo");
     const id = /name="undo" value="([^"]+)"/.exec(okHtml)?.[1] as string;
-    expect(id).toMatch(/^\d{8}T\d{6}Z$/);
+    expect(id).toMatch(/^\d{8}T\d{9}Z$/);
 
     // The pre-restore export downloads like a nightly one.
-    const folder = /exports\/(\d{4}-\d{2}-\d{2}-pre-restore-\d{6})\/bundle\.tar/.exec(okHtml)?.[1];
+    const folder = /exports\/(\d{4}-\d{2}-\d{2}-pre-restore-\d{9})\/bundle\.tar/.exec(okHtml)?.[1];
     expect(folder).toBeDefined();
     const dl = await s.app.request(`${LIB}/exports/${folder}/bundle.tar`);
     expect(dl.status).toBe(200);
@@ -160,7 +160,52 @@ describe("point-in-time restore (spec: Backups and recovery)", () => {
     expect(s.pitr.armed[1]).toMatch(/^undo@/);
     expect(undoHtml).toContain("Undid the restore made");
 
-    const missing = await post(s, { undo: "20200101T000000Z", confirm: "demo" });
+    const missing = await post(s, { undo: "20200101T000000000Z", confirm: "demo" });
     expect(missing.status).toBe(404);
+  });
+
+  test("REST: human-only restore and listing, bookmarks kept server-side", async () => {
+    const s = setup();
+    await put(s, "a.md", md("A\n"));
+    const json = (token: string, body: unknown) =>
+      s.req("/restore", {
+        method: "POST",
+        token,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    expect((await json("writer", { to: new Date(Date.now() - 60_000).toISOString() })).status).toBe(
+      403,
+    );
+    expect((await json("human", {})).status).toBe(400);
+    expect((await json("human", { to: "2020-01-01T00:00:00Z" })).status).toBe(400);
+
+    const to = new Date(Date.now() - 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const res = await json("human", { to });
+    expect(res.status).toBe(201);
+    const record = (await res.json()) as Record<string, unknown>;
+    expect(record).toMatchObject({ kind: "restore", to, actor: "human:owner", seq_before: 1 });
+    expect(record.bookmark).toBeUndefined();
+    expect(record.undo_bookmark).toBeUndefined();
+
+    const list = (await (await s.req("/restores", { token: "human" })).json()) as {
+      restores: Record<string, unknown>[];
+    };
+    expect(list.restores.map((r) => r.id)).toEqual([record.id]);
+    expect(list.restores[0]?.undo_bookmark).toBeUndefined();
+
+    const undo = await json("human", { undo: record.id });
+    expect(undo.status).toBe(201);
+    const undone = (await undo.json()) as Record<string, unknown>;
+    expect(undone).toMatchObject({ kind: "undo", undoes: record.id });
+    // Even within the same second, the undo gets its own record and export folder.
+    expect(undone.id).not.toBe(record.id);
+    expect(undone.export).not.toBe(record.export);
+    expect(
+      ((await (await s.req("/restores", { token: "human" })).json()) as { restores: unknown[] })
+        .restores,
+    ).toHaveLength(2);
+    expect((await json("human", { undo: "nope" })).status).toBe(404);
   });
 });

@@ -44,7 +44,7 @@ worker/src/okf/          OKF semantics: parse, record, render, links, footnotes,
 worker/src/store/        Library schema and LibraryStore (writes, ledger, snapshots, queries) against a plain SQLite handle
 worker/src/util/tar.ts   Tar reader and writer for import and export
 worker/src/mcp/server.ts MCP server at /mcp: stateless Streamable HTTP, tier 1 and tier 2 tools, okf:// resources
-worker/scripts/          seed.ts (`bun run seed`), gate.ts (`bun run gate`), mcp-smoke.ts (MCP flow against any URL)
+worker/scripts/          seed.ts (`bun run seed`), gate.ts (`bun run gate`), mcp-smoke.ts (MCP flow against any URL), restore-smoke.ts (PITR restore and undo against a deployed Worker)
 worker/migrations/       D1 migrations (account layer)
 worker/test/             bun tests; worker/test/tsconfig.json adds bun types
 skills/okf/SKILL.md      Agent skill doc: the OKF workflow over the MCP tools
