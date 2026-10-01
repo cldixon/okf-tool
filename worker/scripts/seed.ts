@@ -50,7 +50,7 @@ export function seed(opts: SeedOptions = {}): Seeded {
   const sql = [
     `INSERT OR IGNORE INTO users (id, email, actor, created) VALUES ('user_dev', 'dev@localhost', ${q(human)}, ${q(now)});`,
     `INSERT OR IGNORE INTO libraries (id, slug, owner, visibility, created, do_id) VALUES (${q(libraryId)}, ${q(slug)}, 'user_dev', 'private', ${q(now)}, ${q(libraryId)});`,
-    `INSERT INTO tokens (id, hash, library, actor, scope, prefix, created_by) VALUES (${q(`tok_${crypto.randomUUID()}`)}, ${q(hashToken(secret))}, (SELECT id FROM libraries WHERE slug = ${q(slug)}), ${q(actor)}, ${q(scope)}, ${q(opts.prefix ?? null)}, 'user_dev');`,
+    `INSERT OR IGNORE INTO tokens (id, hash, library, actor, scope, prefix, created_by) VALUES (${q(`tok_${crypto.randomUUID()}`)}, ${q(hashToken(secret))}, (SELECT id FROM libraries WHERE slug = ${q(slug)}), ${q(actor)}, ${q(scope)}, ${q(opts.prefix ?? null)}, 'user_dev');`,
   ].join(" ");
   d1Sql(sql, where(opts));
   const rows = d1Sql(`SELECT id FROM libraries WHERE slug = ${q(slug)}`, where(opts));

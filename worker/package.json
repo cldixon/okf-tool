@@ -9,7 +9,8 @@
     "typecheck": "cf workers types -q && tsc --noEmit && tsc --noEmit -p test",
     "test": "bun test",
     "seed": "bun scripts/seed.ts",
-    "gate": "bun scripts/gate.ts"
+    "gate": "bun scripts/gate.ts",
+    "logs": "bun scripts/logs.ts"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^1.2.1",
@@ -35,24 +36,5 @@
     "typescript": "^7.0.2",
     "wrangler": "^4.142.0"
   },
-  "packageManager": "bun@1.3.11",
-  "cloudflare": {
-    "bindings": {
-      "DB": {
-        "description": "D1 database for users, libraries and tokens. Its migrations run on every deploy."
-      },
-      "BLOBS": {
-        "description": "R2 bucket for attachments (`blobs/<sha256>`), nightly exports (`exports/`) and restore records (`restores/`)."
-      },
-      "OAUTH_KV": {
-        "description": "KV namespace for OAuth clients and grants, used when MCP apps such as claude.ai connect."
-      },
-      "LIBRARY": {
-        "description": "One SQLite-backed Durable Object per library: its files, ledger and indexes."
-      },
-      "EXPORT_RETENTION_DAYS": {
-        "description": "Nightly exports older than this many days are deleted; the newest is always kept."
-      }
-    }
-  }
+  "packageManager": "bun@1.3.11"
 }

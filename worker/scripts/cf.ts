@@ -3,6 +3,8 @@
  * details from cloudflare.config.ts. cf resource commands take resource IDs, not names or bindings,
  * so D1 commands get the ID from the config.
  */
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import config from "../cloudflare.config";
 
@@ -32,20 +34,46 @@ export interface CfOptions {
   /** Local state directory; defaults to LOCAL_STATE. */
   persistTo?: string;
   cwd?: string;
+  /** Per attempt; a call that times out is retried twice. Default 20 s local, 120 s remote. */
+  timeoutMs?: number;
 }
 
-/** Runs `cf <args>`, returning stdout (JSON for most commands); throws with cf's output on failure. */
+/**
+ * Runs `cf <args>`, returning stdout (JSON for most commands); throws with cf's output on failure.
+ * cf (beta) now and then hangs on a local D1 command (one call in ten to thirty here, whatever
+ * launches it), so each call has a timeout and is retried; every call made through this helper
+ * must be safe to repeat. Output goes to files rather than pipes.
+ */
 export function cf(args: string[], opts: CfOptions = {}): string {
   const full = ["bunx", "cf", ...args];
   if (opts.local) full.push("--local", "--persist-to", opts.persistTo ?? LOCAL_STATE);
-  const p = Bun.spawnSync(full, {
-    cwd: opts.cwd ?? WORKER_DIR,
-    env: { ...process.env, CF_SEND_TELEMETRY: "false", CI: "1" },
-  });
-  if (p.exitCode !== 0) {
-    throw new Error(`cf ${args.join(" ")} failed:\n${p.stderr.toString()}${p.stdout.toString()}`);
+  const attempts = 3;
+  for (let attempt = 1; ; attempt++) {
+    const dir = mkdtempSync(join(tmpdir(), "okf-cf-"));
+    try {
+      const p = Bun.spawnSync(full, {
+        cwd: opts.cwd ?? WORKER_DIR,
+        env: { ...process.env, CF_SEND_TELEMETRY: "false", CI: "1" },
+        stdin: "ignore",
+        stdout: Bun.file(join(dir, "out")),
+        stderr: Bun.file(join(dir, "err")),
+        timeout: opts.timeoutMs ?? (opts.local ? 20_000 : 120_000),
+      });
+      const out = readFileSync(join(dir, "out"), "utf8");
+      if (p.exitCode === 0) return out;
+      const err = readFileSync(join(dir, "err"), "utf8");
+      if (p.exitCode === null && attempt < attempts) {
+        console.error(
+          `cf ${args.slice(0, 3).join(" ")} timed out; retrying (${attempt}/${attempts - 1})`,
+        );
+        continue;
+      }
+      const why = p.exitCode === null ? "timed out" : `exited ${p.exitCode}`;
+      throw new Error(`cf ${args.join(" ")} ${why}:\n${err}${out}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }
-  return p.stdout.toString();
 }
 
 /** Applies D1 migrations (./migrations) to the account database, locally or remotely. */

@@ -1,5 +1,5 @@
 /**
- * Point-in-time restore against a deployed Worker (wrangler dev has no PITR). Use a throwaway
+ * Point-in-time restore against a deployed Worker (local dev has no PITR). Use a throwaway
  * library that is a few minutes old (a new one has no recoverable history for a minute or two).
  * It writes marker A, waits, picks the restore point, waits, writes marker B, waits again (history
  * trails live writes by about a minute), restores and checks B is gone and A stayed, then undoes

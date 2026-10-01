@@ -9,32 +9,28 @@ The live doc is the source of truth. Do not add a markdown copy of the spec here
 
 ## Deploy your own
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cldixon/okf-tool/tree/main/worker)
-
-Everything runs in your own Cloudflare account; the Workers Free plan is enough to start.
+Everything runs in your own Cloudflare account; the Workers Free plan is enough to start. The
+project uses Cloudflare's [`cf` CLI](https://developers.cloudflare.com/cf/) (a dev dependency, so
+`bunx cf` runs the pinned version) and its typed `worker/cloudflare.config.ts`.
 
 ### 1. Deploy
 
-**With the button.** It copies `worker/` into a new repository on your GitHub or GitLab account and
-creates the Worker with its Durable Objects, a D1 database, an R2 bucket and a KV namespace. Each
-push to that repository then redeploys. Accept the suggested deploy command
-(`wrangler d1 migrations apply DB --remote && wrangler deploy`): it sets up the database before
-each deploy. The button asks for no secrets; those come in step 2.
-
-**Or from a clone**, with [bun](https://bun.sh) and a Cloudflare login (`bunx wrangler login`):
+With [bun](https://bun.sh):
 
 ```sh
 git clone https://github.com/cldixon/okf-tool && cd okf-tool && bun install
 cd worker
-bunx wrangler d1 create okf-accounts        # paste the database_id into wrangler.jsonc
-bunx wrangler kv namespace create OAUTH_KV  # paste the id into wrangler.jsonc
-bunx wrangler r2 bucket create okf-blobs
-bun run deploy                              # applies D1 migrations, then deploys
+bunx cf auth login                               # or set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+bunx cf d1 create --name okf-accounts            # put its id in cloudflare.config.ts (DB)
+bunx cf kv namespaces create --title okf-oauth   # put its id in cloudflare.config.ts (OAUTH_KV)
+bunx cf r2 buckets create --name okf-blobs
+bun run deploy                                   # applies D1 migrations, then cf deploy
 ```
 
-Either way you get `https://okf-service.<your-subdomain>.workers.dev` (the name is yours to change).
-`https://<your-worker>/healthz` should answer `{"ok":true,...}`, and `https://<your-worker>/app`
-says "Sign-in is not set up" until step 2.
+You get `https://okf-service.<your-subdomain>.workers.dev` (the `name` in `cloudflare.config.ts` is
+yours to change). `https://<your-worker>/healthz` should answer `{"ok":true,...}`, and
+`https://<your-worker>/app` says "Sign-in is not set up" until step 2. `bun run deploy --dry-run`
+builds and validates without touching your account.
 
 ### 2. Put Cloudflare Access in front of `/app/`
 
@@ -54,11 +50,12 @@ are protected by tokens.
    domain (`https://<team>.cloudflareaccess.com`) is shown in the Zero Trust **Settings**.
 4. Set them as two secrets on the Worker: in the dashboard under **Workers & Pages → your Worker →
    Settings → Variables and Secrets**, add `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` as type
-   **Secret**. Or, from `worker/` in a clone:
+   **Secret**. Or, from `worker/`:
 
    ```sh
-   bunx wrangler secret put ACCESS_TEAM_DOMAIN   # https://<team>.cloudflareaccess.com
-   bunx wrangler secret put ACCESS_AUD           # the audience tag
+   bunx cf workers secrets update ACCESS_TEAM_DOMAIN --worker okf-service --type secret_text \
+     --text https://<team>.cloudflareaccess.com
+   bunx cf workers secrets update ACCESS_AUD --worker okf-service --type secret_text --text <AUD tag>
    ```
 
 ### 3. Create a library and connect an agent
@@ -75,9 +72,9 @@ Requires [bun](https://bun.sh).
 ```sh
 bun install
 bun run seed    # local user, library `dev` and a write token (printed)
-bun run dev     # wrangler dev on http://localhost:8787
+bun run dev     # cf dev on http://localhost:8787
 bun run check   # lint + typecheck + tests
-bun run gate    # Phase 1 gate: round-trip Google's sample bundles through wrangler dev
+bun run gate    # gate: round-trip Google's sample bundles and more through cf dev
 ```
 
 With the dev server running and a seeded token:
@@ -159,7 +156,7 @@ teaches the workflow to agents that load skills.
   changed since the last run, it writes `bundle.tar` (a conformant bundle), `ledger.jsonl` (every
   event and blob, so history can be rebuilt) and `manifest.json` to the R2 bucket under
   `exports/<library id>/<date>/`. Exports older than `EXPORT_RETENTION_DAYS` (a var in
-  `wrangler.jsonc`, default 30) are deleted; the newest is always kept. The library's **Import &
+  `cloudflare.config.ts`, default 30) are deleted; the newest is always kept. The library's **Import &
   export** page lists them for download and has **Export now**.
 - **Point-in-time restore.** A library's **Recovery** page restores the whole library, ledger
   included, to any moment in the last 30 days and at least 2 minutes ago (Durable Object point-in-time
@@ -168,7 +165,7 @@ teaches the workflow to agents that load skills.
   library's name to confirm. It first exports the library as it stands to
   `exports/<library id>/<date>-pre-restore-<hhmmssmmm>/`, records the restore under
   `restores/<library id>/`, and lists past restores with an **Undo**. To take back one change, revert
-  it from the ledger instead. `wrangler dev` has no point-in-time recovery, so there a restore is
+  it from the ledger instead. Local dev (`cf dev`) has no point-in-time recovery, so there a restore is
   refused without writing anything. Over REST, with a `human:` token for the library:
   `POST /api/v1/libraries/<lib>/restore` with `{ "to": "<ISO time>" }` or `{ "undo": "<id>" }`, and
   `GET /api/v1/libraries/<lib>/restores`; `worker/scripts/restore-smoke.ts` runs a restore and undo
@@ -179,6 +176,10 @@ teaches the workflow to agents that load skills.
   failing one otherwise). `GET /api/v1/libraries/<lib>/stats` reports paths, events, requests,
   storage bytes, the export cursor and lag, and the last and next maintenance run; the library's
   home page shows the same.
+- **Logs and deployments.** From `worker/`: `bun run logs` prints recent requests, Durable Object
+  calls and alarms from Workers Observability (`--minutes 60`, `--errors`, `--json`);
+  `bunx cf workers deployments list --worker okf-service` lists deployments. `cf` cannot stream
+  live logs yet, so for a live tail run `bunx wrangler tail okf-service`.
 
 For local development, copy `worker/.dev.vars.sample` to `worker/.dev.vars`; `/app/` then treats
 `localhost` requests as signed in with `DEV_ACCESS_EMAIL`.

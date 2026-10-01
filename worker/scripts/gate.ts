@@ -121,7 +121,7 @@ async function nightlyExport(slug: string, originals: number): Promise<string[]>
 }
 
 /**
- * The Recovery page renders, and a restore in wrangler dev (no point-in-time recovery there)
+ * The Recovery page renders, and a restore in cf dev (no point-in-time recovery there)
  * fails cleanly: a 501 naming the reason, no pre-restore export, the library still answering.
  */
 async function restoreUnavailable(slug: string): Promise<string[]> {
@@ -138,7 +138,7 @@ async function restoreUnavailable(slug: string): Promise<string[]> {
   });
   const html = await r.text();
   if (r.status !== 501 || !html.includes("point-in-time recovery")) {
-    return [`restore in wrangler dev: ${r.status} ${html.slice(0, 200)}`];
+    return [`restore in cf dev: ${r.status} ${html.slice(0, 200)}`];
   }
   const transfer = await (await fetch(`${lib}/transfer`)).text();
   if (transfer.includes("before a restore")) return ["a pre-restore export was written"];

@@ -10,7 +10,7 @@ import { type ExportBucket, exportsPrefix, type MaintainedStore, writeExport } f
 
 /** The storage calls a restore needs; the DO passes ctx.storage's PITR methods. */
 export interface Recovery {
-  /** A bookmark for a moment in the past; throws where the backend has no PITR (wrangler dev). */
+  /** A bookmark for a moment in the past; throws where the backend has no PITR (local dev). */
   bookmarkForTime(t: Date): Promise<string>;
   /** The object's state now: with nothing else running, the bookmark that undoes a restore. */
   currentBookmark(): Promise<string>;
@@ -56,7 +56,7 @@ export const restoresPrefix = (libraryId: string) => `restores/${libraryId}/`;
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-/** Maps the storage's PITR errors (as seen from Cloudflare and wrangler dev) to answers. */
+/** Maps the storage's PITR errors (as seen on Cloudflare and in local dev) to answers. */
 export function bookmarkError(message: string): { status: number; code: string; message: string } {
   if (/before this database existed/i.test(message)) {
     return {
