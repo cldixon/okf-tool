@@ -563,6 +563,48 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     return c.body(null, 204);
   });
 
+  // Point-in-time restore (spec: Backups and recovery), as the UI's Recovery page.
+  const recoveryFor = (c: C) => {
+    const token = c.var.token;
+    if (!token.actor.startsWith("human:")) {
+      throw new OkfError(403, "human_only", "Point-in-time restore needs a human: token.");
+    }
+    const recovery = c.var.deps.recovery;
+    if (!recovery) throw new OkfError(501, "unavailable", "Restore is not wired here.");
+    return { recovery, ref: token.library, token };
+  };
+
+  app.get(`${BASE}/restores`, async (c) => {
+    const { recovery, ref } = recoveryFor(c);
+    const restores = await recovery.list(ref.do_id);
+    // Bookmarks stay server-side: undo goes by id.
+    return c.json({
+      restores: restores.map(({ bookmark: _b, undo_bookmark: _u, ...r }) => r),
+    });
+  });
+
+  app.post(`${BASE}/restore`, async (c) => {
+    const { recovery, ref, token } = recoveryFor(c);
+    const body = await c.req
+      .json<{ to?: string; undo?: string }>()
+      .catch(() => ({}) as { to?: string; undo?: string });
+    if (!body.to === !body.undo) {
+      throw new OkfError(
+        400,
+        "bad_request",
+        "Send { to: <ISO 8601 time> } or { undo: <restore id> }.",
+      );
+    }
+    const outcome = await recovery.restore(
+      ref.do_id,
+      body.undo ? { undo: body.undo } : { to: body.to as string },
+      token.actor,
+    );
+    if (!outcome.ok) throw new OkfError(outcome.status, outcome.code, outcome.message);
+    const { bookmark: _b, undo_bookmark: _u, ...record } = outcome.record;
+    return c.json(record, 201);
+  });
+
   // ------------------------------------------------------------------ MCP
 
   // ------------------------------------------------------------------ apps (OAuth consent)

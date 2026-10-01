@@ -104,8 +104,10 @@ export async function prepareRestore(opts: {
   }
 
   const stamp = iso(now);
-  const id = stamp.replace(/[-:]/g, "");
-  const folder = `${exportsPrefix(opts.libraryId)}${stamp.slice(0, 10)}-pre-restore-${stamp.slice(11, 19).replace(/:/g, "")}/`;
+  // Millisecond ids, so a restore and a quick undo never share a record or an export folder.
+  const ms = now.toISOString();
+  const id = ms.replace(/[-:.]/g, "");
+  const folder = `${exportsPrefix(opts.libraryId)}${ms.slice(0, 10)}-pre-restore-${ms.slice(11, 23).replace(/[:.]/g, "")}/`;
   const seqBefore = opts.store.headSeq();
   await writeExport({ ...opts, folder, stamp, kind: "pre-restore" });
 
@@ -136,8 +138,8 @@ export async function prepareRestore(opts: {
   return { ok: true, record };
 }
 
-/** Restore records are named by their request time, e.g. 20260930T180211Z. */
-export const RESTORE_ID = /^\d{8}T\d{6}Z$/;
+/** Restore records are named by their request time to the millisecond, e.g. 20260930T180211042Z. */
+export const RESTORE_ID = /^\d{8}T\d{9}Z$/;
 
 /** A library's restores, newest first; `read` returns an R2 object's text or null. */
 export async function listRestores(

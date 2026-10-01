@@ -492,7 +492,7 @@ export function registerUiRoutes<E extends AppEnv>(
     };
     const type = types[file];
     const obj =
-      type && /^\d{4}-\d{2}-\d{2}(-pre-restore-\d{6})?$/.test(date) && p.deps.exports
+      type && /^\d{4}-\d{2}-\d{2}(-pre-restore-\d{9})?$/.test(date) && p.deps.exports
         ? await p.deps.exports.get(`exports/${ref.do_id}/${date}/${file}`)
         : null;
     if (!obj || !type) throw new OkfError(404, "not_found", "No such export.");

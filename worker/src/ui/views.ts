@@ -799,7 +799,7 @@ function opsLine(urls: Urls, s: LibraryStats): string {
 }
 
 export interface NightlyExport {
-  /** The folder under exports/<library id>/: YYYY-MM-DD, or YYYY-MM-DD-pre-restore-HHMMSS. */
+  /** The folder under exports/<library id>/: YYYY-MM-DD, or YYYY-MM-DD-pre-restore-HHMMSSmmm. */
   date: string;
   seq: number | null;
   files: number | null;
@@ -807,7 +807,7 @@ export interface NightlyExport {
 
 /** "2026-09-30", or "2026-09-30 18:02:11 UTC, before a restore" for a pre-restore export. */
 function exportLabel(folder: string): string {
-  const m = /^(\d{4}-\d{2}-\d{2})-pre-restore-(\d{2})(\d{2})(\d{2})$/.exec(folder);
+  const m = /^(\d{4}-\d{2}-\d{2})-pre-restore-(\d{2})(\d{2})(\d{2})\d{3}$/.exec(folder);
   return m ? `${m[1]} ${m[2]}:${m[3]}:${m[4]} UTC, before a restore` : folder;
 }
 
@@ -921,9 +921,9 @@ ${recent ? `<h2>Recent requests</h2><p class="small muted">The ledger is at seq 
 ${rows ? `<p class="small">Undo returns the library to how it was just before that restore. It is a restore too: it writes its own export first and can itself be undone.</p><div class="table-wrap"><table class="list"><tbody>${rows}</tbody></table></div>` : `<p class="muted small">None.</p>`}</div>`;
 }
 
-/** A restore id (20260930T180211Z) as an ISO time. */
+/** A restore id (20260930T180211042Z) as an ISO time, to the second. */
 function restoreTime(id: string): string {
-  return id.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, "$1-$2-$3T$4:$5:$6Z");
+  return id.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\d{3}Z$/, "$1-$2-$3T$4:$5:$6Z");
 }
 
 // ---------------------------------------------------------------- tokens
