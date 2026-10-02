@@ -7,17 +7,18 @@ import { renderBody } from "./markdown";
 export class Urls {
   readonly base: string;
   constructor(
+    readonly owner: string,
     readonly slug: string,
     readonly at?: number,
   ) {
-    this.base = `/app/libraries/${encodeURIComponent(slug)}/`;
+    this.base = `/app/libraries/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/`;
   }
   private q(extra?: string) {
     const parts = [this.at === undefined ? "" : `at=${this.at}`, extra ?? ""].filter(Boolean);
     return parts.length ? `?${parts.join("&")}` : "";
   }
   pinned(at: number | undefined) {
-    return new Urls(this.slug, at);
+    return new Urls(this.owner, this.slug, at);
   }
   tree(dir: string) {
     return dir === "" ? `${this.base}${this.q()}` : `${this.base}tree/${enc(dir)}/${this.q()}`;
@@ -149,6 +150,7 @@ function atNotice(urls: Urls, head: number, currentUrl: string): string {
 // ---------------------------------------------------------------- library list
 
 export interface LibrarySummary {
+  owner: string;
   slug: string;
   seq: number;
   concepts: number;
@@ -171,7 +173,7 @@ export function libraryList(libs: LibrarySummary[], error?: string): string {
     .map(
       (
         l,
-      ) => `<tr><td class="name"><a href="/app/libraries/${esc(encodeURIComponent(l.slug))}/"><strong>${esc(l.slug)}</strong></a></td>
+      ) => `<tr><td class="name"><a href="${esc(new Urls(l.owner, l.slug).tree(""))}"><strong>${esc(l.slug)}</strong></a></td>
 <td>${l.concepts}</td><td>${l.attachments}</td><td>${l.open_work ? chip(`${l.open_work} open`, "warn") : chip("none", "ok")}</td><td class="muted">${l.seq}</td></tr>`,
     )
     .join("");

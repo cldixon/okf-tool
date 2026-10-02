@@ -162,21 +162,21 @@ describe("stats, healthz and nightly exports in the UI and API", () => {
       libraryId: "lib-1",
       now: new Date(),
     });
-    const home = await (await s.app.request("/app/libraries/demo/")).text();
+    const home = await (await s.app.request("/app/libraries/owner/demo/")).text();
     expect(home).toContain("1 events in 1 requests");
     expect(home).toContain("last nightly export");
-    const transfer = await (await s.app.request("/app/libraries/demo/transfer")).text();
+    const transfer = await (await s.app.request("/app/libraries/owner/demo/transfer")).text();
     const date = new Date().toISOString().slice(0, 10);
-    expect(transfer).toContain(`/app/libraries/demo/exports/${date}/bundle.tar`);
-    const tar = await s.app.request(`/app/libraries/demo/exports/${date}/bundle.tar`);
+    expect(transfer).toContain(`/app/libraries/owner/demo/exports/${date}/bundle.tar`);
+    const tar = await s.app.request(`/app/libraries/owner/demo/exports/${date}/bundle.tar`);
     expect(tar.headers.get("Content-Disposition")).toContain(`demo-${date}-bundle.tar`);
     expect(readTar(new Uint8Array(await tar.arrayBuffer())).map((f) => f.path)).toContain("a.md");
-    expect((await s.app.request(`/app/libraries/demo/exports/${date}/secrets.txt`)).status).toBe(
-      404,
-    );
-    expect((await s.app.request("/app/libraries/demo/exports/..%2F..%2Fx/bundle.tar")).status).toBe(
-      404,
-    );
+    expect(
+      (await s.app.request(`/app/libraries/owner/demo/exports/${date}/secrets.txt`)).status,
+    ).toBe(404);
+    expect(
+      (await s.app.request("/app/libraries/owner/demo/exports/..%2F..%2Fx/bundle.tar")).status,
+    ).toBe(404);
   });
 });
 
@@ -189,14 +189,14 @@ describe("Export now", () => {
       body: md("A\n"),
     });
     const post = () =>
-      s.app.request("/app/libraries/demo/maintain", {
+      s.app.request("/app/libraries/owner/demo/maintain", {
         method: "POST",
         headers: { Origin: "http://localhost" },
       });
     const first = await (await post()).text();
     expect(first).toContain("Exported to R2 at <code>exports/lib-1/");
     expect(await (await post()).text()).toContain("Nothing changed since the last export");
-    const forged = await s.app.request("/app/libraries/demo/maintain", {
+    const forged = await s.app.request("/app/libraries/owner/demo/maintain", {
       method: "POST",
       headers: { Origin: "https://evil.example" },
     });

@@ -6,7 +6,7 @@
  * and checks B is back. Takes about five minutes.
  *
  *   bun run scripts/restore-smoke.ts --url https://okf-service.example.workers.dev \
- *     --library scratch --token <human: token for that library>
+ *     --library dev/scratch --token <human: token for that library>
  */
 import { parseArgs } from "node:util";
 
@@ -19,7 +19,9 @@ const { values } = parseArgs({
   },
 });
 if (!values.url || !values.library || !values.token) {
-  console.error("Usage: --url <worker> --library <slug> --token <human: token> [--gap seconds]");
+  console.error(
+    "Usage: --url <worker> --library <owner>/<slug> --token <human: token> [--gap seconds]",
+  );
   process.exit(2);
 }
 const lib = `${values.url.replace(/\/$/, "")}/api/v1/libraries/${values.library}`;

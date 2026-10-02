@@ -4,6 +4,7 @@ import { makeClient, r2BlobStore } from "./client";
 import type { Library } from "./library";
 import { listExports } from "./maintain";
 import { listRestores, RESTORE_ID, restoresPrefix } from "./recovery";
+import { d1Sessions } from "./session";
 import { createWorker } from "./worker";
 
 export { Library } from "./library";
@@ -28,6 +29,9 @@ export default createWorker((env) => {
   return {
     authenticate,
     accounts: d1Accounts(env.DB),
+    sessions: d1Sessions(env.DB),
+    // No mail provider until A3 (v2 spec: Open questions); local dev uses DEV_SIGNIN=1.
+    mailer: null,
     blobs: r2BlobStore(env.BLOBS),
     maintain: (doId) => libraryStub(env, doId).maintain(),
     health: async () => {

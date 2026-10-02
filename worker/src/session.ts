@@ -1,0 +1,160 @@
+import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
+import type { User } from "./accounts";
+import { sha256Hex } from "./okf/hash";
+
+/**
+ * Browser sign-in (v2 spec: Accounts and sign-in): single-use magic links, then a session cookie.
+ * Only hashes of link and session secrets are stored, in D1.
+ */
+
+export const SESSION_COOKIE = "__Host-okf_session";
+export const SESSION_IDLE_DAYS = 30;
+export const SESSION_MAX_DAYS = 90;
+export const LINK_MINUTES = 15;
+/** Sign-in emails per address, and per IP, in any hour. */
+export const LINKS_PER_EMAIL_HOUR = 5;
+export const LINKS_PER_IP_HOUR = 20;
+/** last_seen (and the idle expiry) is written at most this often. */
+const TOUCH_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+
+export interface Sessions {
+  /** A new sign-in link's secret, or null when this email or IP has asked too often. */
+  createLink(email: string, ip: string | null): Promise<string | null>;
+  /** Uses up a link: its email, or null when it is unknown, used or expired. */
+  consumeLink(secret: string): Promise<string | null>;
+  /** Starts a session; returns the cookie's secret. */
+  create(userId: string, userAgent: string | null): Promise<string>;
+  /** The signed-in user for a cookie's secret, or null. */
+  user(secret: string): Promise<User | null>;
+  end(secret: string): Promise<void>;
+  /** Signs the user out everywhere. */
+  endAll(userId: string): Promise<void>;
+}
+
+export const newSecret = () => bytesToHex(randomBytes(32));
+const hash = (secret: string) => sha256Hex(secret);
+const iso = (ms: number) => new Date(ms).toISOString();
+
+interface SessionRow {
+  hash: string;
+  last_seen: string;
+  expires: string;
+  id: string;
+  email: string;
+  actor: string;
+  handle: string;
+}
+
+export function d1Sessions(db: D1Database, now = () => Date.now()): Sessions {
+  return {
+    async createLink(email, ip) {
+      const t = now();
+      const hourAgo = iso(t - 3_600_000);
+      const counts = await db
+        .prepare(
+          `SELECT (SELECT COUNT(*) FROM sign_in_links WHERE email = ?1 AND created > ?2) AS by_email,
+                  (SELECT COUNT(*) FROM sign_in_links WHERE ip = ?3 AND created > ?2) AS by_ip`,
+        )
+        .bind(email, hourAgo, ip ?? "")
+        .first<{ by_email: number; by_ip: number }>();
+      if ((counts?.by_email ?? 0) >= LINKS_PER_EMAIL_HOUR) return null;
+      if (ip && (counts?.by_ip ?? 0) >= LINKS_PER_IP_HOUR) return null;
+      const secret = newSecret();
+      await db.batch([
+        // Links older than a day are of no further use, even for rate limiting.
+        db.prepare("DELETE FROM sign_in_links WHERE created < ?").bind(iso(t - DAY_MS)),
+        db
+          .prepare(
+            "INSERT INTO sign_in_links (hash, email, created, expires, ip) VALUES (?, ?, ?, ?, ?)",
+          )
+          .bind(hash(secret), email, iso(t), iso(t + LINK_MINUTES * 60_000), ip),
+      ]);
+      return secret;
+    },
+
+    async consumeLink(secret) {
+      const t = iso(now());
+      const row = await db
+        .prepare(
+          `UPDATE sign_in_links SET used = ?1
+           WHERE hash = ?2 AND used IS NULL AND expires > ?1 RETURNING email`,
+        )
+        .bind(t, hash(secret))
+        .first<{ email: string }>();
+      return row?.email ?? null;
+    },
+
+    async create(userId, userAgent) {
+      const t = now();
+      const secret = newSecret();
+      await db
+        .prepare(
+          `INSERT INTO sessions (hash, user, created, last_seen, idle_expires, expires, user_agent)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          hash(secret),
+          userId,
+          iso(t),
+          iso(t),
+          iso(t + SESSION_IDLE_DAYS * DAY_MS),
+          iso(t + SESSION_MAX_DAYS * DAY_MS),
+          userAgent?.slice(0, 200) ?? null,
+        )
+        .run();
+      return secret;
+    },
+
+    async user(secret) {
+      const t = now();
+      const row = await db
+        .prepare(
+          `SELECT s.hash, s.last_seen, s.expires, u.id, u.email, u.actor, u.handle
+           FROM sessions s JOIN users u ON u.id = s.user
+           WHERE s.hash = ?1 AND s.idle_expires > ?2 AND s.expires > ?2 AND u.suspended IS NULL`,
+        )
+        .bind(hash(secret), iso(t))
+        .first<SessionRow>();
+      if (!row) return null;
+      if (t - Date.parse(row.last_seen) > TOUCH_MS) {
+        const idle = Math.min(t + SESSION_IDLE_DAYS * DAY_MS, Date.parse(row.expires));
+        await db
+          .prepare("UPDATE sessions SET last_seen = ?, idle_expires = ? WHERE hash = ?")
+          .bind(iso(t), iso(idle), row.hash)
+          .run();
+      }
+      return { id: row.id, email: row.email, actor: row.actor, handle: row.handle };
+    },
+
+    async end(secret) {
+      await db.prepare("DELETE FROM sessions WHERE hash = ?").bind(hash(secret)).run();
+    },
+
+    async endAll(userId) {
+      await db.prepare("DELETE FROM sessions WHERE user = ?").bind(userId).run();
+    },
+  };
+}
+
+export function readCookie(req: Request, name: string): string | null {
+  for (const part of (req.headers.get("Cookie") ?? "").split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return v.join("=");
+  }
+  return null;
+}
+
+export function sessionCookie(secret: string): string {
+  return `${SESSION_COOKIE}=${secret}; Path=/; Max-Age=${SESSION_MAX_DAYS * 86_400}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export const clearedSessionCookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
+
+/** Where to go after signing in: only a path on this site's /app. */
+export function safeNext(next: string | null | undefined): string {
+  if (!next?.startsWith("/app") || next.startsWith("//") || next.includes("\\")) {
+    return "/app";
+  }
+  return next;
+}

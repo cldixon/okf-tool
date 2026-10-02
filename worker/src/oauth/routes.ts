@@ -6,11 +6,12 @@ import {
   type OAuthHelpers,
 } from "@cloudflare/workers-oauth-provider";
 import type { Hono } from "hono";
-import { accessIdentity } from "../access";
-import type { Accounts, LibraryRef, User } from "../accounts";
+import type { LibraryRef, User } from "../accounts";
 import { checkSlug } from "../accounts";
+import type { Deps } from "../app";
 import type { TokenInfo } from "../auth";
 import { normalizeDir } from "../okf/paths";
+import { signedIn } from "../signin";
 import { OkfError } from "../store/errors";
 import { type ConsentForm, consentPage, grantsPage, messagePage } from "./pages";
 
@@ -25,35 +26,6 @@ export interface GrantProps {
 const AGENT_ACTOR = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/;
 
 type AppEnv = { Bindings: Cloudflare.Env };
-
-interface RouteDeps {
-  accounts(env: Cloudflare.Env): Accounts;
-}
-
-export async function signedIn(
-  req: Request,
-  env: Cloudflare.Env,
-  accounts: Accounts,
-): Promise<User | Response> {
-  const result = await accessIdentity(req, {
-    teamDomain: env.ACCESS_TEAM_DOMAIN,
-    audience: env.ACCESS_AUD,
-    devEmail: env.DEV_ACCESS_EMAIL,
-  });
-  if (result.ok) return accounts.user(result.identity.email);
-  if (result.reason === "not_configured") {
-    return messagePage(
-      "Sign-in is not set up",
-      "This deployment has no Cloudflare Access application for /app/ yet. Its operator creates one and sets the ACCESS_TEAM_DOMAIN and ACCESS_AUD secrets (see the README).",
-      503,
-    );
-  }
-  return messagePage(
-    "Not signed in",
-    "This page is protected by Cloudflare Access, and the request did not carry a valid Access sign-in. Open it again in your browser to sign in.",
-    403,
-  );
-}
 
 function defaultActor(details: ConsentDescription): string {
   const base = (details.clientDomain ?? details.clientName ?? "")
@@ -103,7 +75,7 @@ function validate(form: ConsentForm, libs: LibraryRef[]): string | null {
       return (e as OkfError).message;
     }
     if (libs.some((l) => l.slug === form.newLibrary.toLowerCase())) {
-      return `A library named ${form.newLibrary} already exists; pick it from the list.`;
+      return `You already have a library named ${form.newLibrary}; pick it from the list.`;
     }
   } else if (!libs.some((l) => l.slug === form.library)) {
     return "Pick a library from the list, or create a new one.";
@@ -133,17 +105,24 @@ function authError(e: unknown): Response {
   throw e;
 }
 
-/** /app/authorize and /app/grants, behind Cloudflare Access (spec: Apps under Auth). */
-export function registerAppRoutes<E extends AppEnv>(app: Hono<E>, deps: RouteDeps) {
+/**
+ * /app/authorize and /app/grants, for the signed-in person (spec: Apps under Auth). Consent lists
+ * only their own libraries, and a grant belongs to their account (v2 spec: Tenancy).
+ */
+export function registerAppRoutes<E extends AppEnv>(
+  app: Hono<E>,
+  deps: (env: Cloudflare.Env) => Deps,
+) {
   app.get("/app/authorize", async (c) => {
-    const accounts = deps.accounts(c.env);
-    const user = await signedIn(c.req.raw, c.env, accounts);
+    const d = deps(c.env);
+    const accounts = d.accounts;
+    const user = await signedIn(c.req.raw, c.env, d);
     if (user instanceof Response) return user;
     const oauth: OAuthHelpers = c.env.OAUTH_PROVIDER;
     try {
       const request = await oauth.parseAuthRequest(c.req.raw);
       const details = await oauth.describeConsent(request);
-      const libs = await accounts.libraries();
+      const libs = await accounts.libraries(user.id);
       const consent = await oauth.beginConsent(request);
       return html(
         consentPage({
@@ -161,8 +140,9 @@ export function registerAppRoutes<E extends AppEnv>(app: Hono<E>, deps: RouteDep
   });
 
   app.post("/app/authorize", async (c) => {
-    const accounts = deps.accounts(c.env);
-    const user = await signedIn(c.req.raw, c.env, accounts);
+    const d = deps(c.env);
+    const accounts = d.accounts;
+    const user = await signedIn(c.req.raw, c.env, d);
     if (user instanceof Response) return user;
     const oauth: OAuthHelpers = c.env.OAUTH_PROVIDER;
     const body = await c.req.formData();
@@ -173,7 +153,7 @@ export function registerAppRoutes<E extends AppEnv>(app: Hono<E>, deps: RouteDep
         return new Response(null, { status: 302, headers: denied.headers });
       }
       const form = readForm(body);
-      const libs = await accounts.libraries();
+      const libs = await accounts.libraries(user.id);
       const problem = validate(form, libs);
       if (problem) {
         // The handle is still unused, so the same page can be shown again with the error. The
@@ -206,7 +186,7 @@ export function registerAppRoutes<E extends AppEnv>(app: Hono<E>, deps: RouteDep
       const approved = await oauth.approveConsent(c.req.raw, handle, { scope });
       const library =
         form.library === ""
-          ? await accounts.createLibrary(form.newLibrary, user.id)
+          ? await accounts.createLibrary(form.newLibrary, user)
           : (libs.find((l) => l.slug === form.library) as LibraryRef);
       const prefix = normalizeDir(form.prefix) || null;
       const props: GrantProps = {
@@ -216,7 +196,12 @@ export function registerAppRoutes<E extends AppEnv>(app: Hono<E>, deps: RouteDep
           scope: form.access,
           prefix,
           mcp_tiers: form.tiers,
-          library: { id: library.id, slug: library.slug, do_id: library.do_id },
+          library: {
+            id: library.id,
+            slug: library.slug,
+            do_id: library.do_id,
+            owner: library.owner,
+          },
         },
       };
       const { redirectTo } = await oauth.completeAuthorization({
@@ -241,17 +226,15 @@ export function registerAppRoutes<E extends AppEnv>(app: Hono<E>, deps: RouteDep
   });
 
   app.get("/app/grants", async (c) => {
-    const accounts = deps.accounts(c.env);
-    const user = await signedIn(c.req.raw, c.env, accounts);
+    const user = await signedIn(c.req.raw, c.env, deps(c.env));
     if (user instanceof Response) return user;
     return html(await renderGrants(c.env.OAUTH_PROVIDER, user, c.req.query("notice")));
   });
 
   app.post("/app/grants/revoke", async (c) => {
-    const accounts = deps.accounts(c.env);
-    const user = await signedIn(c.req.raw, c.env, accounts);
+    const user = await signedIn(c.req.raw, c.env, deps(c.env));
     if (user instanceof Response) return user;
-    // Access cookies ride along on cross-site form posts, so insist on a same-origin request.
+    // Session cookies are SameSite=Lax, and every post must also come from this site.
     const origin = c.req.header("Origin");
     if (origin !== new URL(c.req.url).origin) {
       return messagePage("Refused", "Revoke requests must come from this site.", 403);

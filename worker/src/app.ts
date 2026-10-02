@@ -13,16 +13,23 @@ import { registerAppRoutes } from "./oauth/routes";
 import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
 import type { RestoreOutcome, RestoreRecord } from "./recovery";
+import type { Sessions } from "./session";
+import { type Mailer, registerSignInRoutes } from "./signin";
 import { OkfError } from "./store/errors";
 import type { ConceptContent, RequestContext, WriteOp } from "./store/store";
+import { authorizeLibrary } from "./tenancy";
 import { registerUiRoutes } from "./ui/routes";
 import { maybeGunzip, readTar } from "./util/tar";
 
 /** What the app needs from the platform; production wires D1, the DO and R2, tests fakes. */
 export interface Deps {
   authenticate: Authenticate;
-  /** Users and libraries in D1, for the consent page. */
+  /** Users, libraries and tokens in D1, always scoped to one account. */
   accounts: Accounts;
+  /** Magic links and browser sessions (v2 spec: Accounts and sign-in). */
+  sessions: Sessions;
+  /** Sends sign-in emails; without one, only local dev with DEV_SIGNIN=1 can sign in. */
+  mailer?: Mailer | null;
   library(token: TokenInfo): LibraryClient;
   /** The library a signed download URL names, or null when no such library exists. */
   libraryByDoId(doId: string): Promise<LibraryClient | null>;
@@ -60,7 +67,8 @@ type Env = {
 };
 type C = Context<Env>;
 
-const BASE = "/api/v1/libraries/:lib";
+/** A library's routes: {owner} is its owner's handle (v2 spec: Tenancy and authorization). */
+const BASE = "/api/v1/libraries/:owner/:lib";
 
 function tail(c: C, marker: string): string {
   const path = c.req.path;
@@ -179,10 +187,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   app.use(`${BASE}/*`, async (c, next) => {
     const d = deps(c.env);
     const token = await d.authenticate(bearer(c));
-    const lib = c.req.param("lib");
-    if (lib !== token.library.slug && lib !== token.library.id) {
-      throw new OkfError(403, "wrong_library", "This token is for a different library.");
-    }
+    await authorizeLibrary(d.accounts, { token }, c.req.param("owner"), c.req.param("lib"));
     c.set("deps", d);
     c.set("token", token);
     c.set("lib", d.library(token));
@@ -493,37 +498,45 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   // ------------------------------------------------------------------ libraries and tokens
 
-  /** Management routes are human-only (spec: HTTP API): a human: bearer token. */
+  /**
+   * Management routes are human-only (spec: HTTP API): a human: bearer token, acting for the
+   * person who minted it, on that person's own libraries and tokens.
+   */
   const human = async (c: C) => {
     const d = deps(c.env);
     const token = await d.authenticate(bearer(c));
-    if (!token.actor.startsWith("human:")) {
+    if (!token.actor.startsWith("human:") || !token.created_by || !token.library.owner) {
       throw new OkfError(403, "human_only", "Library and token management needs a human: token.");
     }
-    return { d, token };
+    const user = { id: token.created_by, handle: token.library.owner };
+    return { d, token, user };
   };
 
   app.get("/api/v1/libraries", async (c) => {
-    const { d } = await human(c);
+    const { d, user } = await human(c);
     return c.json({
-      libraries: (await d.accounts.libraries()).map(({ id, slug }) => ({ id, slug })),
+      libraries: (await d.accounts.libraries(user.id)).map(({ id, slug, owner }) => ({
+        id,
+        owner,
+        slug,
+      })),
     });
   });
 
   app.post("/api/v1/libraries", async (c) => {
-    const { d, token } = await human(c);
+    const { d, user } = await human(c);
     const body = await c.req.json<{ slug?: string }>().catch(() => ({}) as { slug?: string });
-    const lib = await d.accounts.createLibrary(body.slug ?? "", token.created_by ?? null);
-    return c.json({ id: lib.id, slug: lib.slug }, 201);
+    const lib = await d.accounts.createLibrary(body.slug ?? "", user);
+    return c.json({ id: lib.id, owner: lib.owner, slug: lib.slug }, 201);
   });
 
   app.get("/api/v1/tokens", async (c) => {
-    const { d } = await human(c);
-    return c.json({ tokens: await d.accounts.tokens() });
+    const { d, user } = await human(c);
+    return c.json({ tokens: await d.accounts.tokens(user.id) });
   });
 
   app.post("/api/v1/tokens", async (c) => {
-    const { d, token } = await human(c);
+    const { d, user } = await human(c);
     const body = await c.req
       .json<{
         library?: string;
@@ -534,7 +547,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
         mcp_tiers?: string;
       }>()
       .catch(() => ({}) as Record<string, undefined>);
-    const lib = (await d.accounts.libraries()).find(
+    const lib = (await d.accounts.libraries(user.id)).find(
       (l) => l.slug === body.library || l.id === body.library,
     );
     if (!lib) throw new OkfError(404, "no_library", `There is no library ${body.library ?? ""}.`);
@@ -552,14 +565,14 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     const minted = await d.accounts.createToken({
       ...fields,
       libraryId: lib.id,
-      createdBy: token.created_by ?? null,
+      createdBy: user.id,
     });
     return c.json({ id: minted.id, secret: minted.secret, library: lib.slug, ...fields }, 201);
   });
 
   app.delete("/api/v1/tokens/:id", async (c) => {
-    const { d } = await human(c);
-    await d.accounts.revokeToken(c.req.param("id"));
+    const { d, user } = await human(c);
+    await d.accounts.revokeToken(c.req.param("id"), user.id);
     return c.body(null, 204);
   });
 
@@ -610,7 +623,8 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // ------------------------------------------------------------------ apps (OAuth consent)
 
   // /mcp itself is served by the OAuth provider (worker.ts), which checks tokens first.
-  registerAppRoutes(app, { accounts: (env) => deps(env).accounts });
+  registerSignInRoutes(app, deps);
+  registerAppRoutes(app, deps);
   registerUiRoutes(app, deps);
 
   return app;

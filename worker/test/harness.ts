@@ -1,6 +1,7 @@
 /**
  * The real Worker in process: Cloudflare's OAuth provider in front of the app, bun:sqlite stores
- * behind the same callStore the DO uses, and in-memory KV, blobs and accounts.
+ * behind the same callStore the DO uses, the account layer's real SQL on bun:sqlite (d1.ts), and
+ * in-memory KV and blobs. Requests through `app` are signed in as the demo library's owner.
  */
 import { mock } from "bun:test";
 
@@ -11,14 +12,15 @@ Object.assign(globalThis, {
   Cloudflare: { compatibilityFlags: { global_fetch_strictly_public: true } },
 });
 
-import type { Accounts, LibraryRef, TokenRow, User } from "../src/accounts";
-import { checkSlug, humanActor } from "../src/accounts";
+import { d1Accounts, type LibraryRef } from "../src/accounts";
 import type { Deps } from "../src/app";
-import type { TokenInfo } from "../src/auth";
+import { d1Authenticate, type TokenInfo } from "../src/auth";
 import { type BlobStore, callStore, type LibraryClient, makeClient } from "../src/client";
+import { sha256Hex } from "../src/okf/hash";
 import type { RestoreRecord } from "../src/recovery";
-import { OkfError } from "../src/store/errors";
+import { d1Sessions, SESSION_COOKIE } from "../src/session";
 import { LibraryStore } from "../src/store/store";
+import { bunD1 } from "./d1";
 import { bunSqlHandle } from "./sqlite";
 
 const { createWorker } = await import("../src/worker");
@@ -156,7 +158,12 @@ export function memoryKV() {
   return kv;
 }
 
-export const LIB: LibraryRef = { id: "lib-1", slug: "demo", do_id: "lib-1" };
+/** The signed-in owner of the demo library, and their library. */
+export const OWNER = { id: "user_1", email: "owner@example.com", handle: "owner" };
+export const LIB: LibraryRef = { id: "lib-1", slug: "demo", do_id: "lib-1", owner: "owner" };
+/** The demo library's paths. */
+export const API = "/api/v1/libraries/owner/demo";
+export const UI = "/app/libraries/owner/demo";
 
 export const TOKENS: Record<string, TokenInfo> = {
   writer: {
@@ -210,68 +217,6 @@ export const TOKENS: Record<string, TokenInfo> = {
   },
 };
 
-export function memoryAccounts(): Accounts & {
-  users: Map<string, User>;
-  libs: LibraryRef[];
-  minted: Map<string, TokenRow & { secret: string }>;
-} {
-  const users = new Map<string, User>();
-  const libs: LibraryRef[] = [LIB];
-  const minted = new Map<string, TokenRow & { secret: string }>();
-  return {
-    users,
-    libs,
-    minted,
-    async tokens() {
-      return [...minted.values()].reverse().map(({ secret: _, ...row }) => row);
-    },
-    async createToken(t) {
-      const id = `tok_${minted.size + 1}`;
-      const secret = `okf_test_${minted.size + 1}`;
-      const lib = libs.find((l) => l.id === t.libraryId);
-      const email = [...users.values()].find((u) => u.id === t.createdBy)?.email ?? null;
-      minted.set(id, {
-        id,
-        secret,
-        library: lib?.slug ?? "",
-        actor: t.actor,
-        scope: t.scope,
-        prefix: t.prefix,
-        expires: t.expires,
-        mcp_tiers: t.mcpTiers,
-        created_by: email,
-        revoked: null,
-      });
-      return { id, secret };
-    },
-    async revokeToken(id) {
-      const t = minted.get(id);
-      if (!t || t.revoked) throw new OkfError(404, "not_found", "No such active token.");
-      t.revoked = new Date().toISOString();
-    },
-    async user(email) {
-      let u = users.get(email);
-      if (!u) {
-        u = { id: `user_${users.size + 1}`, email, actor: humanActor(email) };
-        users.set(email, u);
-      }
-      return u;
-    },
-    async libraries() {
-      return [...libs].sort((a, b) => (a.slug < b.slug ? -1 : 1));
-    },
-    async createLibrary(slugInput) {
-      const slug = checkSlug(slugInput);
-      if (libs.some((l) => l.slug === slug)) {
-        throw new OkfError(409, "library_exists", `A library named ${slug} already exists.`);
-      }
-      const lib = { id: `lib-${libs.length + 1}`, slug, do_id: `lib-${libs.length + 1}` };
-      libs.push(lib);
-      return lib;
-    },
-  };
-}
-
 export const ORIGIN = "http://localhost";
 
 export function setup() {
@@ -289,7 +234,35 @@ export function setup() {
     return c;
   };
   clientFor(LIB.do_id);
-  const accounts = memoryAccounts();
+  const { d1, db } = bunD1();
+  const now = new Date().toISOString();
+  db.run("INSERT INTO users (id, email, actor, handle, created) VALUES (?, ?, ?, ?, ?)", [
+    OWNER.id,
+    OWNER.email,
+    `human:${OWNER.handle}`,
+    OWNER.handle,
+    now,
+  ]);
+  db.run(
+    "INSERT INTO libraries (id, slug, owner, visibility, created, do_id) VALUES (?, ?, ?, 'private', ?, ?)",
+    [LIB.id, LIB.slug, OWNER.id, now, LIB.do_id],
+  );
+  const accounts = d1Accounts(d1);
+  const sessions = d1Sessions(d1);
+  const outbox: { to: string; subject: string; text: string }[] = [];
+  // No cache, so a revocation shows at once.
+  const d1Auth = d1Authenticate(d1, Date.now, 0);
+  /** A session for a user, written straight to D1 (setup stays synchronous). */
+  const sessionFor = (userId: string) => {
+    const secret = `session-${userId}-${crypto.randomUUID()}`;
+    const later = new Date(Date.now() + 86_400_000).toISOString();
+    db.run(
+      "INSERT INTO sessions (hash, user, created, last_seen, idle_expires, expires) VALUES (?, ?, ?, ?, ?, ?)",
+      [sha256Hex(secret), userId, now, now, later, later],
+    );
+    return secret;
+  };
+  const ownerSession = sessionFor(OWNER.id);
   const bucket = memoryBucket();
   const pitr = fakeRecovery();
   const deps: Deps = {
@@ -362,51 +335,110 @@ export function setup() {
     authenticate: async (secret) => {
       const t = TOKENS[secret];
       if (t) return t;
-      const m = [...accounts.minted.values()].find((x) => x.secret === secret);
-      if (!m) throw new OkfError(401, "bad_token", "Unknown bearer token.");
-      if (m.revoked) throw new OkfError(401, "token_revoked", "This token has been revoked.");
-      const lib = accounts.libs.find((l) => l.slug === m.library) as LibraryRef;
-      return {
-        id: m.id,
-        actor: m.actor,
-        scope: m.scope,
-        prefix: m.prefix,
-        mcp_tiers: m.mcp_tiers,
-        library: { id: lib.id, slug: lib.slug, do_id: lib.do_id },
-      };
+      return d1Auth(secret);
     },
     accounts,
+    sessions,
+    mailer: {
+      async send(msg) {
+        outbox.push(msg);
+      },
+    },
     blobs,
     library: (token) => clientFor(token.library.do_id),
     libraryByDoId: async (doId) =>
-      accounts.libs.some((l) => l.do_id === doId) ? clientFor(doId) : null,
+      db.query("SELECT 1 FROM libraries WHERE do_id = ?").get(doId) ? clientFor(doId) : null,
   };
   const worker = createWorker(() => deps);
   const kv = memoryKV();
-  const env = { OAUTH_KV: kv, DEV_ACCESS_EMAIL: "owner@example.com" } as unknown as Env;
+  const env = { OAUTH_KV: kv } as unknown as Env;
   const ctx = {
     waitUntil() {},
     passThroughOnException() {},
     props: {},
   } as unknown as ExecutionContext;
 
-  /** Like Hono's app.request: a path or URL, resolved against http://localhost. */
-  const app = {
+  /**
+   * Like Hono's app.request: a path or URL, resolved against http://localhost, sent with the
+   * given session's cookie (added to any cookies the request already has); null sends none.
+   */
+  const client = (session: string | null) => ({
     request: (input: string | URL | Request, init?: RequestInit) => {
       const request =
         input instanceof Request ? input : new Request(new URL(String(input), ORIGIN), init);
+      if (session && !(request.headers.get("Cookie") ?? "").includes(SESSION_COOKIE)) {
+        const cookie = request.headers.get("Cookie");
+        const ours = `${SESSION_COOKIE}=${session}`;
+        request.headers.set("Cookie", cookie ? `${cookie}; ${ours}` : ours);
+      }
       return worker.fetch(
         request as Request<unknown, IncomingRequestCfProperties>,
         env,
         ctx,
       ) as Promise<Response>;
     },
-  };
+  });
+  /** Requests as the demo library's owner. */
+  const app = client(ownerSession);
+  /** Requests with no session. */
+  const anon = client(null);
   const req = (path: string, init: RequestInit & { token?: string } = {}) => {
     const headers = new Headers(init.headers);
     if (init.token !== "") headers.set("Authorization", `Bearer ${init.token ?? "writer"}`);
-    return app.request(`/api/v1/libraries/demo${path}`, { ...init, headers });
+    return anon.request(`${API}${path}`, { ...init, headers });
+  };
+
+  /**
+   * Another account: signed in, owning a library also named demo, with a write token for it
+   * and a human: token. Nothing of theirs should ever reach the owner, or the other way round.
+   */
+  const stranger = async (email = "stranger@example.com") => {
+    const user = await accounts.user(email);
+    const lib = await accounts.createLibrary("demo", user);
+    clientFor(lib.do_id);
+    const writer = await accounts.createToken({
+      libraryId: lib.id,
+      actor: "claude-code/stranger",
+      scope: "write",
+      prefix: null,
+      expires: null,
+      mcpTiers: "all",
+      createdBy: user.id,
+    });
+    const human = await accounts.createToken({
+      libraryId: lib.id,
+      actor: user.actor,
+      scope: "write",
+      prefix: null,
+      expires: null,
+      mcpTiers: "all",
+      createdBy: user.id,
+    });
+    return {
+      user,
+      lib,
+      app: client(sessionFor(user.id)),
+      writer: writer.secret,
+      human: human.secret,
+    };
   };
   const store = () => stores.get(LIB.do_id) as LibraryStore;
-  return { app, req, store, blobs, kv, env, accounts, deps, bucket, pitr };
+  return {
+    app,
+    anon,
+    req,
+    store,
+    blobs,
+    kv,
+    env,
+    accounts,
+    sessions,
+    outbox,
+    db,
+    deps,
+    bucket,
+    pitr,
+    stranger,
+    sessionFor,
+  };
 }

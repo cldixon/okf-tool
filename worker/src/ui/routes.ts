@@ -2,9 +2,10 @@ import type { Context, Hono } from "hono";
 import { checkNewToken, type LibraryRef, type User } from "../accounts";
 import type { Deps } from "../app";
 import { bundleFiles, type LibraryClient } from "../client";
-import { signedIn } from "../oauth/routes";
 import { basename, dirname } from "../okf/paths";
+import { signedIn } from "../signin";
 import { OkfError } from "../store/errors";
+import { authorizeLibrary } from "../tenancy";
 import { maybeGunzip, readTar } from "../util/tar";
 import { esc, htmlResponse, layout } from "./layout";
 import { linkTarget } from "./markdown";
@@ -84,7 +85,7 @@ function intParam(c: C, name: string): number | undefined {
   return n;
 }
 
-/** Access cookies ride along on cross-site form posts, so writes insist on a same-origin request. */
+/** Session cookies are SameSite=Lax; writes also insist on a same-origin request. */
 function requireSameOrigin(c: C) {
   if (c.req.header("Origin") !== new URL(c.req.url).origin) {
     throw new OkfError(
@@ -128,11 +129,11 @@ function errorPage(user: User | null, status: number, message: string): Response
   );
 }
 
-/** Wraps a page handler: Access sign-in first, and OKF errors as HTML pages. */
+/** Wraps a page handler: sign-in first, and OKF errors as HTML pages. */
 function ui(deps: (env: Cloudflare.Env) => Deps, handler: (p: Page) => Promise<Response>) {
   return async (c: C) => {
     const d = deps(c.env);
-    const user = await signedIn(c.req.raw, c.env, d.accounts);
+    const user = await signedIn(c.req.raw, c.env, d);
     if (user instanceof Response) return user;
     try {
       return await handler({ c, user, deps: d });
@@ -143,12 +144,14 @@ function ui(deps: (env: Cloudflare.Env) => Deps, handler: (p: Page) => Promise<R
   };
 }
 
+/** The library at /app/libraries/{owner}/{slug}, if the signed-in person may open it. */
 async function openLibrary(p: Page): Promise<{ urls: Urls; lib: LibraryClient; ref: LibraryRef }> {
+  const owner = p.c.req.param("owner") ?? "";
   const slug = p.c.req.param("lib") ?? "";
-  const ref = (await p.deps.accounts.libraries()).find((l) => l.slug === slug);
-  const lib = ref ? await p.deps.libraryByDoId(ref.do_id) : null;
-  if (!ref || !lib) throw new OkfError(404, "no_library", `There is no library named ${slug}.`);
-  return { urls: new Urls(ref.slug, atParam(p.c)), lib, ref };
+  const ref = await authorizeLibrary(p.deps.accounts, { user: p.user }, owner, slug);
+  const lib = await p.deps.libraryByDoId(ref.do_id);
+  if (!lib) throw new OkfError(404, "no_library", `There is no library ${owner}/${slug}.`);
+  return { urls: new Urls(ref.owner, ref.slug, atParam(p.c)), lib, ref };
 }
 
 function show(p: Page, title: string, body: string): Response {
@@ -170,7 +173,7 @@ function bodyUrl(urls: Urls, from: string) {
 
 /**
  * The built-in UI's reading pages (spec: Built-in UI): library list, directory and concept views,
- * attachments, raw sources, all behind Cloudflare Access and all accepting ?at=N.
+ * attachments, raw sources, all for the signed-in owner and all accepting ?at=N.
  */
 export function registerUiRoutes<E extends AppEnv>(
   app: Hono<E>,
@@ -180,11 +183,11 @@ export function registerUiRoutes<E extends AppEnv>(
     app.get(path, ui(deps, handler) as never);
 
   const listLibraries = async (p: Page, error?: string) => {
-    const refs = await p.deps.accounts.libraries();
+    const refs = await p.deps.accounts.libraries(p.user.id);
     const libs = await Promise.all(
       refs.map(async (ref): Promise<LibrarySummary | null> => {
         const lib = await p.deps.libraryByDoId(ref.do_id);
-        return lib ? { slug: ref.slug, ...(await lib.summary()) } : null;
+        return lib ? { owner: ref.owner, slug: ref.slug, ...(await lib.summary()) } : null;
       }),
     );
     const body = libraryList(
@@ -199,8 +202,11 @@ export function registerUiRoutes<E extends AppEnv>(
   get("/app", (p) => listLibraries(p));
   app.get("/app/", (c) => c.redirect("/app", 301));
   app.get("/app/libraries", (c) => c.redirect("/app", 301));
-  app.get("/app/libraries/:lib", (c) =>
-    c.redirect(`/app/libraries/${encodeURIComponent(c.req.param("lib"))}/`, 301),
+  app.get("/app/libraries/:owner/:lib", (c) =>
+    c.redirect(
+      `/app/libraries/${encodeURIComponent(c.req.param("owner"))}/${encodeURIComponent(c.req.param("lib"))}/`,
+      301,
+    ),
   );
 
   const directory = async (p: Page, dir: string) => {
@@ -223,16 +229,16 @@ export function registerUiRoutes<E extends AppEnv>(
         dir,
         head,
         entries: tree.entries as TreeEntry[],
-        summary: summary ? { slug: urls.slug, ...summary } : undefined,
+        summary: summary ? { owner: urls.owner, slug: urls.slug, ...summary } : undefined,
         ops: ops as LibraryStats | undefined,
       });
     return show(p, dir === "" ? urls.slug : `${dir}/ · ${urls.slug}`, body);
   };
 
-  get("/app/libraries/:lib/", (p) => directory(p, ""));
-  get("/app/libraries/:lib/tree/*", (p) => directory(p, tail(p.c, "/tree/")));
+  get("/app/libraries/:owner/:lib/", (p) => directory(p, ""));
+  get("/app/libraries/:owner/:lib/tree/*", (p) => directory(p, tail(p.c, "/tree/")));
 
-  get("/app/libraries/:lib/files/*", async (p) => {
+  get("/app/libraries/:owner/:lib/files/*", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const path = tail(p.c, "/files/");
     if (basename(path) === "index.md") return p.c.redirect(urls.tree(dirname(path)));
@@ -281,7 +287,7 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   // The markdown exactly as an export writes it (spec: raw-source view).
-  get("/app/libraries/:lib/raw/*", async (p) => {
+  get("/app/libraries/:owner/:lib/raw/*", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const view = await lib.read(tail(p.c, "/raw/"), { at: urls.at });
     if (view.kind === "attachment") return p.c.redirect(urls.download(view.path));
@@ -296,7 +302,7 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   // Attachment bytes: a redirect to a short-lived signed URL, as the API and MCP hand out.
-  get("/app/libraries/:lib/download/*", async (p) => {
+  get("/app/libraries/:owner/:lib/download/*", async (p) => {
     const { urls, lib, ref } = await openLibrary(p);
     const view = await lib.read(tail(p.c, "/download/"), { at: urls.at });
     if (view.kind !== "attachment") return p.c.redirect(urls.raw(view.path));
@@ -311,7 +317,7 @@ export function registerUiRoutes<E extends AppEnv>(
 
   // ---------------------------------------------------------------- history and the ledger
 
-  get("/app/libraries/:lib/diff/*", async (p) => {
+  get("/app/libraries/:owner/:lib/diff/*", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const path = tail(p.c, "/diff/");
     const [d, head] = await Promise.all([
@@ -326,7 +332,7 @@ export function registerUiRoutes<E extends AppEnv>(
     );
   });
 
-  get("/app/libraries/:lib/ledger", async (p) => {
+  get("/app/libraries/:owner/:lib/ledger", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const q = (k: string) => p.c.req.query(k)?.trim() || undefined;
     const filters: LedgerFilters = {
@@ -356,7 +362,7 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   // Revert a request (spec: The ledger): a confirmation page, then a same-origin POST.
-  get("/app/libraries/:lib/revert/:request", async (p) => {
+  get("/app/libraries/:owner/:lib/revert/:request", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const request = (await lib.request(p.c.req.param("request") ?? "")) as LedgerRequest;
     const content = request.events.filter((e) => e.op !== "verify" && e.op !== "move").slice(0, 20);
@@ -382,7 +388,7 @@ export function registerUiRoutes<E extends AppEnv>(
       }) as never,
     );
 
-  post("/app/libraries/:lib/revert/:request", async (p) => {
+  post("/app/libraries/:owner/:lib/revert/:request", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const ctx = await humanContext(p);
     const res = await lib.revert(ctx, { request_id: p.c.req.param("request") ?? "" });
@@ -390,7 +396,7 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   // Restore one file to an earlier version: the same revert, for a path.
-  get("/app/libraries/:lib/restore/*", async (p) => {
+  get("/app/libraries/:owner/:lib/restore/*", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const path = tail(p.c, "/restore/");
     const to = intParam(p.c, "to");
@@ -405,7 +411,7 @@ export function registerUiRoutes<E extends AppEnv>(
     );
   });
 
-  post("/app/libraries/:lib/restore/*", async (p) => {
+  post("/app/libraries/:owner/:lib/restore/*", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const path = tail(p.c, "/restore/");
     const to = intParam(p.c, "to");
@@ -420,8 +426,8 @@ export function registerUiRoutes<E extends AppEnv>(
   post("/app/libraries", async (p) => {
     const slug = String((await p.c.req.formData()).get("slug") ?? "");
     try {
-      const lib = await p.deps.accounts.createLibrary(slug, p.user.id);
-      return p.c.redirect(new Urls(lib.slug).tree(""), 303);
+      const lib = await p.deps.accounts.createLibrary(slug, p.user);
+      return p.c.redirect(new Urls(lib.owner, lib.slug).tree(""), 303);
     } catch (e) {
       if (e instanceof OkfError && e.status < 500) return listLibraries(p, e.message);
       throw e;
@@ -429,7 +435,7 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   // Human verification of the current version (spec: OKF conformance, What the service stamps).
-  post("/app/libraries/:lib/verify/*", async (p) => {
+  post("/app/libraries/:owner/:lib/verify/*", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const path = tail(p.c, "/verify/");
     const res = await lib.verify(await humanContext(p), path);
@@ -437,7 +443,7 @@ export function registerUiRoutes<E extends AppEnv>(
     return p.c.redirect(`${urls.pinned(undefined).file(verified)}?done=verify`, 303);
   });
 
-  get("/app/libraries/:lib/work", async (p) => {
+  get("/app/libraries/:owner/:lib/work", async (p) => {
     const { urls, lib } = await openLibrary(p);
     const kind = p.c.req.query("kind") || undefined;
     const res = await lib.work({ kind, limit: 200 });
@@ -467,9 +473,9 @@ export function registerUiRoutes<E extends AppEnv>(
     );
   };
 
-  get("/app/libraries/:lib/transfer", (p) => transfer(p, 200, {}));
+  get("/app/libraries/:owner/:lib/transfer", (p) => transfer(p, 200, {}));
 
-  post("/app/libraries/:lib/maintain", async (p) => {
+  post("/app/libraries/:owner/:lib/maintain", async (p) => {
     const { ref } = await openLibrary(p);
     if (!p.deps.maintain) throw new OkfError(501, "unavailable", "Maintenance is not wired here.");
     const res = (await p.deps.maintain(ref.do_id)) as { export: { key?: string } };
@@ -481,7 +487,7 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   // A nightly export's files, streamed from R2 (spec: Backups and recovery).
-  get("/app/libraries/:lib/exports/:date/:file", async (p) => {
+  get("/app/libraries/:owner/:lib/exports/:date/:file", async (p) => {
     const { ref } = await openLibrary(p);
     const date = p.c.req.param("date") ?? "";
     const file = p.c.req.param("file") ?? "";
@@ -538,9 +544,9 @@ export function registerUiRoutes<E extends AppEnv>(
     );
   };
 
-  get("/app/libraries/:lib/recovery", (p) => recovery(p, 200, {}));
+  get("/app/libraries/:owner/:lib/recovery", (p) => recovery(p, 200, {}));
 
-  post("/app/libraries/:lib/recovery", async (p) => {
+  post("/app/libraries/:owner/:lib/recovery", async (p) => {
     const { urls, ref } = await openLibrary(p);
     if (!p.deps.recovery) throw new OkfError(501, "unavailable", "Restore is not wired here.");
     const form = await p.c.req.formData();
@@ -573,14 +579,14 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   // Export: a redirect to a signed download, like the API's and MCP's export links.
-  get("/app/libraries/:lib/export", async (p) => {
+  get("/app/libraries/:owner/:lib/export", async (p) => {
     const { urls, lib, ref } = await openLibrary(p);
     const at = intParam(p.c, "at") ?? (await lib.headSeq());
     const token = await lib.signDownload({ k: "export", at, name: urls.slug });
     return p.c.redirect(`/dl/${encodeURIComponent(ref.do_id)}/${token}`, 302);
   });
 
-  post("/app/libraries/:lib/import", async (p) => {
+  post("/app/libraries/:owner/:lib/import", async (p) => {
     const { lib } = await openLibrary(p);
     const form = await p.c.req.formData();
     const file = form.get("bundle");
@@ -621,7 +627,10 @@ export function registerUiRoutes<E extends AppEnv>(
     p: Page,
     opts: { form?: TokenForm; error?: string; notice?: string } = {},
   ) => {
-    const [rows, libs] = await Promise.all([p.deps.accounts.tokens(), p.deps.accounts.libraries()]);
+    const [rows, libs] = await Promise.all([
+      p.deps.accounts.tokens(p.user.id),
+      p.deps.accounts.libraries(p.user.id),
+    ]);
     const body = tokensPage({
       tokens: rows as TokenListRow[],
       libraries: libs.map((l) => l.slug),
@@ -659,7 +668,7 @@ export function registerUiRoutes<E extends AppEnv>(
       tiers: s("tiers") === "files" ? "files" : "all",
     };
     try {
-      const lib = (await p.deps.accounts.libraries()).find((l) => l.slug === form.library);
+      const lib = (await p.deps.accounts.libraries(p.user.id)).find((l) => l.slug === form.library);
       if (!lib) throw new OkfError(400, "no_library", "Pick a library.");
       const fields = checkNewToken(
         {
@@ -690,7 +699,7 @@ export function registerUiRoutes<E extends AppEnv>(
   });
 
   post("/app/tokens/:id/revoke", async (p) => {
-    await p.deps.accounts.revokeToken(p.c.req.param("id") ?? "");
+    await p.deps.accounts.revokeToken(p.c.req.param("id") ?? "", p.user.id);
     return p.c.redirect("/app/tokens?done=revoke", 303);
   });
 }

@@ -34,10 +34,12 @@ builds and validates without touching your account.
 
 ### 2. Put Cloudflare Access in front of `/app/`
 
-The web UI and the page where you approve apps sit behind
+The web UI and the page where you approve apps need you signed in. The service is moving to email
+magic links (see the v2 spec); until a mail provider is wired in, a deployment signs people in through
 [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/).
 Access covers only `/app/`; `/mcp`, the OAuth endpoints and the REST API stay reachable by apps and
-are protected by tokens.
+are protected by tokens. Each person who signs in gets their own account: they see and manage only
+their own libraries, tokens and connected apps.
 
 1. In the Cloudflare dashboard, open **Zero Trust** (create the free organization if asked) and
    make sure a login method is available: **One-time PIN** (email codes) works with no setup.
@@ -71,8 +73,8 @@ Requires [bun](https://bun.sh).
 
 ```sh
 bun install
-bun run seed    # local user, library `dev` and a write token (printed)
-bun run dev     # cf dev on http://localhost:8787
+bun run seed    # local user dev@localhost, library dev/dev and a write token (printed)
+bun run dev     # cf dev on http://localhost:8787; sign in at /app as dev@localhost
 bun run check   # lint + typecheck + tests
 bun run gate    # gate: round-trip Google's sample bundles and more through cf dev
 ```
@@ -81,7 +83,7 @@ With the dev server running and a seeded token:
 
 ```sh
 T=okf_...   # from bun run seed
-L=http://localhost:8787/api/v1/libraries/dev
+L=http://localhost:8787/api/v1/libraries/dev/dev   # {owner handle}/{library}
 curl -X PUT -H "Authorization: Bearer $T" -H 'If-None-Match: *' -H 'X-Note: first note' \
   --data-binary $'---\ntype: Note\ntitle: Hello\n---\nHello.\n' $L/files/notes/hello.md
 curl -H "Authorization: Bearer $T" $L/files/notes/hello.md       # rendered OKF markdown, ETag = hash
@@ -100,8 +102,9 @@ and short-lived `/dl/…` download links.
 
 ## Web UI
 
-`https://<your-worker>/app` is the built-in UI, behind the same Cloudflare Access sign-in (see
-[Deploy your own](#deploy-your-own), step 2). It lists your libraries; each library page shows its directories and concepts with
+`https://<your-worker>/app` is the built-in UI, for the signed-in person (see
+[Deploy your own](#deploy-your-own), step 2). It lists your libraries, each at
+`/app/libraries/<your handle>/<library>/`; each library page shows its directories and concepts with
 their type, trust tier and staleness. A concept page renders the body, with the frontmatter, the
 sources (footnotes resolved, internal sources with their own trust and staleness), inbound links and
 the history beside it. Every page takes `?at=<seq>` to show the library as it was then, and a
@@ -121,7 +124,7 @@ libraries, and **Tokens** mints, lists and revokes bearer tokens. There is no ed
 agent.
 
 The same management is available over REST with a `human:` token (mint one for your own actor on the
-Tokens page): `GET/POST /api/v1/libraries`, `GET/POST /api/v1/tokens` and
+Tokens page), limited to your own libraries and tokens: `GET/POST /api/v1/libraries`, `GET/POST /api/v1/tokens` and
 `DELETE /api/v1/tokens/{id}`.
 
 ## Agents (MCP)
@@ -129,8 +132,8 @@ Tokens page): `GET/POST /api/v1/libraries`, `GET/POST /api/v1/tokens` and
 The Worker serves an MCP server at `/mcp` (Streamable HTTP). Each connection reaches one library.
 
 **claude.ai, ChatGPT and other apps (OAuth).** Add `https://<your-worker>/mcp` as a custom
-connector. The app sends you to `/app/authorize`, where you sign in with Cloudflare Access and choose
-what the app may do: which library (or a new one), read only or read and write, an optional
+connector. The app sends you to `/app/authorize`, where you sign in and choose what the app may do:
+which of your libraries (or a new one), read only or read and write, an optional
 directory, the name its changes carry in the ledger (e.g. `claude-ai/connector`), and all tools or
 file tools only. `/app/grants` lists connected apps and revokes them.
 
@@ -167,21 +170,25 @@ teaches the workflow to agents that load skills.
   `restores/<library id>/`, and lists past restores with an **Undo**. To take back one change, revert
   it from the ledger instead. Local dev (`cf dev`) has no point-in-time recovery, so there a restore is
   refused without writing anything. Over REST, with a `human:` token for the library:
-  `POST /api/v1/libraries/<lib>/restore` with `{ "to": "<ISO time>" }` or `{ "undo": "<id>" }`, and
-  `GET /api/v1/libraries/<lib>/restores`; `worker/scripts/restore-smoke.ts` runs a restore and undo
+  `POST /api/v1/libraries/<owner>/<lib>/restore` with `{ "to": "<ISO time>" }` or
+  `{ "undo": "<id>" }`, and `GET /api/v1/libraries/<owner>/<lib>/restores`; `worker/scripts/restore-smoke.ts` runs a restore and undo
   against a deployed Worker.
 - **Usage.** Reads of a concept's current version are counted per day; internal sources show their
   read count over the last 30 days, and the same run prunes older counts.
 - **Health and stats.** `GET /healthz` checks D1, R2 and the Durable Object namespace (503 with the
-  failing one otherwise). `GET /api/v1/libraries/<lib>/stats` reports paths, events, requests,
+  failing one otherwise). `GET /api/v1/libraries/<owner>/<lib>/stats` reports paths, events, requests,
   storage bytes, the export cursor and lag, and the last and next maintenance run; the library's
   home page shows the same.
 - **Logs and deployments.** From `worker/`: `bun run logs` prints recent requests, Durable Object
   calls and alarms from Workers Observability (`--minutes 60`, `--errors`, `--json`);
   `bunx cf workers deployments list --worker okf-service` lists deployments. `cf` cannot stream
   live logs yet, so for a live tail run `bunx wrangler tail okf-service`.
+- **Accounts.** `bun run admin users` lists accounts and their libraries; `bun run admin transfer
+  --library <owner>/<slug> --to <email>` gives a library to another account (who has signed in
+  once); `bun run admin suspend --email <email>` refuses an account's sessions and tokens (`--undo`
+  lifts it). Local D1 by default; add `--remote` for the deployed one.
 
-For local development, copy `worker/.dev.vars.sample` to `worker/.dev.vars`; `/app/` then treats
-`localhost` requests as signed in with `DEV_ACCESS_EMAIL`.
+For local development, copy `worker/.dev.vars.sample` to `worker/.dev.vars`. It sets
+`DEV_SIGNIN=1`: on `localhost`, `/app/sign-in` shows the magic link on the page instead of mailing it.
 
 `fixtures/` holds Google's sample OKF bundles (Apache 2.0), vendored for the round-trip tests.

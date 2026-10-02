@@ -6,8 +6,9 @@
  * sample bundle, imports each bundle as a tarball, exports it, and compares: same parsed
  * frontmatter (generated and verified included) and bodies, byte-identical attachments,
  * synthesized index.md and log.md ignored. Then renders every concept and directory of each bundle
- * in the built-in UI (signed in with the dev Access identity), and runs the nightly export through
- * the Durable Object into local R2. Exits non-zero on any mismatch.
+ * in the built-in UI (signed in by a dev magic link), runs the nightly export through the Durable
+ * Object into local R2, and signs up a second user who must not see the first one's libraries
+ * (v2 spec: Phases and gates, A1). Exits non-zero on any mismatch.
  *
  *   bun run gate [--port 8799] [--keep]
  */
@@ -30,8 +31,8 @@ const base = `http://127.0.0.1:${port}`;
 /**
  * `cf dev` keeps local state in .wrangler/state beside cloudflare.config.ts and takes no state
  * directory, so the gate runs it from a throwaway project under worker/.gate/: the config files
- * copied, src/, migrations/ and node_modules/ linked, and a .dev.vars
- * with the dev Access identity, honored only on loopback when no Access team is configured.
+ * copied, src/, migrations/ and node_modules/ linked, and a .dev.vars with DEV_SIGNIN=1 so
+ * sign-in links are shown on the page (on loopback only) instead of mailed.
  */
 mkdirSync(join(WORKER_DIR, ".gate"), { recursive: true });
 const project = mkdtempSync(join(WORKER_DIR, ".gate", "run-"));
@@ -41,7 +42,7 @@ for (const f of ["cloudflare.config.ts", "wrangler.config.ts", "package.json", "
 for (const d of ["src", "migrations", "node_modules"]) {
   symlinkSync(join(WORKER_DIR, d), join(project, d));
 }
-writeFileSync(join(project, ".dev.vars"), "DEV_ACCESS_EMAIL=gate@localhost\n");
+writeFileSync(join(project, ".dev.vars"), "DEV_SIGNIN=1\n");
 const state = join(project, ".wrangler/state");
 
 console.log(`project: ${project}`);
@@ -69,10 +70,41 @@ async function waitForHealth() {
   throw new Error("cf dev did not become healthy");
 }
 
+/** Signs in by a dev magic link (DEV_SIGNIN=1 shows it on the page); returns the session cookie. */
+async function signIn(email: string): Promise<string> {
+  const asked = await fetch(`${base}/app/sign-in`, {
+    method: "POST",
+    headers: { Origin: base },
+    body: new URLSearchParams({ email, next: "/app" }),
+  });
+  const html = await asked.text();
+  const t = /[?&]t=([0-9a-f]{64})/.exec(html.replace(/&#38;/g, "&"))?.[1];
+  if (!t) throw new Error(`sign-in for ${email}: ${asked.status} ${html.slice(0, 300)}`);
+  const done = await fetch(`${base}/app/sign-in/link`, {
+    method: "POST",
+    headers: { Origin: base },
+    body: new URLSearchParams({ t, next: "/app" }),
+    redirect: "manual",
+  });
+  const cookie = done.headers.get("Set-Cookie")?.split(";")[0];
+  if (done.status !== 303 || !cookie) throw new Error(`sign-in link for ${email}: ${done.status}`);
+  return cookie;
+}
+
+/** The seeded user's session, set once the Worker is up. */
+let devCookie = "";
+
+/** A UI request as the seeded user; a redirect (e.g. to sign-in) is not followed. */
+function ui(url: string, init: RequestInit = {}, cookie = devCookie) {
+  const headers = new Headers(init.headers);
+  headers.set("Cookie", cookie);
+  return fetch(url, { ...init, headers, redirect: "manual" });
+}
+
 /** Fetches the library page, every directory page and every concept page of a library. */
-async function uiPages(slug: string, paths: string[]): Promise<string[]> {
+async function uiPages(owner: string, slug: string, paths: string[]): Promise<string[]> {
   const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
-  const lib = `${base}/app/libraries/${slug}`;
+  const lib = `${base}/app/libraries/${owner}/${slug}`;
   const concepts = paths.filter((p) => p.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(p));
   const dirs = new Set<string>();
   for (const p of paths) {
@@ -87,7 +119,7 @@ async function uiPages(slug: string, paths: string[]): Promise<string[]> {
   ];
   const problems: string[] = [];
   for (const url of urls) {
-    const r = await fetch(url);
+    const r = await ui(url);
     const html = await r.text();
     if (r.status !== 200 || !html.includes("</main>")) {
       problems.push(`${url.slice(base.length)}: ${r.status} ${html.slice(0, 200)}`);
@@ -97,25 +129,25 @@ async function uiPages(slug: string, paths: string[]): Promise<string[]> {
 }
 
 /** Runs the daily maintainers through the UI and reads the export back from R2. */
-async function nightlyExport(slug: string, originals: number): Promise<string[]> {
-  const lib = `${base}/app/libraries/${slug}`;
-  const r = await fetch(`${lib}/maintain`, { method: "POST", headers: { Origin: base } });
+async function nightlyExport(owner: string, slug: string, originals: number): Promise<string[]> {
+  const lib = `${base}/app/libraries/${owner}/${slug}`;
+  const r = await ui(`${lib}/maintain`, { method: "POST", headers: { Origin: base } });
   const html = await r.text();
   if (r.status !== 200 || !html.includes("Exported to R2")) {
     return [`export now: ${r.status} ${html.slice(0, 200)}`];
   }
   const date = new Date().toISOString().slice(0, 10);
-  const tar = await fetch(`${lib}/exports/${date}/bundle.tar`);
+  const tar = await ui(`${lib}/exports/${date}/bundle.tar`);
   if (!tar.ok) return [`nightly bundle.tar: ${tar.status}`];
   const files = readTar(new Uint8Array(await tar.arrayBuffer()));
   // The originals' own index.md and log.md are replaced by synthesized ones, so at least as many.
   if (files.length < originals) return [`nightly bundle has ${files.length} files`];
-  const ledger = await fetch(`${lib}/exports/${date}/ledger.jsonl`);
+  const ledger = await ui(`${lib}/exports/${date}/ledger.jsonl`);
   if (!ledger.ok || !(await ledger.text()).includes('"t":"event"')) {
     return [`nightly ledger.jsonl: ${ledger.status}`];
   }
   // The daily alarm was set when the library was first used.
-  const home = await (await fetch(`${lib}/`)).text();
+  const home = await (await ui(`${lib}/`)).text();
   if (!home.includes("next run")) return ["no daily maintenance alarm scheduled"];
   return [];
 }
@@ -124,14 +156,14 @@ async function nightlyExport(slug: string, originals: number): Promise<string[]>
  * The Recovery page renders, and a restore in cf dev (no point-in-time recovery there)
  * fails cleanly: a 501 naming the reason, no pre-restore export, the library still answering.
  */
-async function restoreUnavailable(slug: string): Promise<string[]> {
-  const lib = `${base}/app/libraries/${slug}`;
-  const page = await fetch(`${lib}/recovery`);
+async function restoreUnavailable(owner: string, slug: string): Promise<string[]> {
+  const lib = `${base}/app/libraries/${owner}/${slug}`;
+  const page = await ui(`${lib}/recovery`);
   if (!page.ok || !(await page.text()).includes("Restore this library to a point in time")) {
     return [`recovery page: ${page.status}`];
   }
   const to = new Date(Date.now() - 5 * 60_000).toISOString().slice(0, 19);
-  const r = await fetch(`${lib}/recovery`, {
+  const r = await ui(`${lib}/recovery`, {
     method: "POST",
     headers: { Origin: base },
     body: new URLSearchParams({ to, confirm: slug }),
@@ -140,19 +172,49 @@ async function restoreUnavailable(slug: string): Promise<string[]> {
   if (r.status !== 501 || !html.includes("point-in-time recovery")) {
     return [`restore in cf dev: ${r.status} ${html.slice(0, 200)}`];
   }
-  const transfer = await (await fetch(`${lib}/transfer`)).text();
+  const transfer = await (await ui(`${lib}/transfer`)).text();
   if (transfer.includes("before a restore")) return ["a pre-restore export was written"];
-  const home = await fetch(`${lib}/`);
+  const home = await ui(`${lib}/`);
   if (!home.ok) return [`library after a refused restore: ${home.status}`];
   return [];
+}
+
+/**
+ * Two accounts cannot see each other (v2 spec: Tenancy): a second user signs up, creates a
+ * library with a name the first already uses, and neither reaches the other's.
+ */
+async function strangers(owner: string, slug: string, token: string): Promise<string[]> {
+  const problems: string[] = [];
+  const cookie = await signIn("stranger@localhost");
+  const created = await ui(
+    `${base}/app/libraries`,
+    { method: "POST", headers: { Origin: base }, body: new URLSearchParams({ slug }) },
+    cookie,
+  );
+  const theirs = created.headers.get("Location") ?? "";
+  if (created.status !== 303 || !theirs.startsWith("/app/libraries/stranger/")) {
+    problems.push(`stranger creates ${slug}: ${created.status} ${theirs}`);
+  }
+  const home = await (await ui(`${base}/app`, {}, cookie)).text();
+  if (home.includes(`/app/libraries/${owner}/`)) problems.push("stranger's list shows the dev's");
+  const page = await ui(`${base}/app/libraries/${owner}/${slug}/`, {}, cookie);
+  if (page.status !== 404) problems.push(`stranger opens the dev's ${slug}: ${page.status}`);
+  const mine = await (await ui(`${base}/app`)).text();
+  if (mine.includes("/app/libraries/stranger/")) problems.push("dev's list shows the stranger's");
+  const cross = await fetch(`${base}/api/v1/libraries/stranger/${slug}/tree`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (cross.status !== 404) problems.push(`dev's token on the stranger's ${slug}: ${cross.status}`);
+  return problems;
 }
 
 let failed = false;
 try {
   await waitForHealth();
+  devCookie = await signIn("dev@localhost");
   for (const t of tokens) {
     const headers = { Authorization: `Bearer ${t.token}` };
-    const lib = `${base}/api/v1/libraries/${t.slug}`;
+    const lib = `${base}/api/v1/libraries/${t.owner}/${t.slug}`;
     const original = loadBundle(t.bundle);
     const imp = await fetch(`${lib}/import?source=fixtures/${t.bundle}`, {
       method: "POST",
@@ -180,25 +242,33 @@ try {
     if (problems.length > 0) failed = true;
 
     const uiProblems = await uiPages(
+      t.owner,
       t.slug,
       original.map((f) => f.path),
     );
     console.log(`${uiProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: UI pages render`);
     for (const p of uiProblems) console.log(`  - ${p}`);
     if (uiProblems.length > 0) failed = true;
-    const exportProblems = await nightlyExport(t.slug, original.length);
+    const exportProblems = await nightlyExport(t.owner, t.slug, original.length);
     console.log(
       `${exportProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: nightly export to R2 via the Durable Object`,
     );
     for (const p of exportProblems) console.log(`  - ${p}`);
     if (exportProblems.length > 0) failed = true;
-    const restoreProblems = await restoreUnavailable(t.slug);
+    const restoreProblems = await restoreUnavailable(t.owner, t.slug);
     console.log(
       `${restoreProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: restore refused cleanly without point-in-time recovery`,
     );
     for (const p of restoreProblems) console.log(`  - ${p}`);
     if (restoreProblems.length > 0) failed = true;
   }
+  const first = tokens[0];
+  const tenancy = first ? await strangers(first.owner, first.slug, first.token) : ["no library"];
+  console.log(
+    `${tenancy.length === 0 ? "PASS" : "FAIL"} a second account sees nothing of the first`,
+  );
+  for (const p of tenancy) console.log(`  - ${p}`);
+  if (tenancy.length > 0) failed = true;
   const mcpOk = await mcpSmoke({ url: base, token: mcpToken });
   console.log(`${mcpOk ? "PASS" : "FAIL"} MCP smoke on an empty library`);
   if (!mcpOk) failed = true;
