@@ -7,8 +7,9 @@
  * frontmatter (generated and verified included) and bodies, byte-identical attachments,
  * synthesized index.md and log.md ignored. Then renders every concept and directory of each bundle
  * in the built-in UI (signed in by a dev magic link), runs the nightly export through the Durable
- * Object into local R2, and signs up a second user who must not see the first one's libraries
- * (v2 spec: Phases and gates, A1). Exits non-zero on any mismatch.
+ * Object into local R2, signs up a second user who must not see the first one's libraries
+ * (v2 spec: Phases and gates, A1), and has a fresh account sign up, connect over OAuth and write
+ * (A2). Exits non-zero on any mismatch.
  *
  *   bun run gate [--port 8799] [--keep]
  */
@@ -208,6 +209,134 @@ async function strangers(owner: string, slug: string, token: string): Promise<st
   return problems;
 }
 
+const b64url = (bytes: Uint8Array) =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+/**
+ * A fresh account's first run (v2 spec: Phases and gates, A2): sign up, welcome, then connect an
+ * MCP client through OAuth with PKCE, as Claude Code would, write through MCP, and see the
+ * Connect page notice.
+ */
+async function freshAccountConnects(): Promise<string[]> {
+  const cookie = await signIn("newcomer@localhost");
+  const home = await ui(`${base}/app`, {}, cookie);
+  if (home.headers.get("Location") !== "/app/welcome") return [`first /app: ${home.status}`];
+  const welcomed = await ui(
+    `${base}/app/welcome`,
+    {
+      method: "POST",
+      headers: { Origin: base },
+      body: new URLSearchParams({ handle: "newcomer", library: "notes", starter: "1" }),
+    },
+    cookie,
+  );
+  const connect = `${base}${welcomed.headers.get("Location") ?? ""}`;
+  if (welcomed.status !== 303 || !connect.endsWith("/app/libraries/newcomer/notes/connect")) {
+    return [`welcome: ${welcomed.status} ${connect}`];
+  }
+  if (!(await (await ui(connect, {}, cookie)).text()).includes("No agent has written yet")) {
+    return ["connect page before the agent"];
+  }
+
+  const redirect = "https://claude.ai/api/mcp/auth_callback";
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_name: "Gate",
+      redirect_uris: [redirect],
+      token_endpoint_auth_method: "none",
+    }),
+  });
+  const { client_id } = (await reg.json()) as { client_id: string };
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64url(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))),
+  );
+  const authorize = `${base}/app/authorize?${new URLSearchParams({
+    response_type: "code",
+    client_id,
+    redirect_uri: redirect,
+    scope: "okf:read okf:write",
+    state: "gate",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    resource: `${base}/mcp`,
+  })}`;
+  const consent = await ui(authorize, {}, cookie);
+  const html = await consent.text();
+  const handle = /name="handle" value="([^"]+)"/.exec(html)?.[1];
+  if (!handle) return [`consent page: ${consent.status} ${html.slice(0, 200)}`];
+  const consentCookies = consent.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  const approved = await ui(
+    authorize,
+    {
+      method: "POST",
+      headers: { Origin: base },
+      body: new URLSearchParams({
+        handle,
+        decision: "approve",
+        library: "notes",
+        new_library: "",
+        access: "write",
+        prefix: "",
+        actor: "claude-code/gate",
+        tiers: "all",
+      }),
+    },
+    `${cookie}; ${consentCookies}`,
+  );
+  const code = new URL(approved.headers.get("Location") ?? redirect).searchParams.get("code");
+  if (!code) return [`consent: ${approved.status}`];
+  const tok = await fetch(`${base}/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirect,
+      client_id,
+      code_verifier: verifier,
+    }),
+  });
+  const { access_token } = (await tok.json()) as { access_token?: string };
+  if (!access_token) return [`token: ${tok.status}`];
+  if (!(await mcpSmoke({ url: base, token: access_token }))) return ["MCP over OAuth"];
+  const after = await (await ui(connect, {}, cookie)).text();
+  if (!after.includes("Last agent write: claude-code/gate"))
+    return ["connect page after the agent"];
+
+  // Deleting the library wipes its Durable Object and ends the connection.
+  const lib = connect.replace(/\/connect$/, "");
+  await ui(`${lib}/maintain`, { method: "POST", headers: { Origin: base } }, cookie);
+  const del = await ui(
+    `${lib}/delete`,
+    { method: "POST", headers: { Origin: base }, body: new URLSearchParams({ confirm: "notes" }) },
+    cookie,
+  );
+  if (del.status !== 303)
+    return [`delete library: ${del.status} ${(await del.text()).slice(0, 200)}`];
+  const gone = await ui(`${lib}/`, {}, cookie);
+  if (gone.status !== 404) return [`deleted library page: ${gone.status}`];
+  const mcp = await fetch(`${base}/mcp`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+  });
+  if (mcp.status !== 401) return [`MCP after delete: ${mcp.status}`];
+  return [];
+}
+
 let failed = false;
 try {
   await waitForHealth();
@@ -269,6 +398,12 @@ try {
   );
   for (const p of tenancy) console.log(`  - ${p}`);
   if (tenancy.length > 0) failed = true;
+  const fresh = await freshAccountConnects();
+  console.log(
+    `${fresh.length === 0 ? "PASS" : "FAIL"} a fresh account signs up, connects over OAuth, writes, deletes`,
+  );
+  for (const p of fresh) console.log(`  - ${p}`);
+  if (fresh.length > 0) failed = true;
   const mcpOk = await mcpSmoke({ url: base, token: mcpToken });
   console.log(`${mcpOk ? "PASS" : "FAIL"} MCP smoke on an empty library`);
   if (!mcpOk) failed = true;

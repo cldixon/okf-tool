@@ -66,6 +66,12 @@ export class Urls {
   recovery() {
     return `${this.base}recovery`;
   }
+  connect() {
+    return `${this.base}connect`;
+  }
+  remove() {
+    return `${this.base}delete`;
+  }
   nightly(date: string, file: string) {
     return `${this.base}exports/${encodeURIComponent(date)}/${encodeURIComponent(file)}`;
   }
@@ -89,7 +95,7 @@ function query(params: Record<string, string | number | undefined>): string {
 }
 
 /** The library's section tabs: its files and its ledger. */
-export type LibTab = "files" | "ledger" | "work" | "transfer" | "recovery";
+export type LibTab = "files" | "ledger" | "work" | "transfer" | "recovery" | "connect" | "delete";
 
 export function libNav(urls: Urls, active: LibTab): string {
   const tab = (name: string, href: string, key: LibTab) =>
@@ -100,6 +106,8 @@ export function libNav(urls: Urls, active: LibTab): string {
     tab("Work queue", urls.work(), "work"),
     tab("Import &amp; export", urls.transfer(), "transfer"),
     tab("Recovery", urls.recovery(), "recovery"),
+    tab("Connect", urls.connect(), "connect"),
+    tab("Delete", urls.remove(), "delete"),
   ];
   return `<nav class="libnav"><span class="muted">${esc(urls.slug)}:</span> ${tabs.join(" · ")}</nav>`;
 }
@@ -161,13 +169,13 @@ export interface LibrarySummary {
 
 const NEW_LIBRARY = `<form class="inline" method="post" action="/app/libraries">
 <label class="small" for="slug">New library</label>
-<input id="slug" name="slug" type="text" placeholder="team-notes" required pattern="[a-z0-9][a-z0-9-]{0,62}" style="width:200px">
+<input id="slug" name="slug" type="text" placeholder="team-notes" required pattern="[a-z0-9][a-z0-9-]{0,62}">
 <button type="submit">Create</button></form>`;
 
 export function libraryList(libs: LibrarySummary[], error?: string): string {
   const err = error ? `<div class="notice">${esc(error)}</div>` : "";
   if (libs.length === 0) {
-    return `<h1>Libraries</h1>${err}<p class="muted">No libraries yet. Create one here, or when you connect an app.</p>${NEW_LIBRARY}`;
+    return `<h1>Libraries</h1>${err}<p>No libraries yet.</p>${NEW_LIBRARY}`;
   }
   const rows = libs
     .map(
@@ -517,7 +525,7 @@ export function attachmentPage(opts: {
   const { urls } = opts;
   const preview =
     opts.media?.startsWith("image/") === true
-      ? `<p><img src="${esc(urls.download(opts.path))}" alt="${esc(baseName(opts.path))}" style="max-width:100%"></p>`
+      ? `<p><img src="${esc(urls.download(opts.path))}" alt="${esc(baseName(opts.path))}"></p>`
       : "";
   return `${crumbs(urls, opts.path, true)}
 <h1>${esc(baseName(opts.path))}</h1>
@@ -558,7 +566,7 @@ export function diffHtml(diff: string): string {
     else if (line.startsWith("\\")) cls = "meta";
     return `<span class="${cls}">${esc(line) || " "}</span>`;
   });
-  return `<pre class="diff">${rows.join("")}</pre>`;
+  return `<pre class="diff">${rows.join("\n")}</pre>`;
 }
 
 export function diffPage(opts: {
@@ -645,7 +653,6 @@ ${more > 0 ? `<p class="small muted">… and ${more} more</p>` : ""}</li>`;
     ? `<p><a href="${esc(urls.ledger({ ...f, before: opts.next }))}">Older requests →</a></p>`
     : "";
   return `<h1>Ledger</h1>
-<p class="muted">Every change to ${esc(urls.slug)}, newest first, one entry per request.</p>
 ${opts.notice ? `<div class="notice ok">${esc(opts.notice)}</div>` : ""}
 ${form}
 ${items ? `<ol class="ledger">${items}</ol>` : `<p class="muted">No requests match.</p>`}
@@ -666,11 +673,9 @@ export function revertPage(opts: {
 <p>${esc(when(r.ts))} by <strong>${esc(r.actor)}</strong>${r.note ? `: ${esc(r.note)}` : ""}</p>
 <ul class="events">${r.events.map((e) => eventLine(urls, e)).join("")}</ul>
 <div class="panel-box">
-<p>Reverting puts every file this request touched back as it was just before it: edits are undone,
-created files are removed, deleted files come back and moves go back. It is recorded in the ledger
-as a new request by <strong>${esc(opts.actor)}</strong>, so it can itself be reverted.</p>
+<p>Undoes every change in this request, as a new request by ${esc(opts.actor)}.</p>
 <form method="post" action="${esc(urls.revert(r.request_id))}">
-<label>Note <input type="text" name="note" value="Revert: ${esc(r.note ?? r.request_id)}" style="width:100%"></label>
+<label>Note <input type="text" name="note" value="Revert: ${esc(r.note ?? r.request_id)}"></label>
 <p><button class="primary" type="submit">Revert</button> <a href="${esc(urls.ledger())}">Cancel</a></p></form></div>
 <p class="small muted">What this request changed:</p>
 ${diffs}`;
@@ -687,10 +692,9 @@ export function restorePage(opts: {
   return `${crumbs(urls, path, true)}
 <h1>Restore ${esc(baseName(path))} as of seq ${to}?</h1>
 <div class="panel-box">
-<p>This writes the version from seq ${to} back as the current version, recorded in the ledger as a
-revert by <strong>${esc(opts.actor)}</strong>. Nothing is lost: the current version stays in the history.</p>
+<p>Writes back the version from seq ${to}, as a revert by ${esc(opts.actor)}.</p>
 <form method="post" action="${esc(urls.restore(path, to))}">
-<label>Note <input type="text" name="note" value="Restore ${esc(path)} to seq ${to}" style="width:100%"></label>
+<label>Note <input type="text" name="note" value="Restore ${esc(path)} to seq ${to}"></label>
 <p><button class="primary" type="submit">Restore</button> <a href="${esc(urls.pinned(to).file(path))}">Cancel</a></p></form></div>
 <p class="small muted">Current version → version at seq ${to}:</p>
 ${diffHtml(opts.diff)}`;
@@ -718,9 +722,8 @@ function verifyPanel(urls: Urls, c: ConceptData, head: number): string {
     c.trust_tier === "human-reviewed"
       ? ""
       : `<form method="post" action="${esc(urls.verify(c.path))}">
-<input type="text" name="note" placeholder="Note (optional)" style="width:100%;margin-bottom:8px">
-<button class="primary" type="submit">Verify this version</button></form>
-<p class="small muted">Records that you checked this version. The next edit by anyone lapses it.</p>`;
+<input type="text" name="note" placeholder="Note (optional)">
+<button class="primary" type="submit">Verify this version</button></form>`;
   return `<section><h2>Verification</h2>${status}${form}</section>`;
 }
 
@@ -763,7 +766,6 @@ export function workPage(opts: {
     )
     .join("");
   return `<h1>Work queue</h1>
-<p class="muted">What needs fixing in ${esc(urls.slug)}, most linked-to first. Agents see the same list through the <code>work</code> tool; fix things by asking one.</p>
 <p class="small">${filter}</p>
 ${
   rows
@@ -832,32 +834,23 @@ export function transferPage(opts: {
 <td><a href="${esc(urls.nightly(n.date, "bundle.tar"))}">bundle.tar</a> · <a href="${esc(urls.nightly(n.date, "ledger.jsonl"))}">ledger.jsonl</a></td></tr>`,
     )
     .join("");
-  const nightlyBox = `<div class="panel-box"><h2 style="margin-top:0">Nightly exports</h2>
-<p>Each night the library is written to R2 (the bundle, plus the ledger as JSON lines so history can be
-rebuilt) when anything changed that day. Older exports are deleted after the retention period; the newest
-is always kept.</p>
-${nightlyRows ? `<div class="table-wrap"><table class="list"><tbody>${nightlyRows}</tbody></table></div>` : `<p class="muted small">None yet: the first runs tonight.</p>`}
-<form method="post" action="${esc(urls.maintain())}"><button type="submit">Export now</button>
-<span class="small muted">Writes tonight's export now, if anything changed since the last one.</span></form></div>`;
+  const nightlyBox = `<div class="panel-box"><h2>Nightly exports</h2>
+${nightlyRows ? `<div class="table-wrap"><table class="list"><tbody>${nightlyRows}</tbody></table></div>` : `<p>None yet.</p>`}
+<form method="post" action="${esc(urls.maintain())}"><button type="submit">Export now</button></form></div>`;
   return `<h1>Import &amp; export</h1>
 ${opts.result ? `<div class="notice ok">${opts.result}</div>` : ""}
 ${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
-<div class="panel-box"><h2 style="margin-top:0">Export</h2>
-<p>Download ${esc(urls.slug)} as a conformant OKF bundle: a tarball of every concept and attachment, with
-<code>index.md</code> and <code>log.md</code> written out.</p>
+<div class="panel-box"><h2>Export</h2>
 <form class="inline" method="get" action="${esc(urls.exportTar())}">
 <label class="small" for="at">As of sequence</label>
 <input id="at" name="at" type="number" min="0" max="${opts.head}" placeholder="${opts.head} (now)">
 <button class="primary" type="submit">Download .tar</button></form></div>
-<div class="panel-box"><h2 style="margin-top:0">Import</h2>
-<p>Upload a bundle as a <code>.tar</code> or <code>.tar.gz</code>. Every file lands in one request you can
-revert from the ledger. Files at the same paths are replaced; the bundle's own <code>generated</code> and
-<code>verified</code> are kept, and the import is recorded under your name. <code>index.md</code> and
-<code>log.md</code> are skipped: the server writes its own.</p>
+<div class="panel-box"><h2>Import</h2>
+<p>A .tar or .tar.gz, as one revertible request.</p>
 <form method="post" action="${esc(urls.importTar())}" enctype="multipart/form-data">
 <p><input type="file" name="bundle" accept=".tar,.tgz,.gz,application/x-tar,application/gzip" required></p>
 <p><label class="small">Leading directories to drop <input type="number" name="strip" min="0" max="10" value="0"></label></p>
-<p><input type="text" name="note" placeholder="Note (optional)" style="width:100%"></p>
+<p><input type="text" name="note" placeholder="Note (optional)"></p>
 <button class="primary" type="submit">Import</button></form></div>
 ${nightlyBox}`;
 }
@@ -910,20 +903,15 @@ export function recoveryPage(opts: {
   return `<h1>Recovery</h1>
 ${opts.result ? `<div class="notice ok">${opts.result}</div>` : ""}
 ${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
-<div class="panel-box"><h2 style="margin-top:0">Restore this library to a point in time</h2>
-<p>Rewinds all of ${esc(urls.slug)}, ledger included, to how it was at a moment in the last 30 days and at least 2 minutes ago (recoverable history trails
-live writes by about a minute).
-Everything after that moment is removed from the library. Before restoring, the current library is exported
-to R2 (the bundle and the full ledger), and you can undo the restore below.</p>
-<p class="small muted">To take back a single change, revert it from the <a href="${esc(urls.ledger())}">ledger</a>
-instead: that keeps history and touches nothing else.</p>
+<div class="panel-box"><h2>Restore this library to a point in time</h2>
+<p>Rewinds the whole library, ledger included, to a time 2 minutes to 30 days ago. The current state is exported first, and the restore can be undone. To undo one change, revert it in the <a href="${esc(urls.ledger())}">ledger</a>.</p>
 <form method="post" action="${esc(urls.recovery())}">
 <p><label class="small">Time (UTC) <input type="datetime-local" name="to" step="1" required value="${esc(opts.to ?? "")}"></label></p>
 <p>${confirm("confirm")}</p>
 <button class="primary" type="submit">Restore</button></form>
-${recent ? `<h2>Recent requests</h2><p class="small muted">The ledger is at seq ${opts.head}. Pick a time just before the change you want gone.</p><ul class="small">${recent}</ul>` : ""}</div>
-<div class="panel-box"><h2 style="margin-top:0">Past restores</h2>
-${rows ? `<p class="small">Undo returns the library to how it was just before that restore. It is a restore too: it writes its own export first and can itself be undone.</p><div class="table-wrap"><table class="list"><tbody>${rows}</tbody></table></div>` : `<p class="muted small">None.</p>`}</div>`;
+${recent ? `<h2>Recent requests</h2><ul class="small">${recent}</ul>` : ""}</div>
+<div class="panel-box"><h2>Past restores</h2>
+${rows ? `<div class="table-wrap"><table class="list"><tbody>${rows}</tbody></table></div>` : `<p>None.</p>`}</div>`;
 }
 
 /** A restore id (20260930T180211042Z) as an ISO time, to the second. */
@@ -990,17 +978,16 @@ export function tokensPage(opts: {
   const radio = (name: string, value: string, label: string) =>
     `<label class="choice"><input type="radio" name="${name}" value="${value}"${(name === "scope" ? f.scope : f.tiers) === value ? " checked" : ""}> ${label}</label>`;
   return `<h1>Tokens</h1>
-<p class="muted">Bearer tokens for Claude Code, scripts and scheduled agents. Apps like claude.ai connect with OAuth instead (see Connected apps). Each token reaches one library and signs every change it makes with its actor.</p>
 ${opts.notice ? `<div class="notice ok">${esc(opts.notice)}</div>` : ""}
 ${rows ? `<div class="table-wrap"><table class="list"><thead><tr><th>Actor</th><th>Access</th><th></th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted">No tokens yet.</p>`}
-<div class="panel-box"><h2 style="margin-top:0">New token</h2>
+<div class="panel-box"><h2>New token</h2>
 ${opts.error ? `<div class="notice">${esc(opts.error)}</div>` : ""}
 ${
   libOptions
     ? `<form class="token" method="post" action="/app/tokens">
 <p><label>Library <select name="library">${libOptions}</select></label></p>
-<p><label>Actor <input type="text" name="actor" value="${esc(f.actor)}" placeholder="claude-code/laptop" required style="width:260px"></label>
-<span class="small muted">app/label for an agent, process:name for a scheduled job (it may verify), or your own ${esc(opts.human)}</span></p>
+<p><label>Actor <input type="text" name="actor" value="${esc(f.actor)}" placeholder="claude-code/laptop" required></label>
+app/label, process:name, or ${esc(opts.human)}</p>
 <p>${radio("scope", "write", "Read and write")} ${radio("scope", "read", "Read only")}</p>
 <p><label>Directory <input type="text" name="prefix" value="${esc(f.prefix)}" placeholder="whole library"></label>
 <label>Expires <input type="date" name="expires" value="${esc(f.expires)}"></label></p>
@@ -1018,7 +1005,7 @@ export function tokenCreatedPage(opts: {
 }): string {
   const cmd = `claude mcp add --transport http ${opts.library} ${opts.origin}/mcp --header "Authorization: Bearer ${opts.secret}"`;
   return `<h1>Token created</h1>
-<div class="notice">Copy it now: this is the only time it is shown. Only a hash is stored.</div>
+<p>Shown once. Copy it now.</p>
 <p>For <strong>${esc(opts.actor)}</strong> on <strong>${esc(opts.library)}</strong>:</p>
 <pre class="src wrap">${esc(opts.secret)}</pre>
 <p class="small muted">Claude Code:</p>

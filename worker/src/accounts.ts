@@ -1,4 +1,5 @@
 import { hashToken, newTokenSecret } from "./auth";
+import { sha256Hex } from "./okf/hash";
 import { normalizeDir } from "./okf/paths";
 import { OkfError } from "./store/errors";
 
@@ -60,6 +61,12 @@ export interface Accounts {
   createToken(t: NewToken): Promise<{ id: string; secret: string }>;
   /** Revokes a token on one of the user's libraries; 404 for anything else. */
   revokeToken(id: string, userId: string): Promise<void>;
+  /** Changes the user's handle and, for future writes, their human: actor; 409 if taken. */
+  setHandle(userId: string, handle: string): Promise<User>;
+  /** Removes a library's rows and its tokens. Its storage is wiped separately (lifecycle.ts). */
+  deleteLibrary(libraryId: string): Promise<void>;
+  /** Removes the user's rows (they own no libraries by now) and keeps a tombstone. */
+  deleteUser(user: Pick<User, "id" | "email">): Promise<void>;
 }
 
 const AGENT_ACTOR = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/;
@@ -281,6 +288,41 @@ export function d1Accounts(db: D1Database): Accounts {
         .bind(new Date().toISOString(), id, userId)
         .run();
       if (!r.meta.changes) throw new OkfError(404, "not_found", "No such active token.");
+    },
+    async setHandle(userId, handleInput) {
+      const handle = checkHandle(handleInput);
+      const r = await db
+        .prepare(
+          `UPDATE users SET handle = ?1, actor = ?2 WHERE id = ?3
+           AND NOT EXISTS (SELECT 1 FROM users WHERE handle = ?1 AND id != ?3)`,
+        )
+        .bind(handle, humanActor(handle), userId)
+        .run();
+      if (!r.meta.changes)
+        throw new OkfError(409, "handle_taken", `The handle ${handle} is taken.`);
+      const user = await db
+        .prepare("SELECT id, email, actor, handle FROM users WHERE id = ?")
+        .bind(userId)
+        .first<User>();
+      if (!user) throw new OkfError(404, "not_found", "No such account.");
+      return user;
+    },
+    async deleteLibrary(libraryId) {
+      await db.batch([
+        db.prepare("DELETE FROM tokens WHERE library = ?").bind(libraryId),
+        db.prepare("DELETE FROM libraries WHERE id = ?").bind(libraryId),
+      ]);
+    },
+    async deleteUser(user) {
+      await db.batch([
+        db.prepare("DELETE FROM sessions WHERE user = ?").bind(user.id),
+        db.prepare("DELETE FROM sign_in_links WHERE email = ?").bind(user.email),
+        db.prepare("UPDATE tokens SET created_by = NULL WHERE created_by = ?").bind(user.id),
+        db.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
+        db
+          .prepare("INSERT INTO deleted_accounts (email_hash, deleted) VALUES (?, ?)")
+          .bind(sha256Hex(user.email), new Date().toISOString()),
+      ]);
     },
   };
 }

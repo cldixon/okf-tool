@@ -339,6 +339,17 @@ export function setup() {
     },
     accounts,
     sessions,
+    async destroyLibrary(doId) {
+      stores.delete(doId);
+      clients.delete(doId);
+      const { exportsPrefix } = await import("../src/maintain");
+      const { restoresPrefix } = await import("../src/recovery");
+      for (const k of [...bucket.objects.keys()]) {
+        if (k.startsWith(exportsPrefix(doId)) || k.startsWith(restoresPrefix(doId))) {
+          bucket.objects.delete(k);
+        }
+      }
+    },
     mailer: {
       async send(msg) {
         outbox.push(msg);

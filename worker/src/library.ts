@@ -98,6 +98,18 @@ export class Library extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Deletes everything this library stores (v2 spec: A2, delete a library or account). The
+   * caller has already removed its D1 row, so nothing routes here again; the restart drops this
+   * instance, so the call itself fails, as restart() does.
+   */
+  async destroy(): Promise<void> {
+    this.restarting = true;
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.ctx.abort("Library deleted.");
+  }
+
   /** Restarts the object so an armed restore takes effect; the call itself always fails. */
   async restart(): Promise<void> {
     this.ctx.abort("Restarting into a point-in-time restore.");

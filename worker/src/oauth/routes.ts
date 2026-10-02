@@ -90,7 +90,7 @@ function html(body: string, headers?: Headers, status = 200): Response {
   h.set("X-Frame-Options", "DENY");
   h.set(
     "Content-Security-Policy",
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https: http://localhost:* http://127.0.0.1:*; frame-ancestors 'none'",
+    "default-src 'none'; form-action 'self' https: http://localhost:* http://127.0.0.1:*; frame-ancestors 'none'",
   );
   return new Response(body, { status, headers: h });
 }

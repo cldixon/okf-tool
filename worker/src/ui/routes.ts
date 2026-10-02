@@ -2,11 +2,21 @@ import type { Context, Hono } from "hono";
 import { checkNewToken, type LibraryRef, type User } from "../accounts";
 import type { Deps } from "../app";
 import { bundleFiles, type LibraryClient } from "../client";
+import { deleteAccount, deleteLibrary } from "../lifecycle";
 import { basename, dirname } from "../okf/paths";
+import { clearedSessionCookie, readCookie, SESSION_COOKIE, sessionId } from "../session";
 import { signedIn } from "../signin";
 import { OkfError } from "../store/errors";
 import { authorizeLibrary } from "../tenancy";
 import { maybeGunzip, readTar } from "../util/tar";
+import {
+  type AgentWrite,
+  accountPage,
+  connectPage,
+  deleteLibraryPage,
+  STARTER,
+  welcomePage,
+} from "./account";
 import { esc, htmlResponse, layout } from "./layout";
 import { linkTarget } from "./markdown";
 import {
@@ -199,7 +209,13 @@ export function registerUiRoutes<E extends AppEnv>(
       error ? 400 : 200,
     );
   };
-  get("/app", (p) => listLibraries(p));
+  get("/app", async (p) => {
+    // First run: no libraries yet (v2 spec: Onboarding).
+    if ((await p.deps.accounts.libraries(p.user.id)).length === 0) {
+      return p.c.redirect("/app/welcome", 302);
+    }
+    return listLibraries(p);
+  });
   app.get("/app/", (c) => c.redirect("/app", 301));
   app.get("/app/libraries", (c) => c.redirect("/app", 301));
   app.get("/app/libraries/:owner/:lib", (c) =>
@@ -636,7 +652,7 @@ export function registerUiRoutes<E extends AppEnv>(
       libraries: libs.map((l) => l.slug),
       human: p.user.actor,
       form: opts.form ?? {
-        library: libs[0]?.slug ?? "",
+        library: p.c.req.query("library") ?? libs[0]?.slug ?? "",
         actor: "",
         scope: "write",
         prefix: "",
@@ -701,5 +717,138 @@ export function registerUiRoutes<E extends AppEnv>(
   post("/app/tokens/:id/revoke", async (p) => {
     await p.deps.accounts.revokeToken(p.c.req.param("id") ?? "", p.user.id);
     return p.c.redirect("/app/tokens?done=revoke", 303);
+  });
+
+  // ---------------------------------------------------------------- first run, connect, account (v2 A2)
+
+  const welcome = (
+    p: Page,
+    form: { handle: string; library: string; starter: boolean },
+    error?: OkfError,
+  ) =>
+    htmlResponse(
+      layout({
+        title: "Welcome",
+        user: p.user.email,
+        body: welcomePage({ ...form, error: error?.message }),
+      }),
+      error?.status ?? 200,
+    );
+
+  get("/app/welcome", async (p) =>
+    welcome(p, { handle: p.user.handle, library: "notes", starter: true }),
+  );
+
+  post("/app/welcome", async (p) => {
+    const f = await p.c.req.formData();
+    const form = {
+      handle: String(f.get("handle") ?? "").trim(),
+      library: String(f.get("library") ?? "").trim(),
+      starter: f.get("starter") === "1",
+    };
+    let user = p.user;
+    try {
+      if (form.handle.toLowerCase() !== user.handle) {
+        user = await p.deps.accounts.setHandle(user.id, form.handle);
+      }
+      const ref = await p.deps.accounts.createLibrary(form.library, user);
+      if (form.starter) {
+        const lib = await p.deps.libraryByDoId(ref.do_id);
+        await lib?.apply(
+          { actor: user.actor, request_id: crypto.randomUUID(), note: "Starter note" },
+          [{ op: "write", path: "start-here.md", content: STARTER }],
+        );
+      }
+      return p.c.redirect(new Urls(ref.owner, ref.slug).connect(), 303);
+    } catch (e) {
+      if (e instanceof OkfError && e.status < 500) return welcome({ ...p, user }, form, e);
+      throw e;
+    }
+  });
+
+  get("/app/libraries/:owner/:lib/connect", async (p) => {
+    const { urls, lib } = await openLibrary(p);
+    // The newest change by an agent, not a person: "waiting for your agent" (v2 spec: Onboarding).
+    const recent = (await lib.requests({ limit: 50 })).requests as LedgerRequest[];
+    const agent = recent.find((r) => !r.actor.startsWith("human:"));
+    const latest: AgentWrite | null = agent
+      ? { actor: agent.actor, ts: agent.ts, note: agent.note }
+      : null;
+    const mcp = `${new URL(p.c.req.url).origin}/mcp`;
+    return show(
+      p,
+      `Connect · ${urls.slug}`,
+      libNav(urls, "connect") + connectPage({ urls, mcp, latest }),
+    );
+  });
+
+  get("/app/libraries/:owner/:lib/delete", async (p) => {
+    const { urls } = await openLibrary(p);
+    return show(p, `Delete · ${urls.slug}`, libNav(urls, "delete") + deleteLibraryPage({ urls }));
+  });
+
+  post("/app/libraries/:owner/:lib/delete", async (p) => {
+    const { urls, ref } = await openLibrary(p);
+    const confirm = String((await p.c.req.formData()).get("confirm") ?? "").trim();
+    if (confirm !== ref.slug) {
+      const body =
+        libNav(urls, "delete") + deleteLibraryPage({ urls, error: `Type ${ref.slug} to confirm.` });
+      return htmlResponse(
+        layout({ title: `Delete · ${urls.slug}`, user: p.user.email, body }),
+        400,
+      );
+    }
+    await deleteLibrary(p.deps, p.c.env.OAUTH_PROVIDER, p.user, ref);
+    return p.c.redirect("/app", 303);
+  });
+
+  const account = async (p: Page, status = 200, msg: { notice?: string; error?: string } = {}) => {
+    const secret = readCookie(p.c.req.raw, SESSION_COOKIE);
+    const sessions = await p.deps.sessions.list(p.user.id);
+    const body = accountPage({
+      user: p.user,
+      sessions,
+      current: secret ? sessionId(secret) : null,
+      ...msg,
+    });
+    return htmlResponse(layout({ title: "Account", user: p.user.email, body }), status);
+  };
+
+  get("/app/account", (p) => account(p));
+
+  post("/app/account/handle", async (p) => {
+    const handle = String((await p.c.req.formData()).get("handle") ?? "");
+    try {
+      const user = await p.deps.accounts.setHandle(p.user.id, handle);
+      return account({ ...p, user }, 200, { notice: `Handle is now ${user.handle}.` });
+    } catch (e) {
+      if (e instanceof OkfError && e.status < 500)
+        return account(p, e.status, { error: e.message });
+      throw e;
+    }
+  });
+
+  post("/app/account/sessions/end", async (p) => {
+    const id = String((await p.c.req.formData()).get("id") ?? "");
+    await p.deps.sessions.endById(p.user.id, id);
+    return p.c.redirect("/app/account", 303);
+  });
+
+  post("/app/account/delete", async (p) => {
+    const confirm = String((await p.c.req.formData()).get("confirm") ?? "").trim();
+    if (confirm !== p.user.handle) {
+      return account(p, 400, { error: `Type ${p.user.handle} to confirm.` });
+    }
+    await deleteAccount(p.deps, p.c.env.OAUTH_PROVIDER, p.user);
+    return new Response(
+      layout({ title: "Account deleted", user: "", body: "<h1>Account deleted</h1>" }),
+      {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Set-Cookie": clearedSessionCookie,
+          "Cache-Control": "no-store",
+        },
+      },
+    );
   });
 }

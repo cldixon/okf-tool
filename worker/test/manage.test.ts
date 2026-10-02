@@ -150,7 +150,7 @@ describe("libraries and tokens", () => {
     const created = await post(s, "/app/tokens", form("claude-code/laptop"));
     const html = await created.text();
     expect(created.status).toBe(200);
-    expect(html).toContain("only time it is shown");
+    expect(html).toContain("Shown once.");
     const secret = /<pre class="src wrap">(okf_[^<]+)<\/pre>/.exec(html)?.[1] ?? "";
     expect(html).toContain(`claude mcp add --transport http demo ${ORIGIN}/mcp`);
 
