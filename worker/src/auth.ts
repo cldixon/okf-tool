@@ -9,7 +9,8 @@ export interface TokenInfo {
   scope: "read" | "write";
   prefix: string | null;
   mcp_tiers: string;
-  library: { id: string; slug: string; do_id: string };
+  /** `owner` is the owner's handle: the library's path is {owner}/{slug}. */
+  library: { id: string; slug: string; do_id: string; owner: string };
   /** The users row id of the human who minted the token, when known. */
   created_by?: string | null;
 }
@@ -35,22 +36,29 @@ interface TokenRow {
   library_id: string;
   slug: string;
   do_id: string;
+  owner: string | null;
+  suspended: string | null;
 }
 
 const CACHE_MS = 30_000;
 
 /** Looks tokens up in D1 by hash, with a short per-isolate cache so revocation lands within 30s. */
-export function d1Authenticate(db: D1Database, now = () => Date.now()): Authenticate {
+export function d1Authenticate(
+  db: D1Database,
+  now = () => Date.now(),
+  cacheMs = CACHE_MS,
+): Authenticate {
   const cache = new Map<string, { row: TokenRow | null; at: number }>();
   return async (secret) => {
     const hash = hashToken(secret);
     let hit = cache.get(hash);
-    if (!hit || now() - hit.at > CACHE_MS) {
+    if (!hit || now() - hit.at >= cacheMs) {
       const row = await db
         .prepare(
           `SELECT t.id, t.actor, t.scope, t.prefix, t.mcp_tiers, t.expires, t.revoked, t.created_by,
-                  l.id AS library_id, l.slug, l.do_id
-           FROM tokens t JOIN libraries l ON l.id = t.library WHERE t.hash = ?`,
+                  l.id AS library_id, l.slug, l.do_id, u.handle AS owner, u.suspended
+           FROM tokens t JOIN libraries l ON l.id = t.library
+           LEFT JOIN users u ON u.id = l.owner WHERE t.hash = ?`,
         )
         .bind(hash)
         .first<TokenRow>();
@@ -61,6 +69,7 @@ export function d1Authenticate(db: D1Database, now = () => Date.now()): Authenti
     const row = hit.row;
     if (!row) throw new OkfError(401, "bad_token", "Unknown bearer token.");
     if (row.revoked) throw new OkfError(401, "token_revoked", "This token has been revoked.");
+    if (row.suspended) throw new OkfError(401, "suspended", "This account is suspended.");
     if (row.expires && Date.parse(row.expires) <= now()) {
       throw new OkfError(401, "token_expired", "This token has expired.");
     }
@@ -70,7 +79,7 @@ export function d1Authenticate(db: D1Database, now = () => Date.now()): Authenti
       scope: row.scope === "write" ? "write" : "read",
       prefix: row.prefix || null,
       mcp_tiers: row.mcp_tiers,
-      library: { id: row.library_id, slug: row.slug, do_id: row.do_id },
+      library: { id: row.library_id, slug: row.slug, do_id: row.do_id, owner: row.owner ?? "" },
       created_by: row.created_by,
     };
   };

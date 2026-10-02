@@ -1,6 +1,6 @@
 /**
- * `bun run seed`: creates a local user, library and write token in the local D1 and prints the
- * token. Stands in for token management until the UI arrives (spec: Deployment, Local development).
+ * `bun run seed`: creates a local user (dev@localhost, handle dev), library and write token in the
+ * local D1 and prints the token. Sign in to the UI as dev@localhost (DEV_SIGNIN=1 shows the link). Stands in for token management until the UI arrives (spec: Deployment, Local development).
  * With --remote it writes to the deployed D1 instead.
  *
  *   bun run seed [--slug dev] [--actor claude-code/local] [--scope write] [--prefix notes]
@@ -25,6 +25,8 @@ export interface SeedOptions {
 
 export interface Seeded {
   token: string;
+  /** The owner's handle: the library's path is {owner}/{slug}. */
+  owner: string;
   slug: string;
   library_id: string;
   actor: string;
@@ -41,6 +43,7 @@ export async function seed(opts: SeedOptions = {}): Promise<Seeded> {
   const slug = opts.slug ?? "dev";
   const actor = opts.actor ?? "claude-code/local";
   const human = opts.human ?? "human:dev";
+  const handle = human.slice("human:".length);
   const scope = opts.scope ?? "write";
   const now = new Date().toISOString();
   await applyMigrations(where(opts));
@@ -48,14 +51,19 @@ export async function seed(opts: SeedOptions = {}): Promise<Seeded> {
   const secret = newTokenSecret();
   const libraryId = `lib_${crypto.randomUUID()}`;
   const sql = [
-    `INSERT OR IGNORE INTO users (id, email, actor, created) VALUES ('user_dev', 'dev@localhost', ${q(human)}, ${q(now)});`,
+    `INSERT OR IGNORE INTO users (id, email, actor, handle, created) VALUES ('user_dev', 'dev@localhost', ${q(human)}, ${q(handle)}, ${q(now)});`,
     `INSERT OR IGNORE INTO libraries (id, slug, owner, visibility, created, do_id) VALUES (${q(libraryId)}, ${q(slug)}, 'user_dev', 'private', ${q(now)}, ${q(libraryId)});`,
-    `INSERT OR IGNORE INTO tokens (id, hash, library, actor, scope, prefix, created_by) VALUES (${q(`tok_${crypto.randomUUID()}`)}, ${q(hashToken(secret))}, (SELECT id FROM libraries WHERE slug = ${q(slug)}), ${q(actor)}, ${q(scope)}, ${q(opts.prefix ?? null)}, 'user_dev');`,
+    `INSERT OR IGNORE INTO tokens (id, hash, library, actor, scope, prefix, created_by) VALUES (${q(`tok_${crypto.randomUUID()}`)}, ${q(hashToken(secret))}, (SELECT id FROM libraries WHERE owner = 'user_dev' AND slug = ${q(slug)}), ${q(actor)}, ${q(scope)}, ${q(opts.prefix ?? null)}, 'user_dev');`,
   ].join(" ");
   await d1Sql(sql, where(opts));
-  const rows = await d1Sql(`SELECT id FROM libraries WHERE slug = ${q(slug)}`, where(opts));
+  const rows = await d1Sql(
+    `SELECT l.id, u.handle FROM libraries l JOIN users u ON u.id = l.owner
+     WHERE l.owner = 'user_dev' AND l.slug = ${q(slug)}`,
+    where(opts),
+  );
   const id = (rows[0]?.[0] as string | undefined) ?? libraryId;
-  return { token: secret, slug, library_id: id, actor, scope };
+  const owner = (rows[0]?.[1] as string | undefined) ?? handle;
+  return { token: secret, owner, slug, library_id: id, actor, scope };
 }
 
 if (import.meta.main) {
@@ -80,13 +88,13 @@ if (import.meta.main) {
   });
   if (values.json) console.log(JSON.stringify(s));
   else {
-    console.log(`Library: ${s.slug} (${s.library_id})`);
+    console.log(`Library: ${s.owner}/${s.slug} (${s.library_id})`);
     console.log(`Actor:   ${s.actor} (${s.scope})`);
     console.log(`Token:   ${s.token}`);
     if (!values.remote) {
       console.log("\nTry it with `bun run dev` running:");
       console.log(
-        `  curl -H 'Authorization: Bearer ${s.token}' http://localhost:8787/api/v1/libraries/${s.slug}/tree`,
+        `  curl -H 'Authorization: Bearer ${s.token}' http://localhost:8787/api/v1/libraries/${s.owner}/${s.slug}/tree`,
       );
     }
   }

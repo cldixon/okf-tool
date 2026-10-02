@@ -15,7 +15,9 @@
     "format": "biome check --write .",
     "check": "bun run lint && bun run typecheck && bun run test",
     "seed": "bun run --filter worker seed",
-    "gate": "bun run --filter worker gate"
+    "gate": "bun run --filter worker gate",
+    "logs": "bun run --filter worker logs",
+    "admin": "bun run --filter worker admin"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14"

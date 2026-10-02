@@ -3,7 +3,8 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 /**
  * The person signed in through Cloudflare Access (spec: Auth, identity and actors). Access sits in
  * front of /app/* only; the Worker still verifies the JWT Access adds, so a request that reaches
- * it some other way is not trusted.
+ * it some other way is not trusted. v2 replaces Access with magic-link sessions (signin.ts); this
+ * stays only until the A4 cut-over.
  */
 export interface Identity {
   email: string;
@@ -12,8 +13,6 @@ export interface Identity {
 export interface AccessConfig {
   teamDomain?: string;
   audience?: string;
-  /** Local dev only; honored on loopback hosts when Access is not configured. */
-  devEmail?: string;
 }
 
 const jwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -25,10 +24,6 @@ function keySet(teamDomain: string) {
     jwks.set(teamDomain, set);
   }
   return set;
-}
-
-function isLoopback(url: URL): boolean {
-  return ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
 }
 
 function cookie(req: Request, name: string): string | null {
@@ -45,12 +40,7 @@ export type AccessResult =
 
 export async function accessIdentity(req: Request, config: AccessConfig): Promise<AccessResult> {
   const team = config.teamDomain?.replace(/\/+$/, "");
-  if (!team) {
-    if (config.devEmail && isLoopback(new URL(req.url))) {
-      return { ok: true, identity: { email: config.devEmail } };
-    }
-    return { ok: false, reason: "not_configured" };
-  }
+  if (!team) return { ok: false, reason: "not_configured" };
   if (!config.audience) return { ok: false, reason: "not_configured" };
   const jwt = req.headers.get("Cf-Access-Jwt-Assertion") ?? cookie(req, "CF_Authorization");
   if (!jwt) return { ok: false, reason: "not_signed_in" };

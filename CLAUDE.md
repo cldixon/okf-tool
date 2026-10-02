@@ -4,7 +4,11 @@
 The spec is a live Claude Doc and is the single source of truth:
 **OKF Knowledge Service — Spec** — https://claude.ai/artifact/KMuKyyFBSJHzukyEGqvUDn
 
-Read it with the Docs tools before starting on a feature. There is no markdown copy in this repo; do not add one. When implementation shows the spec is wrong, update the doc first, then the code.
+The managed-service work (accounts, magic-link sign-in, tenancy, then sharing) is specified in a
+companion doc that builds on it: **OKF Service — v2 Spec (managed service)** —
+https://claude.ai/code/artifact/cea3e8c6-4161-4f53-aa6d-54093bc7ed75
+
+Read them with the Docs tools before starting on a feature. There is no markdown copy in this repo; do not add one. When implementation shows the spec is wrong, update the doc first, then the code.
 
 ## Tooling
 - **bun for everything JS/TS**: installing (`bun install`, `bun add`), scripts (`bun run …`), tests (`bun test`), one-off binaries (`bunx`). Do not use npm, npx, yarn or pnpm, and do not commit other lockfiles.
@@ -21,9 +25,10 @@ Read it with the Docs tools before starting on a feature. There is no markdown c
 | `bun run check` | Lint + typecheck + tests; run before every commit |
 | `bun run format` | Apply Biome fixes |
 | `bun run deploy` | Apply D1 migrations (database ID from `cloudflare.config.ts`), then `cf deploy`; `--dry-run` builds and validates only |
-| `bun run seed` | Create a local user, library (`dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
+| `bun run seed` | Create a local user (`dev@localhost`, handle `dev`), library (`dev/dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
+| `bun run admin` | Accounts on D1 (local, or `--remote`): `users`, `transfer --library <owner>/<slug> --to <email>`, `suspend --email <email> [--undo]` |
 | `bun run logs` | Recent events from Workers Observability via `cf observability telemetry query` (`--minutes`, `--errors`, `--json`) |
-| `bun run gate` | Gate: boots `cf dev` on fresh state (a throwaway project in `worker/.gate/`), round-trips Google's sample bundles over HTTP, renders every UI page for them, runs the nightly export through the DO into local R2, checks a restore is refused cleanly (no PITR locally), and runs the MCP smoke flow; also runs in CI |
+| `bun run gate` | Gate: boots `cf dev` on fresh state (a throwaway project in `worker/.gate/`), round-trips Google's sample bundles over HTTP, renders every UI page for them (signed in by a dev magic link), runs the nightly export through the DO into local R2, checks a restore is refused cleanly (no PITR locally), signs up a second account that must see nothing of the first, and runs the MCP smoke flow; also runs in CI |
 
 Binding types come from `cloudflare.config.ts`: `bun run typecheck` regenerates them with `cf workers types` into `worker/.cloudflare/types/` (gitignored). Secrets are not in the config; type them in `worker/src/env.d.ts`.
 
@@ -32,10 +37,13 @@ Binding types come from `cloudflare.config.ts`: `bun run typecheck` regenerates 
 worker/                  Worker + Library Durable Object (TypeScript, Hono)
 worker/src/index.ts      Worker entry: wires D1, the Library DO, R2 and KV into createWorker
 worker/src/worker.ts     Cloudflare's OAuth provider in front of the app: discovery, /register, /token, guards /mcp
-worker/src/app.ts        Hono app: REST routes under /api/v1/libraries/{lib}/, with injectable deps
-worker/src/auth.ts       Bearer tokens: hash lookup in D1, scope, prefix, expiry, revocation
-worker/src/access.ts     Cloudflare Access sign-in for /app/* (verifies the Access JWT)
-worker/src/accounts.ts   Users and libraries in D1, for the consent page
+worker/src/app.ts        Hono app: REST routes under /api/v1/libraries/{owner}/{lib}/, with injectable deps
+worker/src/auth.ts       Bearer tokens: hash lookup in D1, scope, prefix, expiry, revocation, suspension
+worker/src/accounts.ts   Users (handles), libraries and tokens in D1, every query scoped to one account
+worker/src/tenancy.ts    authorizeLibrary: the one check that a caller may reach {owner}/{slug}; 404 otherwise
+worker/src/session.ts    Magic links and sessions in D1 (hashes only), the session cookie
+worker/src/signin.ts     /app/sign-in, /app/sign-out and signedIn(); Access JWTs still accepted until the A4 cut-over
+worker/src/access.ts     Cloudflare Access JWT check (transition only; removed at A4)
 worker/src/oauth/        /app/authorize consent page and /app/grants (list, revoke)
 worker/src/ui/           Built-in UI under /app/ (behind Access): routes, views, markdown-to-HTML (no raw HTML, safe URLs only)
 worker/src/client.ts     Worker <-> DO boundary: one `call` RPC, errors as data, R2 blob checks
@@ -47,7 +55,7 @@ worker/src/store/        Library schema and LibraryStore (writes, ledger, snapsh
 worker/src/util/tar.ts   Tar reader and writer for import and export
 worker/src/mcp/server.ts MCP server at /mcp: stateless Streamable HTTP, tier 1 and tier 2 tools, okf:// resources
 worker/cloudflare.config.ts  The Worker for cf: bindings, Durable Object exports, compatibility
-worker/scripts/          cf.ts (runs cf, reads the config), deploy.ts, logs.ts, seed.ts (`bun run seed`), gate.ts (`bun run gate`), mcp-smoke.ts (MCP flow against any URL), restore-smoke.ts (PITR restore and undo against a deployed Worker)
+worker/scripts/          cf.ts (runs cf, reads the config), deploy.ts, logs.ts, seed.ts (`bun run seed`), admin.ts (`bun run admin`), gate.ts (`bun run gate`), mcp-smoke.ts (MCP flow against any URL), restore-smoke.ts (PITR restore and undo against a deployed Worker)
 worker/migrations/       D1 migrations (account layer)
 worker/test/             bun tests; worker/test/tsconfig.json adds bun types
 skills/okf/SKILL.md      Agent skill doc: the OKF workflow over the MCP tools
@@ -57,7 +65,8 @@ fixtures/                Google's four sample OKF bundles, vendored unchanged; d
 ## Testing
 - Unit tests run under `bun test`. `cloudflare:workers` does not exist outside workerd, so tests stub it with `mock.module` (see `worker/test/healthz.test.ts`).
 - Keep storage and OKF logic free of Worker APIs so it can be tested under bun with `bun:sqlite` standing in for the DO's SQLite handle (`worker/test/sqlite.ts`).
-- Route and MCP tests (`worker/test/api.test.ts`, `mcp.test.ts`) run the real app in process via `worker/test/harness.ts`: a bun:sqlite store behind the same `callStore` the DO uses, an in-memory blob store and fake tokens. MCP tests drive it with the SDK's own client.
+- Route and MCP tests (`worker/test/api.test.ts`, `mcp.test.ts`) run the real app in process via `worker/test/harness.ts`: a bun:sqlite store behind the same `callStore` the DO uses, the real account SQL and migrations on bun:sqlite (`worker/test/d1.ts`), an in-memory blob store and fixed test tokens. `s.app` is signed in as the demo library's owner (`owner/demo`), `s.anon` has no session, `s.stranger()` makes a second account. MCP tests drive it with the SDK's own client.
+- Tenancy (`worker/test/tenancy.test.ts`) walks every registered `{owner}/{lib}` route as a stranger and expects 404. A new library route needs nothing extra to be covered, but must go through `authorizeLibrary`.
 - MCP tool descriptions and `INSTRUCTIONS` in `worker/src/mcp/server.ts` carry the agent workflow; keep them in step with `skills/okf/SKILL.md`.
 - `worker/test/oauth.test.ts` drives the OAuth flow as an MCP client would: discovery, DCR, consent (dev sign-in), token with PKCE, MCP calls, revocation.
 - The DO write transaction must stay synchronous (no awaits); hash with `okf/hash.ts`, not WebCrypto.
@@ -66,7 +75,8 @@ fixtures/                Google's four sample OKF bundles, vendored unchanged; d
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set in the cloud environment; cf (and wrangler) read them automatically.
 - Remote resources: D1 `okf-accounts` (id in `cloudflare.config.ts`) and R2 bucket `okf-blobs`. Do not create or delete remote resources without asking.
 - Tokens and libraries are managed at `/app/tokens` and `/app` (or `/api/v1/tokens` and `/api/v1/libraries` with a `human:` token). `bun run seed --remote` (from `worker/`) still creates a library and token directly in the deployed D1.
-- KV `okf-oauth` (binding `OAUTH_KV`) holds OAuth clients and grants. Secrets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` come from the Access application covering `/app/*`; never put Access on `/mcp`. Local dev uses `DEV_ACCESS_EMAIL` from `worker/.dev.vars` (copy `worker/.dev.vars.sample`).
+- KV `okf-oauth` (binding `OAUTH_KV`) holds OAuth clients and grants. Secrets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` come from the Access application covering `/app/*`; until the v2 A4 cut-over, an Access sign-in is accepted alongside magic-link sessions. Never put Access on `/mcp`. Local dev uses `DEV_SIGNIN=1` from `worker/.dev.vars` (copy `worker/.dev.vars.sample`): sign-in links show on the page for localhost.
+- The deployed library `okf-tool` is owned by the seed user (`user_dev`). With tenancy, only its owner sees it in the UI: before deploying A1+ code, move it with `bun run admin transfer --library dev/okf-tool --to <author's email> --remote` (ask first; it changes production).
 - `worker/` is the deployable project and must stay self-contained: its own `package.json` with every dependency, nothing imported from outside `worker/` at build time. `cloudflare.config.ts` must not import Worker code (scripts import it under bun).
 
 ## CI

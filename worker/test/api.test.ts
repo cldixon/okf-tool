@@ -12,10 +12,14 @@ describe("auth", () => {
     const { req, app } = setup();
     expect((await req("/tree", { token: "" })).status).toBe(401);
     expect((await req("/tree", { token: "nope" })).status).toBe(401);
-    const other = await app.request("/api/v1/libraries/other/tree", {
-      headers: { Authorization: "Bearer writer" },
-    });
-    expect(other.status).toBe(403);
+    // Another library, or the same name under another owner, is answered as if it did not exist.
+    for (const path of [
+      "/api/v1/libraries/owner/other/tree",
+      "/api/v1/libraries/someone/demo/tree",
+    ]) {
+      const other = await app.request(path, { headers: { Authorization: "Bearer writer" } });
+      expect(other.status).toBe(404);
+    }
     expect((await req("/tree")).status).toBe(200);
   });
 

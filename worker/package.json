@@ -10,7 +10,8 @@
     "test": "bun test",
     "seed": "bun scripts/seed.ts",
     "gate": "bun scripts/gate.ts",
-    "logs": "bun scripts/logs.ts"
+    "logs": "bun scripts/logs.ts",
+    "admin": "bun scripts/admin.ts"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^1.2.1",

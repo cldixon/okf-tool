@@ -19,6 +19,8 @@ header.top div { max-width: 1120px; margin: 0 auto; padding: 10px 16px; display:
   align-items: baseline; flex-wrap: wrap; }
 header.top .brand { font-weight: 700; color: var(--fg); }
 header.top .who { margin-left: auto; color: var(--muted); font-size: 13px; }
+header.top form { margin: 0; }
+header.top form button { padding: 2px 10px; font-size: 13px; }
 main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
 h1 { font-size: 24px; line-height: 1.25; margin: 4px 0 6px; overflow-wrap: anywhere; }
 h2 { font-size: 17px; margin: 24px 0 8px; }
@@ -125,7 +127,7 @@ export function layout(s: Shell): string {
 <title>${esc(s.title)}</title><style>${STYLE}</style></head>
 <body><header class="top"><div><a class="brand" href="/app">OKF</a>
 <a href="/app">Libraries</a><a href="/app/tokens">Tokens</a><a href="/app/grants">Connected apps</a>
-<span class="who">${esc(s.user)}</span></div></header>
+<span class="who">${esc(s.user)}</span>${s.user ? '<form method="post" action="/app/sign-out"><button type="submit">Sign out</button></form>' : ""}</div></header>
 <main>${s.body}</main></body></html>`;
 }
 

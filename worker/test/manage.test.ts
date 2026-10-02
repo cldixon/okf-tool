@@ -3,7 +3,7 @@ import { readTar, writeTar } from "../src/util/tar";
 import { setup } from "./harness";
 
 type S = ReturnType<typeof setup>;
-const LIB = "/app/libraries/demo";
+const LIB = "/app/libraries/owner/demo";
 const ORIGIN = "http://localhost";
 
 async function page(s: S, path: string) {
@@ -125,11 +125,11 @@ describe("libraries and tokens", () => {
     const s = setup();
     const r = await post(s, "/app/libraries", new URLSearchParams({ slug: "team-notes" }));
     expect(r.status).toBe(303);
-    expect(r.headers.get("Location")).toBe("/app/libraries/team-notes/");
-    expect(s.accounts.libs.map((l) => l.slug)).toContain("team-notes");
+    expect(r.headers.get("Location")).toBe("/app/libraries/owner/team-notes/");
+    expect((await s.accounts.libraries("user_1")).map((l) => l.slug)).toContain("team-notes");
     const dup = await post(s, "/app/libraries", new URLSearchParams({ slug: "team-notes" }));
     expect(dup.status).toBe(400);
-    expect(await dup.text()).toContain("already exists");
+    expect(await dup.text()).toContain("You already have a library named team-notes.");
   });
 
   test("mint a token in the UI, use it, and revoke it", async () => {

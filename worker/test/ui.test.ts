@@ -19,7 +19,7 @@ async function page(s: S, path: string) {
   return { status: r.status, html: await r.text(), headers: r.headers };
 }
 
-const LIB = "/app/libraries/demo";
+const LIB = "/app/libraries/owner/demo";
 
 describe("markdown rendering for the UI", () => {
   const opts = {
@@ -95,7 +95,7 @@ describe("built-in UI pages", () => {
     const list = await page(s, "/app");
     expect(list.status).toBe(200);
     expect(list.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
-    expect(list.html).toContain('href="/app/libraries/demo/"');
+    expect(list.html).toContain('href="/app/libraries/owner/demo/"');
     expect(list.html).toContain("owner@example.com");
 
     const root = await page(s, `${LIB}/`);
@@ -126,7 +126,7 @@ describe("built-in UI pages", () => {
     expect(c.html).toContain(`href="${LIB}/raw/metrics/gross-margin.md"`);
 
     const policy = await page(s, `${LIB}/files/policies/margin.md`);
-    expect(policy.html).toContain(`href="/app/libraries/demo/files/metrics/gross-margin.md"`);
+    expect(policy.html).toContain(`href="/app/libraries/owner/demo/files/metrics/gross-margin.md"`);
     expect(policy.html).toContain("cites it");
   });
 
@@ -177,18 +177,21 @@ describe("built-in UI pages", () => {
     const missing = await page(s, `${LIB}/files/nope.md`);
     expect(missing.status).toBe(404);
     expect(missing.html).toContain("Back to libraries");
-    expect((await page(s, "/app/libraries/other/")).status).toBe(404);
+    expect((await page(s, "/app/libraries/owner/other/")).status).toBe(404);
   });
 
-  test("pages require an Access sign-in", async () => {
+  test("pages require sign-in", async () => {
     const s = setup();
-    Object.assign(s.env, {
-      ACCESS_TEAM_DOMAIN: "https://team.cloudflareaccess.com",
-      ACCESS_AUD: "a",
+    const r = await s.anon.request(`${LIB}/files/a.md?at=1`);
+    expect(r.status).toBe(302);
+    expect(r.headers.get("Location")).toBe(
+      `/app/sign-in?next=${encodeURIComponent(`${LIB}/files/a.md?at=1`)}`,
+    );
+    const post = await s.anon.request(`${LIB}/verify/a.md`, {
+      method: "POST",
+      headers: { Origin: "http://localhost" },
     });
-    const r = await s.app.request("/app");
-    expect(r.status).toBe(403);
-    expect((await s.app.request(`${LIB}/files/a.md`)).status).toBe(403);
+    expect(post.status).toBe(401);
   });
 });
 

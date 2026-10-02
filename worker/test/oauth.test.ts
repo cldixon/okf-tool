@@ -151,7 +151,7 @@ describe("OAuth for MCP clients", () => {
     expect(new URL(location).searchParams.get("state")).toBe("st4te");
     const tokens = await exchange(app, clientId, location, flow.verifier);
     expect(tokens.scope.split(" ").sort()).toEqual(["okf:read", "okf:write"]);
-    expect(accounts.users.get("owner@example.com")?.actor).toBe("human:owner");
+    expect((await accounts.user("owner@example.com")).actor).toBe("human:owner");
 
     const { call } = await mcp(app, tokens.access_token);
     const w = await call("write", {
@@ -195,7 +195,7 @@ describe("OAuth for MCP clients", () => {
       tiers: "files",
     });
     const tokens = await exchange(app, clientId, done.headers.get("Location") ?? "", flow.verifier);
-    expect(accounts.libs.map((l) => l.slug)).toContain("team-notes");
+    expect((await accounts.libraries("user_1")).map((l) => l.slug)).toContain("team-notes");
     const { client, call } = await mcp(app, tokens.access_token);
     const tools = (await client.listTools()).tools.map((t) => t.name);
     expect(tools).not.toContain("search");
@@ -260,21 +260,6 @@ describe("OAuth for MCP clients", () => {
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
     });
     expect(r.status).toBe(401);
-  });
-
-  test("sign-in: the dev email only works on loopback; Access requires its JWT", async () => {
-    const { app, env } = setup();
-    const remote = await app.request("https://okf.example.com/app/grants");
-    expect(remote.status).toBe(503);
-    expect(await remote.text()).toContain("Sign-in is not set up");
-
-    Object.assign(env, {
-      ACCESS_TEAM_DOMAIN: "https://team.cloudflareaccess.com",
-      ACCESS_AUD: "aud",
-    });
-    const unsigned = await app.request("/app/grants");
-    expect(unsigned.status).toBe(403);
-    expect(await unsigned.text()).toContain("Not signed in");
   });
 
   test("bearer tokens still work on /mcp alongside OAuth", async () => {

@@ -7,7 +7,7 @@ import { fakeRecovery, memoryBlobs, memoryBucket, setup } from "./harness";
 import { bunSqlHandle } from "./sqlite";
 
 type S = ReturnType<typeof setup>;
-const LIB = "/app/libraries/demo";
+const LIB = "/app/libraries/owner/demo";
 const ORIGIN = "http://localhost";
 const md = (body: string) => `---\ntype: Note\n---\n${body}`;
 const ctx = () => ({ actor: "claude-code/test", request_id: crypto.randomUUID() });
