@@ -2,7 +2,7 @@ import { d1Accounts } from "./accounts";
 import { d1Authenticate } from "./auth";
 import { makeClient, r2BlobStore } from "./client";
 import type { Library } from "./library";
-import { listExports } from "./maintain";
+import { exportsPrefix, listExports } from "./maintain";
 import { listRestores, RESTORE_ID, restoresPrefix } from "./recovery";
 import { d1Sessions } from "./session";
 import { createWorker } from "./worker";
@@ -34,6 +34,20 @@ export default createWorker((env) => {
     mailer: null,
     blobs: r2BlobStore(env.BLOBS),
     maintain: (doId) => libraryStub(env, doId).maintain(),
+    async destroyLibrary(doId) {
+      // destroy() ends by restarting the object, which fails the call by design.
+      await libraryStub(env, doId)
+        .destroy()
+        .catch(() => {});
+      for (const prefix of [exportsPrefix(doId), restoresPrefix(doId)]) {
+        let cursor: string | undefined;
+        do {
+          const page = await env.BLOBS.list({ prefix, cursor });
+          if (page.objects.length) await env.BLOBS.delete(page.objects.map((o) => o.key));
+          cursor = page.truncated ? page.cursor : undefined;
+        } while (cursor);
+      }
+    },
     health: async () => {
       const check = async (fn: () => Promise<unknown>) => {
         try {

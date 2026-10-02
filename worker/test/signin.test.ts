@@ -74,12 +74,13 @@ describe("magic-link sign-in (v2 spec: Accounts and sign-in)", () => {
     expect(stored).not.toContain(secret);
     expect(JSON.stringify(s.db.query("SELECT * FROM sign_in_links").all())).not.toContain(link.t);
 
-    // A new account, with a handle from the email, and none of the owner's libraries.
-    const home = await s.anon.request("/app", { headers: withSession(secret) });
-    const html = await home.text();
-    expect(home.status).toBe(200);
-    expect(html).toContain("new.person@example.com");
-    expect(html).toContain("No libraries yet");
+    // A new account, with a handle from the email, and none of the owner's libraries: first run.
+    const home = await s.anon.request("/app", { headers: withSession(secret), redirect: "manual" });
+    expect(home.status).toBe(302);
+    expect(home.headers.get("Location")).toBe("/app/welcome");
+    expect(
+      await (await s.anon.request("/app/account", { headers: withSession(secret) })).text(),
+    ).toContain("new.person@example.com");
     expect((await s.accounts.user("new.person@example.com")).actor).toBe("human:new-person");
 
     // Opening the link again (or a scanner fetching it) shows a button; posting it again fails.
@@ -130,15 +131,27 @@ describe("magic-link sign-in (v2 spec: Accounts and sign-in)", () => {
     });
     expect(out.status).toBe(303);
     expect(out.headers.get("Set-Cookie")).toContain("Max-Age=0");
-    expect((await s.anon.request("/app", { headers: withSession(a.secret) })).status).toBe(302);
-    expect((await s.anon.request("/app", { headers: withSession(b.secret) })).status).toBe(200);
+    expect(
+      (await s.anon.request("/app/account", { headers: withSession(a.secret), redirect: "manual" }))
+        .status,
+    ).toBe(302);
+    expect(
+      (await s.anon.request("/app/account", { headers: withSession(b.secret), redirect: "manual" }))
+        .status,
+    ).toBe(200);
 
     await s.anon.request("/app/sign-out/everywhere", {
       method: "POST",
       headers: { Origin: ORIGIN, ...withSession(b.secret) },
     });
-    expect((await s.anon.request("/app", { headers: withSession(b.secret) })).status).toBe(302);
-    expect((await s.anon.request("/app", { headers: withSession(c.secret) })).status).toBe(302);
+    expect(
+      (await s.anon.request("/app/account", { headers: withSession(b.secret), redirect: "manual" }))
+        .status,
+    ).toBe(302);
+    expect(
+      (await s.anon.request("/app/account", { headers: withSession(c.secret), redirect: "manual" }))
+        .status,
+    ).toBe(302);
     // The owner's session is untouched.
     expect((await s.app.request("/app")).status).toBe(200);
   });
@@ -146,7 +159,8 @@ describe("magic-link sign-in (v2 spec: Accounts and sign-in)", () => {
   test("sessions end after 30 idle days or 90 in all; suspension ends them at once", async () => {
     const s = setup();
     const { secret } = await signIn(s, "me@example.com");
-    const ok = () => s.anon.request("/app", { headers: withSession(secret) });
+    const ok = () =>
+      s.anon.request("/app/account", { headers: withSession(secret), redirect: "manual" });
     expect((await ok()).status).toBe(200);
     s.db.run("UPDATE sessions SET idle_expires = '2000-01-01T00:00:00.000Z'");
     expect((await ok()).status).toBe(302);

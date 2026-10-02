@@ -123,6 +123,12 @@ sequence) and imports a `.tar` or `.tar.gz` as one revertible request. The **Lib
 libraries, and **Tokens** mints, lists and revokes bearer tokens. There is no editor, by design: ask an
 agent.
 
+A new account starts at `/app/welcome` (pick a handle and a first library), then lands on the
+library's **Connect** page: the MCP URL for claude.ai, the command for Claude Code, a token link for
+other clients, and a status line that shows the agent's first write. `/app/account` changes the
+handle, lists and ends sessions, and deletes the account; a library's **Delete** tab deletes one
+library. Pages are deliberately plain HTML for now.
+
 The same management is available over REST with a `human:` token (mint one for your own actor on the
 Tokens page), limited to your own libraries and tokens: `GET/POST /api/v1/libraries`, `GET/POST /api/v1/tokens` and
 `DELETE /api/v1/tokens/{id}`.

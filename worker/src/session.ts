@@ -30,7 +30,21 @@ export interface Sessions {
   end(secret: string): Promise<void>;
   /** Signs the user out everywhere. */
   endAll(userId: string): Promise<void>;
+  /** The user's live sessions, newest first; `id` is the stored hash, not the secret. */
+  list(userId: string): Promise<SessionInfo[]>;
+  /** Ends one of the user's sessions by id. */
+  endById(userId: string, id: string): Promise<void>;
 }
+
+export interface SessionInfo {
+  id: string;
+  created: string;
+  last_seen: string;
+  user_agent: string | null;
+}
+
+/** A session's id (the stored hash) from the cookie's secret, to mark "this device". */
+export const sessionId = (secret: string) => sha256Hex(secret);
 
 export const newSecret = () => bytesToHex(randomBytes(32));
 const hash = (secret: string) => sha256Hex(secret);
@@ -133,6 +147,22 @@ export function d1Sessions(db: D1Database, now = () => Date.now()): Sessions {
 
     async endAll(userId) {
       await db.prepare("DELETE FROM sessions WHERE user = ?").bind(userId).run();
+    },
+
+    async list(userId) {
+      const t = iso(now());
+      const r = await db
+        .prepare(
+          `SELECT hash AS id, created, last_seen, user_agent FROM sessions
+           WHERE user = ?1 AND idle_expires > ?2 AND expires > ?2 ORDER BY last_seen DESC`,
+        )
+        .bind(userId, t)
+        .all<SessionInfo>();
+      return r.results;
+    },
+
+    async endById(userId, id) {
+      await db.prepare("DELETE FROM sessions WHERE user = ? AND hash = ?").bind(userId, id).run();
     },
   };
 }

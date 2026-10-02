@@ -10,6 +10,9 @@ https://claude.ai/code/artifact/cea3e8c6-4161-4f53-aa6d-54093bc7ed75
 
 Read them with the Docs tools before starting on a feature. There is no markdown copy in this repo; do not add one. When implementation shows the spec is wrong, update the doc first, then the code.
 
+## UI
+Until the design pass, every page is plain HTML with browser defaults: white background, black text, blue links. No stylesheets, inline styles or scripts (the CSP has no `style-src`), and as little text as works: headings, labels, links, short sentences. Class attributes may stay as hooks for the later design pass. This applies to every page, new or old.
+
 ## Tooling
 - **bun for everything JS/TS**: installing (`bun install`, `bun add`), scripts (`bun run …`), tests (`bun test`), one-off binaries (`bunx`). Do not use npm, npx, yarn or pnpm, and do not commit other lockfiles.
 - **TypeScript only** on the server (Worker + Durable Object). No Rust or WASM in v1.
@@ -28,7 +31,7 @@ Read them with the Docs tools before starting on a feature. There is no markdown
 | `bun run seed` | Create a local user (`dev@localhost`, handle `dev`), library (`dev/dev`) and write token in the local D1; prints the token. From `worker/`, `bun run seed --slug x --actor y` for more |
 | `bun run admin` | Accounts on D1 (local, or `--remote`): `users`, `transfer --library <owner>/<slug> --to <email>`, `suspend --email <email> [--undo]` |
 | `bun run logs` | Recent events from Workers Observability via `cf observability telemetry query` (`--minutes`, `--errors`, `--json`) |
-| `bun run gate` | Gate: boots `cf dev` on fresh state (a throwaway project in `worker/.gate/`), round-trips Google's sample bundles over HTTP, renders every UI page for them (signed in by a dev magic link), runs the nightly export through the DO into local R2, checks a restore is refused cleanly (no PITR locally), signs up a second account that must see nothing of the first, and runs the MCP smoke flow; also runs in CI |
+| `bun run gate` | Gate: boots `cf dev` on fresh state (a throwaway project in `worker/.gate/`), round-trips Google's sample bundles over HTTP, renders every UI page for them (signed in by a dev magic link), runs the nightly export through the DO into local R2, checks a restore is refused cleanly (no PITR locally), signs up a second account that must see nothing of the first, has a fresh account go through first run, connect over OAuth with PKCE, write through MCP and delete its library, and runs the MCP smoke flow; also runs in CI |
 
 Binding types come from `cloudflare.config.ts`: `bun run typecheck` regenerates them with `cf workers types` into `worker/.cloudflare/types/` (gitignored). Secrets are not in the config; type them in `worker/src/env.d.ts`.
 
@@ -44,8 +47,9 @@ worker/src/tenancy.ts    authorizeLibrary: the one check that a caller may reach
 worker/src/session.ts    Magic links and sessions in D1 (hashes only), the session cookie
 worker/src/signin.ts     /app/sign-in, /app/sign-out and signedIn(); Access JWTs still accepted until the A4 cut-over
 worker/src/access.ts     Cloudflare Access JWT check (transition only; removed at A4)
+worker/src/lifecycle.ts  Deleting a library or an account: rows, grants, then the DO and R2 exports (Deps.destroyLibrary)
 worker/src/oauth/        /app/authorize consent page and /app/grants (list, revoke)
-worker/src/ui/           Built-in UI under /app/ (behind Access): routes, views, markdown-to-HTML (no raw HTML, safe URLs only)
+worker/src/ui/           Built-in UI under /app/: routes, views, account.ts (welcome, connect, account, delete), markdown-to-HTML (no raw HTML, safe URLs only)
 worker/src/client.ts     Worker <-> DO boundary: one `call` RPC, errors as data, R2 blob checks
 worker/src/library.ts    Library DO: one per OKF library, hosts the store on its SQLite; its daily alarm runs the maintainers
 worker/src/maintain.ts   Daily maintainers (nightly export to R2 with retention, usage pruning), free of Worker APIs

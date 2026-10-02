@@ -72,8 +72,7 @@ function html(body: string, status = 200, headers: Record<string, string> = {}):
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "X-Frame-Options": "DENY",
-      "Content-Security-Policy":
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+      "Content-Security-Policy": "default-src 'none'; form-action 'self'; frame-ancestors 'none'",
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
       ...headers,
@@ -88,14 +87,14 @@ function sameOrigin(c: C): boolean {
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
 
 function signInForm(next: string, opts: { email?: string; error?: string } = {}) {
-  const err = opts.error ? `<p class="panel error">${esc(opts.error)}</p>` : "";
+  const err = opts.error ? `<p><strong>${esc(opts.error)}</strong></p>` : "";
   return `<h1>Sign in to OKF</h1>
-<p class="muted">Enter your email and we will send you a link to sign in. New here? The same link creates your account.</p>
+<p>We email you a link. New here? The same link creates your account.</p>
 ${err}<form method="post" action="/app/sign-in">
 <input type="hidden" name="next" value="${esc(next)}">
-<fieldset><label class="field" for="email">Email</label>
-<input id="email" name="email" type="text" inputmode="email" autocomplete="email" required value="${esc(opts.email ?? "")}"></fieldset>
-<div class="actions"><button class="primary" type="submit">Email me a sign-in link</button></div></form>`;
+<p><label for="email">Email</label>
+<input id="email" name="email" type="text" inputmode="email" autocomplete="email" required value="${esc(opts.email ?? "")}"></p>
+<p><button type="submit">Email me a link</button></p></form>`;
 }
 
 export function registerSignInRoutes<E extends AppEnv>(
@@ -150,13 +149,13 @@ export function registerSignInRoutes<E extends AppEnv>(
         });
       } else {
         console.log(`Sign-in link for ${email}: ${link}`);
-        shown = `<p class="panel">Local dev: no email is sent. <a id="dev-link" href="${esc(link)}">Open the sign-in link</a>.</p>`;
+        shown = `<p>Local dev, no email sent: <a id="dev-link" href="${esc(link)}">sign-in link</a></p>`;
       }
     }
     // The same answer whether or not the email has an account, or has asked too often.
     return html(`<h1>Check your email</h1>
 <p>If <strong>${esc(email)}</strong> can sign in here, a link is on its way. It works once, within ${LINK_MINUTES} minutes.</p>
-<p class="muted">Nothing after a few minutes? Check spam, or <a href="/app/sign-in?next=${esc(encodeURIComponent(next))}">try again</a> a little later.</p>${shown}`);
+<p>Nothing? Check spam, or <a href="/app/sign-in?next=${esc(encodeURIComponent(next))}">try again</a> later.</p>${shown}`);
   });
 
   // Opening the link only shows a button: mail scanners that fetch links cannot use it up.
@@ -166,7 +165,7 @@ export function registerSignInRoutes<E extends AppEnv>(
     return html(`<h1>Sign in to OKF</h1><p>Continue to finish signing in on this device.</p>
 <form method="post" action="/app/sign-in/link">
 <input type="hidden" name="t" value="${esc(t)}"><input type="hidden" name="next" value="${esc(next)}">
-<div class="actions"><button class="primary" type="submit">Continue</button></div></form>`);
+<p><button type="submit">Continue</button></p></form>`);
   });
 
   app.post("/app/sign-in/link", async (c) => {

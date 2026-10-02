@@ -42,6 +42,8 @@ export interface Deps {
   maintain?: (doId: string) => Promise<unknown>;
   /** Point-in-time restore of a library, by its Durable Object name (spec: Backups and recovery). */
   recovery?: RecoveryDeps;
+  /** Wipes a library's storage: its Durable Object, R2 exports and restore records (lifecycle.ts). */
+  destroyLibrary?: (doId: string) => Promise<void>;
 }
 
 export interface RecoveryDeps {

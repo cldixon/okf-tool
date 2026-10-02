@@ -262,6 +262,41 @@ describe("OAuth for MCP clients", () => {
     expect(r.status).toBe(401);
   });
 
+  test("deleting the library, or the account, revokes its connections", async () => {
+    for (const how of ["library", "account"] as const) {
+      const { app } = setup();
+      const clientId = await register(app);
+      const flow = await begin(app, clientId);
+      const done = await submit(app, flow, approve);
+      const tokens = await exchange(
+        app,
+        clientId,
+        done.headers.get("Location") ?? "",
+        flow.verifier,
+      );
+      const [path, confirm] =
+        how === "library"
+          ? ["/app/libraries/owner/demo/delete", "demo"]
+          : ["/app/account/delete", "owner"];
+      const del = await app.request(path, {
+        method: "POST",
+        headers: { Origin: ORIGIN, "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ confirm }),
+        redirect: "manual",
+      });
+      expect(del.status).toBeLessThan(400);
+      const r = await app.request("/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      });
+      expect(r.status).toBe(401);
+    }
+  });
+
   test("bearer tokens still work on /mcp alongside OAuth", async () => {
     const { app } = setup();
     const { call } = await mcp(app, "writer");
