@@ -202,8 +202,8 @@ teaches the workflow to agents that load skills.
   `mailFrom` in `cloudflare.config.ts` (a domain onboarded for Email Sending; empty means no mailer).
   The digest address is the `OPERATOR_EMAIL` secret:
   `bunx cf workers secrets update OPERATOR_EMAIL --worker okf-service --type secret_text --text <email>`.
-- **Staging.** `bun run deploy --mode staging` deploys `okf-service-staging` with its own D1, R2 and KV,
-  once their ids are filled in under `STAGING` in `cloudflare.config.ts`.
+- **Staging.** `bun run deploy --mode staging` deploys `okf-service-staging` with its own D1, R2 and KV
+  (`STAGING` in `cloudflare.config.ts`). It has no Access in front: sign in by email link.
 - **Accounts.** `bun run admin users` lists accounts and their libraries; `bun run admin transfer
   --library <owner>/<slug> --to <email>` gives a library to another account (who has signed in
   once); `bun run admin suspend --email <email>` refuses an account's sessions and tokens (`--undo`
