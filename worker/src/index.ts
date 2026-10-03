@@ -1,10 +1,14 @@
 import { d1Accounts } from "./accounts";
+import type { Deps } from "./app";
 import { d1Authenticate } from "./auth";
 import { makeClient, r2BlobStore } from "./client";
 import type { Library } from "./library";
+import { DEFAULT_STORAGE_MB } from "./limits";
 import { exportsPrefix, listExports } from "./maintain";
 import { listRestores, RESTORE_ID, restoresPrefix } from "./recovery";
 import { d1Sessions } from "./session";
+import type { Mailer } from "./signin";
+import { d1Orphans, digestText, sweep } from "./sweep";
 import { createWorker } from "./worker";
 
 export { Library } from "./library";
@@ -18,9 +22,31 @@ function libraryStub(env: Env, name: string): DurableObjectStub<Library> {
   return ns.get(ns.idFromName(name));
 }
 
+/**
+ * Cloudflare Email Service (v2 spec: A3). The EMAIL binding exists only once a sending domain is
+ * set in cloudflare.config.ts (mailFrom); without it there is no mailer.
+ */
+type MailBinding = {
+  send(m: { from: string; to: string; subject: string; text: string }): Promise<unknown>;
+};
+
+function mailerFor(env: Env): Mailer | null {
+  const binding = (env as unknown as { EMAIL?: MailBinding }).EMAIL;
+  const from = env.MAIL_FROM;
+  if (!binding || !from) return null;
+  return {
+    async send(m) {
+      await binding.send({ from, ...m });
+    },
+  };
+}
+
+const storageLimitBytes = (env: Env) =>
+  (Number(env.LIBRARY_STORAGE_MB) || DEFAULT_STORAGE_MB) * 1048576;
+
 let authenticate: ReturnType<typeof d1Authenticate> | undefined;
 
-export default createWorker((env) => {
+const depsFor = (env: Env): Deps => {
   authenticate ??= d1Authenticate(env.DB);
   const client = (doId: string) => {
     const stub = libraryStub(env, doId);
@@ -30,8 +56,20 @@ export default createWorker((env) => {
     authenticate,
     accounts: d1Accounts(env.DB),
     sessions: d1Sessions(env.DB),
-    // No mail provider until A3 (v2 spec: Open questions); local dev uses DEV_SIGNIN=1.
-    mailer: null,
+    mailer: mailerFor(env),
+    async rateLimit(kind, key) {
+      const limiter = kind === "write" ? env.WRITE_LIMITER : env.REQUEST_LIMITER;
+      return (await limiter.limit({ key })).success;
+    },
+    meter(e) {
+      try {
+        env.USAGE.writeDataPoint({
+          blobs: [e.kind, e.account, e.library ?? ""],
+          doubles: [1, e.bytes ?? 0],
+          indexes: [e.account.slice(0, 96)],
+        });
+      } catch {}
+    },
     blobs: r2BlobStore(env.BLOBS),
     maintain: (doId) => libraryStub(env, doId).maintain(),
     async destroyLibrary(doId) {
@@ -116,4 +154,39 @@ export default createWorker((env) => {
       return row ? client(doId) : null;
     },
   };
-}) satisfies ExportedHandler<Env>;
+};
+
+const worker = createWorker(depsFor);
+
+export default {
+  fetch: worker.fetch,
+
+  /** The daily blob sweep and operator digest (v2 spec: A3); cron in cloudflare.config.ts. */
+  async scheduled(_controller, env) {
+    const result = await sweep({
+      libraries: async () =>
+        (
+          await env.DB.prepare(
+            "SELECT l.do_id AS id, COALESCE(u.handle, '?') || '/' || l.slug AS path FROM libraries l LEFT JOIN users u ON u.id = l.owner",
+          ).all<{ id: string; path: string }>()
+        ).results,
+      inventory: (id) => libraryStub(env, id).inventory(),
+      bucket: {
+        list: (o) => env.BLOBS.list(o),
+        delete: (keys) => env.BLOBS.delete(keys),
+      },
+      orphans: d1Orphans(env.DB),
+      storageLimitBytes: storageLimitBytes(env),
+      now: new Date(),
+    });
+    console.log(JSON.stringify({ sweep: result }));
+    const mailer = mailerFor(env);
+    if (result.attention.length && env.OPERATOR_EMAIL && mailer) {
+      await mailer.send({
+        to: env.OPERATOR_EMAIL,
+        subject: `OKF digest: ${result.attention.length} to look at`,
+        text: digestText(result),
+      });
+    }
+  },
+} satisfies ExportedHandler<Env>;

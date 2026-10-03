@@ -404,6 +404,11 @@ try {
   );
   for (const p of fresh) console.log(`  - ${p}`);
   if (fresh.length > 0) failed = true;
+  // The daily blob sweep and digest (v2 spec: A3), run through cf dev's scheduled handler.
+  const cron = await fetch(`${base}/cdn-cgi/handler/scheduled?cron=30+4+*+*+*`);
+  const cronOk = cron.ok;
+  console.log(`${cronOk ? "PASS" : "FAIL"} the daily sweep runs (${cron.status})`);
+  if (!cronOk) failed = true;
   const mcpOk = await mcpSmoke({ url: base, token: mcpToken });
   console.log(`${mcpOk ? "PASS" : "FAIL"} MCP smoke on an empty library`);
   if (!mcpOk) failed = true;

@@ -9,6 +9,7 @@ import {
   mediaFor,
   putBlob,
 } from "./client";
+import { registerLegalRoutes } from "./legal";
 import { registerAppRoutes } from "./oauth/routes";
 import { normalizePath, underPrefix } from "./okf/paths";
 import type { JsonObject } from "./okf/types";
@@ -19,10 +20,11 @@ import { OkfError } from "./store/errors";
 import type { ConceptContent, RequestContext, WriteOp } from "./store/store";
 import { authorizeLibrary } from "./tenancy";
 import { registerUiRoutes } from "./ui/routes";
+import { admit, type UsageDeps } from "./usage";
 import { maybeGunzip, readTar } from "./util/tar";
 
 /** What the app needs from the platform; production wires D1, the DO and R2, tests fakes. */
-export interface Deps {
+export interface Deps extends UsageDeps {
   authenticate: Authenticate;
   /** Users, libraries and tokens in D1, always scoped to one account. */
   accounts: Accounts;
@@ -190,6 +192,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     const d = deps(c.env);
     const token = await d.authenticate(bearer(c));
     await authorizeLibrary(d.accounts, { token }, c.req.param("owner"), c.req.param("lib"));
+    await admit(d, token, c.req.method !== "GET" && c.req.method !== "HEAD");
     c.set("deps", d);
     c.set("token", token);
     c.set("lib", d.library(token));
@@ -625,6 +628,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // ------------------------------------------------------------------ apps (OAuth consent)
 
   // /mcp itself is served by the OAuth provider (worker.ts), which checks tokens first.
+  registerLegalRoutes(app);
   registerSignInRoutes(app, deps);
   registerAppRoutes(app, deps);
   registerUiRoutes(app, deps);

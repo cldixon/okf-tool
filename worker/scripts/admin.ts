@@ -9,8 +9,11 @@
  *       Refuses the account's sessions and tokens without deleting anything.
  *   bun run admin users [--remote]
  *       Lists accounts with their handles and libraries.
+ *   bun run admin limits --email <email> [--set libraries=10,tokens=100] [--reset] [--remote]
+ *       Shows an account's limits, or overrides them (v2 spec: Limits; defaults in limits.ts).
  */
 import { parseArgs } from "node:util";
+import { DEFAULT_LIMITS, type Limits, limitsFrom } from "../src/limits";
 import { type CfOptions, d1Sql } from "./cf";
 
 const { values, positionals } = parseArgs({
@@ -20,6 +23,8 @@ const { values, positionals } = parseArgs({
     to: { type: "string" },
     email: { type: "string" },
     undo: { type: "boolean" },
+    set: { type: "string" },
+    reset: { type: "boolean" },
     remote: { type: "boolean" },
   },
 });
@@ -69,6 +74,27 @@ switch (positionals[0]) {
     console.log(`${values.email} ${values.undo ? "restored" : "suspended"}.`);
     break;
   }
+  case "limits": {
+    if (!values.email)
+      fail("Usage: limits --email <email> [--set libraries=10,tokens=100] [--reset]");
+    const user = await one(
+      `SELECT id, limits FROM users WHERE email = ${q(values.email.toLowerCase())}`,
+    );
+    if (!user) fail(`No account for ${values.email}.`);
+    let overrides = JSON.parse(String(user[1] ?? "{}")) as Partial<Limits>;
+    if (values.reset) overrides = {};
+    for (const pair of (values.set ?? "").split(",").filter(Boolean)) {
+      const [k, v] = pair.split("=");
+      if (!k || !(k in DEFAULT_LIMITS) || !/^\d+$/.test(v ?? "")) fail(`Bad setting ${pair}.`);
+      overrides[k as keyof Limits] = Number(v);
+    }
+    if (values.set || values.reset) {
+      const json = Object.keys(overrides).length ? q(JSON.stringify(overrides)) : "NULL";
+      await d1Sql(`UPDATE users SET limits = ${json} WHERE id = ${q(String(user[0]))}`, where);
+    }
+    console.log(JSON.stringify(limitsFrom(JSON.stringify(overrides))));
+    break;
+  }
   case "users": {
     const rows = await d1Sql(
       `SELECT u.handle, u.email, u.suspended, group_concat(l.slug, ', ')
@@ -81,5 +107,5 @@ switch (positionals[0]) {
     break;
   }
   default:
-    fail("Commands: transfer, suspend, users (see scripts/admin.ts).");
+    fail("Commands: transfer, suspend, users, limits (see scripts/admin.ts).");
 }

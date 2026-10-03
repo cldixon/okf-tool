@@ -20,6 +20,7 @@ import { sha256Hex } from "../src/okf/hash";
 import type { RestoreRecord } from "../src/recovery";
 import { d1Sessions, SESSION_COOKIE } from "../src/session";
 import { LibraryStore } from "../src/store/store";
+import type { UsageEvent } from "../src/usage";
 import { bunD1 } from "./d1";
 import { bunSqlHandle } from "./sqlite";
 
@@ -221,6 +222,8 @@ export const ORIGIN = "http://localhost";
 
 export function setup() {
   const blobs = memoryBlobs();
+  /** Storage per library; tests lower it to see the limit. */
+  const limits = { storageBytes: undefined as number | undefined };
   const stores = new Map<string, LibraryStore>();
   const clients = new Map<string, LibraryClient>();
   const clientFor = (doId: string) => {
@@ -228,7 +231,9 @@ export function setup() {
     if (!c) {
       const store = new LibraryStore(bunSqlHandle());
       stores.set(doId, store);
-      c = makeClient((method, args) => callStore(store, blobs, method, args));
+      c = makeClient((method, args) =>
+        callStore(store, blobs, method, args, { storageLimitBytes: limits.storageBytes }),
+      );
       clients.set(doId, c);
     }
     return c;
@@ -250,6 +255,8 @@ export function setup() {
   const accounts = d1Accounts(d1);
   const sessions = d1Sessions(d1);
   const outbox: { to: string; subject: string; text: string }[] = [];
+  /** Metered usage, as the Worker would write it to Analytics Engine. */
+  const usage: UsageEvent[] = [];
   // No cache, so a revocation shows at once.
   const d1Auth = d1Authenticate(d1, Date.now, 0);
   /** A session for a user, written straight to D1 (setup stays synchronous). */
@@ -355,6 +362,7 @@ export function setup() {
         outbox.push(msg);
       },
     },
+    meter: (e) => usage.push(e),
     blobs,
     library: (token) => clientFor(token.library.do_id),
     libraryByDoId: async (doId) =>
@@ -449,6 +457,8 @@ export function setup() {
     deps,
     bucket,
     pitr,
+    usage,
+    limits,
     stranger,
     sessionFor,
   };

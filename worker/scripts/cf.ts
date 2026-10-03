@@ -13,7 +13,9 @@ export const WORKER_DIR = new URL("..", import.meta.url).pathname;
 /** Where `cf dev` keeps local state (it runs the Wrangler bundler); local D1 commands use it too. */
 export const LOCAL_STATE = join(WORKER_DIR, ".wrangler/state");
 
-const resolved = await config;
+/** The deployment: OKF_MODE=staging for staging, otherwise production (cloudflare.config.ts). */
+export const MODE = process.env.OKF_MODE || undefined;
+const resolved = await config({ isPreview: false, mode: MODE });
 const worker = await resolved.worker;
 if (!worker) throw new Error("cloudflare.config.ts defines no worker.");
 

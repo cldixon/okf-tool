@@ -205,3 +205,66 @@ describe("deleting (v2 spec: A2)", () => {
     expect(await s.accounts.libraries(again.id)).toEqual([]);
   });
 });
+
+describe("changing the email (v2 spec: A3)", () => {
+  const linkIn = (text: string) => new URL(/https?:\/\/\S+/.exec(text)?.[0] ?? "");
+
+  test("a link to the new address confirms it; the old address is told", async () => {
+    const s = setup();
+    const bad = await post(s.app, "/app/account/email", { email: "nope" });
+    expect(bad.status).toBe(400);
+    const asked = await post(s.app, "/app/account/email", { email: "New@Example.org" });
+    expect(asked.status).toBe(200);
+    expect(await asked.text()).toContain("Check new@example.org for a link.");
+    const mail = s.outbox.at(-1);
+    expect(mail?.to).toBe("new@example.org");
+    const t = linkIn(mail?.text ?? "").searchParams.get("t") ?? "";
+
+    // The link cannot sign anyone in: it is for changing the email only.
+    const asSignIn = await post(s.anon, "/app/sign-in/link", { t, next: "/app" });
+    expect(asSignIn.status).toBe(400);
+    // Nor confirm for another account.
+    const stranger = await s.stranger();
+    expect((await post(stranger.app, "/app/account/email/confirm", { t })).status).toBe(400);
+
+    const page = await text(s.app.request(`/app/account/email/confirm?t=${t}`));
+    expect(page).toContain("Confirm your new email");
+    const done = await post(s.app, "/app/account/email/confirm", { t });
+    expect(done.status).toBe(200);
+    expect(await done.text()).toContain("Your email is now new@example.org.");
+    expect(s.outbox.at(-1)).toMatchObject({
+      to: "owner@example.com",
+      subject: "Your OKF email changed",
+    });
+    // The account is the same; it signs in with the new address now.
+    expect((await s.accounts.user("new@example.org")).id).toBe("user_1");
+    // A used link is spent.
+    expect((await post(s.app, "/app/account/email/confirm", { t })).status).toBe(400);
+  });
+
+  test("an address another account uses cannot be taken", async () => {
+    const s = setup();
+    await s.stranger();
+    await post(s.app, "/app/account/email", { email: "stranger@example.com" });
+    const t = linkIn(s.outbox.at(-1)?.text ?? "").searchParams.get("t") ?? "";
+    const r = await post(s.app, "/app/account/email/confirm", { t });
+    expect(r.status).toBe(409);
+    expect((await s.accounts.user("owner@example.com")).id).toBe("user_1");
+  });
+});
+
+describe("terms and privacy (v2 spec: A3)", () => {
+  test("plain public pages, linked from sign-in and the account page", async () => {
+    const s = setup();
+    for (const path of ["/terms", "/privacy"]) {
+      const r = await s.anon.request(path);
+      const html = await r.text();
+      expect(r.status).toBe(200);
+      expect(html).not.toContain("<script");
+      expect(html).not.toContain("<style");
+    }
+    expect(await text(s.anon.request("/terms"))).toContain("Draft.");
+    expect(await text(s.anon.request("/app/sign-in"))).toContain('<a href="/privacy">');
+    expect(await text(s.app.request("/app/account"))).toContain('<a href="/terms">');
+  });
+});

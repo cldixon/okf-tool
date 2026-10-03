@@ -2,6 +2,8 @@ import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { createApp, type Deps } from "./app";
 import { handleMcp } from "./mcp/server";
 import { type GrantProps, SCOPES } from "./oauth/routes";
+import { OkfError } from "./store/errors";
+import { admit, mcpWrites } from "./usage";
 
 const HOUR = 3600;
 
@@ -29,6 +31,21 @@ export function createWorker(deps: (env: Cloudflare.Env) => Deps): {
         async fetch(request, env, ctx) {
           const { token } = (ctx as unknown as { props: GrantProps }).props;
           const d = deps(env);
+          let write = false;
+          if (request.method === "POST") {
+            write = mcpWrites(
+              await request
+                .clone()
+                .json()
+                .catch(() => null),
+            );
+          }
+          try {
+            await admit(d, token, write);
+          } catch (e) {
+            if (e instanceof OkfError) return Response.json(e.toJSON(), { status: e.status });
+            throw e;
+          }
           return handleMcp(request, { token, lib: d.library(token), blobs: d.blobs, origin });
         },
       },

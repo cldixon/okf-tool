@@ -5,7 +5,7 @@ import { bundleFiles, type LibraryClient } from "../client";
 import { deleteAccount, deleteLibrary } from "../lifecycle";
 import { basename, dirname } from "../okf/paths";
 import { clearedSessionCookie, readCookie, SESSION_COOKIE, sessionId } from "../session";
-import { signedIn } from "../signin";
+import { sendLink, signedIn } from "../signin";
 import { OkfError } from "../store/errors";
 import { authorizeLibrary } from "../tenancy";
 import { maybeGunzip, readTar } from "../util/tar";
@@ -14,6 +14,7 @@ import {
   accountPage,
   connectPage,
   deleteLibraryPage,
+  emailConfirmPage,
   STARTER,
   welcomePage,
 } from "./account";
@@ -802,13 +803,23 @@ export function registerUiRoutes<E extends AppEnv>(
     return p.c.redirect("/app", 303);
   });
 
-  const account = async (p: Page, status = 200, msg: { notice?: string; error?: string } = {}) => {
+  const account = async (
+    p: Page,
+    status = 200,
+    msg: { notice?: string; error?: string; devLink?: string } = {},
+  ) => {
     const secret = readCookie(p.c.req.raw, SESSION_COOKIE);
-    const sessions = await p.deps.sessions.list(p.user.id);
+    const [sessions, usage, limits] = await Promise.all([
+      p.deps.sessions.list(p.user.id),
+      p.deps.accounts.usage(p.user.id),
+      p.deps.accounts.limits(p.user.id),
+    ]);
     const body = accountPage({
       user: p.user,
       sessions,
       current: secret ? sessionId(secret) : null,
+      usage,
+      limits,
       ...msg,
     });
     return htmlResponse(layout({ title: "Account", user: p.user.email, body }), status);
@@ -826,6 +837,62 @@ export function registerUiRoutes<E extends AppEnv>(
         return account(p, e.status, { error: e.message });
       throw e;
     }
+  });
+
+  // Changing the email: a link to the new address confirms it (v2 spec: Accounts, A3).
+  post("/app/account/email", async (p) => {
+    const email = String((await p.c.req.formData()).get("email") ?? "")
+      .trim()
+      .toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+$/.test(email) || email.length > 254) {
+      return account(p, 400, { error: "That does not look like an email address." });
+    }
+    if (email === p.user.email) return account(p, 400, { error: "That is your email already." });
+    const ip = p.c.req.header("CF-Connecting-IP") ?? null;
+    const secret = await p.deps.sessions.createLink(email, ip, { user: p.user.id });
+    if (!secret) return account(p, 429, { error: "Too many links asked for. Try again later." });
+    const link = `${new URL(p.c.req.url).origin}/app/account/email/confirm?t=${secret}`;
+    const sent = await sendLink(p.c.req.raw, p.c.env, p.deps, {
+      to: email,
+      link,
+      subject: "Confirm your new OKF email",
+      text: `Open this link to make this your OKF sign-in email:\n\n${link}\n\nIt works once, within 15 minutes. If you did not ask for it, ignore this email.\n`,
+    });
+    if (sent === null) return account(p, 502, { error: "Could not send email. Try again later." });
+    return account(p, 200, { notice: `Check ${email} for a link.`, devLink: sent || undefined });
+  });
+
+  get("/app/account/email/confirm", async (p) =>
+    show(p, "Confirm email", emailConfirmPage(p.c.req.query("t") ?? "")),
+  );
+
+  post("/app/account/email/confirm", async (p) => {
+    const t = String((await p.c.req.formData()).get("t") ?? "");
+    const link = await p.deps.sessions.consumeLink(t, "email-change", p.user.id);
+    if (!link || link.user !== p.user.id) {
+      return account(p, 400, { error: "That link has expired or is not for this account." });
+    }
+    const old = p.user.email;
+    try {
+      await p.deps.accounts.setEmail(p.user.id, link.email);
+    } catch (e) {
+      if (e instanceof OkfError && e.status < 500)
+        return account(p, e.status, { error: e.message });
+      throw e;
+    }
+    // Tell the old address, so a takeover does not go unnoticed.
+    await p.deps.mailer
+      ?.send({
+        to: old,
+        subject: "Your OKF email changed",
+        text: `Your OKF account now signs in with ${link.email}. If you did not do this, reply to this email.\n`,
+      })
+      .catch((e) =>
+        console.error(JSON.stringify({ mail_failed: "email change notice", error: String(e) })),
+      );
+    return account({ ...p, user: { ...p.user, email: link.email } }, 200, {
+      notice: `Your email is now ${link.email}.`,
+    });
   });
 
   post("/app/account/sessions/end", async (p) => {

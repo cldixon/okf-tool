@@ -19,10 +19,18 @@ const TOUCH_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
 export interface Sessions {
-  /** A new sign-in link's secret, or null when this email or IP has asked too often. */
-  createLink(email: string, ip: string | null): Promise<string | null>;
-  /** Uses up a link: its email, or null when it is unknown, used or expired. */
-  consumeLink(secret: string): Promise<string | null>;
+  /**
+   * A new link's secret, or null when this email or IP has asked too often. A link signs in, or,
+   * with purpose "email-change", confirms `email` as the new address of account `user`.
+   */
+  createLink(email: string, ip: string | null, change?: { user: string }): Promise<string | null>;
+  /** Uses up a link of that purpose: its email (and account), or null if unknown, used or expired. */
+  consumeLink(
+    secret: string,
+    purpose?: LinkPurpose,
+    /** For an email change: only this account's link is used up. */
+    user?: string,
+  ): Promise<{ email: string; user: string | null } | null>;
   /** Starts a session; returns the cookie's secret. */
   create(userId: string, userAgent: string | null): Promise<string>;
   /** The signed-in user for a cookie's secret, or null. */
@@ -35,6 +43,8 @@ export interface Sessions {
   /** Ends one of the user's sessions by id. */
   endById(userId: string, id: string): Promise<void>;
 }
+
+export type LinkPurpose = "sign-in" | "email-change";
 
 export interface SessionInfo {
   id: string;
@@ -62,7 +72,7 @@ interface SessionRow {
 
 export function d1Sessions(db: D1Database, now = () => Date.now()): Sessions {
   return {
-    async createLink(email, ip) {
+    async createLink(email, ip, change) {
       const t = now();
       const hourAgo = iso(t - 3_600_000);
       const counts = await db
@@ -80,23 +90,33 @@ export function d1Sessions(db: D1Database, now = () => Date.now()): Sessions {
         db.prepare("DELETE FROM sign_in_links WHERE created < ?").bind(iso(t - DAY_MS)),
         db
           .prepare(
-            "INSERT INTO sign_in_links (hash, email, created, expires, ip) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO sign_in_links (hash, email, created, expires, ip, purpose, user) VALUES (?, ?, ?, ?, ?, ?, ?)",
           )
-          .bind(hash(secret), email, iso(t), iso(t + LINK_MINUTES * 60_000), ip),
+          .bind(
+            hash(secret),
+            email,
+            iso(t),
+            iso(t + LINK_MINUTES * 60_000),
+            ip,
+            change ? "email-change" : "sign-in",
+            change?.user ?? null,
+          ),
       ]);
       return secret;
     },
 
-    async consumeLink(secret) {
+    async consumeLink(secret, purpose = "sign-in", user) {
       const t = iso(now());
       const row = await db
         .prepare(
           `UPDATE sign_in_links SET used = ?1
-           WHERE hash = ?2 AND used IS NULL AND expires > ?1 RETURNING email`,
+           WHERE hash = ?2 AND purpose = ?3 AND used IS NULL AND expires > ?1
+             AND (?4 IS NULL OR user = ?4)
+           RETURNING email, user`,
         )
-        .bind(t, hash(secret))
-        .first<{ email: string }>();
-      return row?.email ?? null;
+        .bind(t, hash(secret), purpose, user ?? null)
+        .first<{ email: string; user: string | null }>();
+      return row ? { email: row.email, user: row.user } : null;
     },
 
     async create(userId, userAgent) {
