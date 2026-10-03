@@ -2078,6 +2078,25 @@ export class LibraryStore {
   }
 
   /** GET /stats (spec: Observability): sizes, counts and each maintainer's cursor lag. */
+  /**
+   * Bytes the library uses against its storage limit (v2 spec: Limits): its SQLite (concepts,
+   * ledger, indexes) plus every attachment it has stored in R2.
+   */
+  storageBytes(): number {
+    const r2 =
+      this.sql.all<{ n: number | null }>(
+        "SELECT SUM(size) AS n FROM blobs WHERE location = 'r2'",
+      )[0]?.n ?? 0;
+    return (this.size ? this.size() : 0) + r2;
+  }
+
+  /** The attachment hashes this library references in R2, for the daily blob sweep. */
+  blobHashes(): string[] {
+    return this.sql
+      .all<{ hash: string }>("SELECT hash FROM blobs WHERE location = 'r2'")
+      .map((r) => r.hash);
+  }
+
   stats() {
     const one = (q: string) => this.sql.all<{ n: number }>(q)[0]?.n ?? 0;
     const seq = this.headSeq();

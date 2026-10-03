@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { type CallResult, callStore, type LibraryMethod, r2BlobStore } from "./client";
+import { DEFAULT_STORAGE_MB } from "./limits";
 import {
   DEFAULT_RETENTION_DAYS,
   type MaintenanceResult,
@@ -28,7 +29,24 @@ export class Library extends DurableObject<Env> {
   async call(method: LibraryMethod, args: unknown[]): Promise<CallResult> {
     if (this.restarting) return RESTARTING;
     if (!this.alarmChecked) await this.ensureAlarm();
-    return callStore(this.store, r2BlobStore(this.env.BLOBS), method, args);
+    const mb = Number(this.env.LIBRARY_STORAGE_MB) || DEFAULT_STORAGE_MB;
+    return callStore(this.store, r2BlobStore(this.env.BLOBS), method, args, {
+      storageLimitBytes: mb * 1048576,
+    });
+  }
+
+  /** For the daily sweep and digest: referenced attachments, storage and maintenance stats. */
+  async inventory(): Promise<{
+    hashes: string[];
+    bytes: number;
+    stats: ReturnType<LibraryStore["stats"]>;
+  }> {
+    if (this.restarting) throw new Error("The library is restarting.");
+    return {
+      hashes: this.store.blobHashes(),
+      bytes: this.store.storageBytes(),
+      stats: this.store.stats(),
+    };
   }
 
   /** For /healthz: proves the namespace answers without touching any library's state. */

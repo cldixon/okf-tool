@@ -189,6 +189,20 @@ teaches the workflow to agents that load skills.
   calls and alarms from Workers Observability (`--minutes 60`, `--errors`, `--json`);
   `bunx cf workers deployments list --worker okf-service` lists deployments. `cf` cannot stream
   live logs yet, so for a live tail run `bunx wrangler tail okf-service`.
+- **Limits.** Per account: 5 libraries and 50 active tokens (`bun run admin limits --email <email>
+  --set libraries=10` overrides). Per library: 100 MB of storage (`LIBRARY_STORAGE_MB`); past it,
+  writes get `507` but reads, deletes and moves still work. Tokens and connected apps get 60 writes a
+  minute per account and 600 requests a minute each (`429`). Usage is metered to the Analytics Engine
+  dataset `okf_usage`.
+- **Daily sweep.** At 04:30 UTC a cron asks every library which attachment files it uses and deletes
+  files no library has used for 31 days (longer than the restore window). It emails `OPERATOR_EMAIL` a
+  digest when an export is stale, maintenance is overdue, a library is over 80% full, or the sweep was
+  skipped.
+- **Email.** Sign-in links, email changes and the digest go through Cloudflare Email Service. Set
+  `mailFrom` for the deployment in `cloudflare.config.ts` once a sending domain is onboarded; until
+  then there is no mailer.
+- **Staging.** `bun run deploy --mode staging` deploys `okf-service-staging` with its own D1, R2 and KV,
+  once their ids are filled in under `STAGING` in `cloudflare.config.ts`.
 - **Accounts.** `bun run admin users` lists accounts and their libraries; `bun run admin transfer
   --library <owner>/<slug> --to <email>` gives a library to another account (who has signed in
   once); `bun run admin suspend --email <email>` refuses an account's sessions and tokens (`--undo`

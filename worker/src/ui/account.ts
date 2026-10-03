@@ -1,4 +1,5 @@
 import type { User } from "../accounts";
+import type { Limits } from "../limits";
 import type { SessionInfo } from "../session";
 import { esc, when } from "./layout";
 import type { Urls } from "./views";
@@ -69,8 +70,12 @@ export function accountPage(opts: {
   user: User;
   sessions: SessionInfo[];
   current: string | null;
+  usage: { libraries: number; tokens: number };
+  limits: Limits;
   notice?: string;
   error?: string;
+  /** Local dev: the email-change link, shown instead of mailed. */
+  devLink?: string;
 }): string {
   const { user } = opts;
   const rows = opts.sessions
@@ -87,11 +92,16 @@ export function accountPage(opts: {
     .join("");
   return `<h1>Account</h1>
 ${opts.notice ? `<p>${esc(opts.notice)}</p>` : ""}${err(opts.error)}
-<p>${esc(user.email)}</p>
+${opts.devLink ?? ""}
+<form method="post" action="/app/account/email">
+<p><label>Email <input type="text" name="email" value="${esc(user.email)}" required></label> <button type="submit">Change</button></p>
+</form>
 <form method="post" action="/app/account/handle">
 <p><label>Handle <input type="text" name="handle" value="${esc(user.handle)}" required></label> <button type="submit">Change</button></p>
 </form>
 <p>Actor: ${esc(user.actor)}</p>
+<h2>Limits</h2>
+<p>Libraries: ${opts.usage.libraries} of ${opts.limits.libraries}. Active tokens: ${opts.usage.tokens} of ${opts.limits.tokens}.</p>
 <h2>Sessions</h2>
 <table><tr><th>Started</th><th>Last seen</th><th>Device</th><th></th></tr>${rows}</table>
 <form method="post" action="/app/sign-out"><button type="submit">Sign out</button></form>
@@ -101,6 +111,15 @@ ${opts.notice ? `<p>${esc(opts.notice)}</p>` : ""}${err(opts.error)}
 <form method="post" action="/app/account/delete">
 <p><label>Type ${esc(user.handle)} to confirm <input type="text" name="confirm" autocomplete="off" required></label></p>
 <p><button type="submit">Delete account</button></p>
+</form>
+<p><a href="/terms">Terms</a> | <a href="/privacy">Privacy</a></p>`;
+}
+
+export function emailConfirmPage(t: string): string {
+  return `<h1>Confirm your new email</h1>
+<form method="post" action="/app/account/email/confirm">
+<input type="hidden" name="t" value="${esc(t)}">
+<p><button type="submit">Confirm</button></p>
 </form>`;
 }
 

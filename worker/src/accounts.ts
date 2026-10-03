@@ -1,4 +1,5 @@
 import { hashToken, newTokenSecret } from "./auth";
+import { type Limits, limitsFrom, overLimit } from "./limits";
 import { sha256Hex } from "./okf/hash";
 import { normalizeDir } from "./okf/paths";
 import { OkfError } from "./store/errors";
@@ -61,6 +62,12 @@ export interface Accounts {
   createToken(t: NewToken): Promise<{ id: string; secret: string }>;
   /** Revokes a token on one of the user's libraries; 404 for anything else. */
   revokeToken(id: string, userId: string): Promise<void>;
+  /** The account's limits: defaults with its overrides. */
+  limits(userId: string): Promise<Limits>;
+  /** What the account uses against its limits. */
+  usage(userId: string): Promise<{ libraries: number; tokens: number }>;
+  /** Moves the account to a new, confirmed email address; 409 if another account has it. */
+  setEmail(userId: string, email: string): Promise<void>;
   /** Changes the user's handle and, for future writes, their human: actor; 409 if taken. */
   setHandle(userId: string, handle: string): Promise<User>;
   /** Removes a library's rows and its tokens. Its storage is wiped separately (lifecycle.ts). */
@@ -177,6 +184,13 @@ export function handleFromEmail(email: string): string {
 export const humanActor = (handle: string) => `human:${handle}`;
 
 export function d1Accounts(db: D1Database): Accounts {
+  const limitsOf = async (userId: string) => {
+    const row = await db
+      .prepare("SELECT limits FROM users WHERE id = ?")
+      .bind(userId)
+      .first<{ limits: string | null }>();
+    return limitsFrom(row?.limits);
+  };
   const byEmail = (email: string) =>
     db
       .prepare("SELECT id, email, actor, handle FROM users WHERE email = ?")
@@ -231,15 +245,26 @@ export function d1Accounts(db: D1Database): Accounts {
     },
     async createLibrary(slugInput, owner) {
       const slug = checkSlug(slugInput);
+      const { libraries: max } = await limitsOf(owner.id);
       const id = `lib_${crypto.randomUUID()}`;
+      // The count is checked in the same statement, so two creates cannot both slip under it.
       const r = await db
         .prepare(
-          "INSERT OR IGNORE INTO libraries (id, slug, owner, visibility, created, do_id) VALUES (?, ?, ?, 'private', ?, ?)",
+          `INSERT OR IGNORE INTO libraries (id, slug, owner, visibility, created, do_id)
+           SELECT ?1, ?2, ?3, 'private', ?4, ?1
+           WHERE (SELECT COUNT(*) FROM libraries WHERE owner = ?3) < ?5`,
         )
-        .bind(id, slug, owner.id, new Date().toISOString(), id)
+        .bind(id, slug, owner.id, new Date().toISOString(), max)
         .run();
       if (!r.meta.changes) {
-        throw new OkfError(409, "library_exists", `You already have a library named ${slug}.`);
+        const exists = await db
+          .prepare("SELECT 1 AS x FROM libraries WHERE owner = ? AND slug = ?")
+          .bind(owner.id, slug)
+          .first();
+        if (exists) {
+          throw new OkfError(409, "library_exists", `You already have a library named ${slug}.`);
+        }
+        throw overLimit("libraries", max);
       }
       return { id, slug, do_id: id, owner: owner.handle };
     },
@@ -260,10 +285,19 @@ export function d1Accounts(db: D1Database): Accounts {
     async createToken(t) {
       const id = `tok_${crypto.randomUUID()}`;
       const secret = newTokenSecret();
-      await db
+      const owner = await db
+        .prepare("SELECT owner FROM libraries WHERE id = ?")
+        .bind(t.libraryId)
+        .first<{ owner: string }>();
+      if (!owner) throw new OkfError(404, "no_library", "No such library.");
+      const { tokens: max } = await limitsOf(owner.owner);
+      const r = await db
         .prepare(
           `INSERT INTO tokens (id, hash, library, actor, scope, prefix, expires, mcp_tiers, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+           WHERE (SELECT COUNT(*) FROM tokens WHERE revoked IS NULL
+                  AND (expires IS NULL OR expires > ?10)
+                  AND library IN (SELECT id FROM libraries WHERE owner = ?11)) < ?12`,
         )
         .bind(
           id,
@@ -275,9 +309,38 @@ export function d1Accounts(db: D1Database): Accounts {
           t.expires,
           t.mcpTiers,
           t.createdBy,
+          new Date().toISOString(),
+          owner.owner,
+          max,
         )
         .run();
+      if (!r.meta.changes) throw overLimit("active tokens", max);
       return { id, secret };
+    },
+    limits: limitsOf,
+    async usage(userId) {
+      const row = await db
+        .prepare(
+          `SELECT (SELECT COUNT(*) FROM libraries WHERE owner = ?1) AS libraries,
+                  (SELECT COUNT(*) FROM tokens WHERE revoked IS NULL
+                     AND (expires IS NULL OR expires > ?2)
+                     AND library IN (SELECT id FROM libraries WHERE owner = ?1)) AS tokens`,
+        )
+        .bind(userId, new Date().toISOString())
+        .first<{ libraries: number; tokens: number }>();
+      return { libraries: row?.libraries ?? 0, tokens: row?.tokens ?? 0 };
+    },
+    async setEmail(userId, email) {
+      const r = await db
+        .prepare(
+          `UPDATE users SET email = ?1 WHERE id = ?2
+           AND NOT EXISTS (SELECT 1 FROM users WHERE email = ?1 AND id != ?2)`,
+        )
+        .bind(email, userId)
+        .run();
+      if (!r.meta.changes) {
+        throw new OkfError(409, "email_taken", "Another account uses that email address.");
+      }
     },
     async revokeToken(id, userId) {
       const r = await db

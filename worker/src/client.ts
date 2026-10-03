@@ -127,15 +127,35 @@ export async function verifyBlobs(
 }
 
 /** Runs a store method, turning thrown OkfErrors into data. Shared by the DO and tests. */
+/**
+ * Calls that can add to a library, refused once it is at its storage limit. Deletes and moves
+ * always go through, so a full library can be cleared.
+ */
+function grows(method: LibraryMethod, args: unknown[]): boolean {
+  if (method === "import" || method === "revert") return true;
+  if (method !== "apply") return false;
+  const ops = (args[1] ?? []) as { op?: string }[];
+  return ops.some((o) => o.op !== "delete" && o.op !== "move");
+}
+
 export async function callStore(
   store: LibraryStore,
   blobs: BlobStore,
   method: LibraryMethod,
   args: unknown[],
+  opts: { storageLimitBytes?: number } = {},
 ): Promise<CallResult> {
   try {
     if (!LIBRARY_METHODS.includes(method)) {
       throw new OkfError(400, "bad_method", `Unknown library method ${method}.`);
+    }
+    const limit = opts.storageLimitBytes;
+    if (limit !== undefined && grows(method, args) && store.storageBytes() >= limit) {
+      throw new OkfError(
+        507,
+        "storage_full",
+        `This library is at its storage limit of ${Math.round(limit / 1048576)} MB. Delete or move content to free space.`,
+      );
     }
     await verifyBlobs(blobs, method, args);
     const fn = store[method] as unknown as (...a: unknown[]) => unknown;

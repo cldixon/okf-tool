@@ -66,6 +66,31 @@ export async function signedIn(
   return messagePage("Not signed in", "Sign in again, then retry.", 401);
 }
 
+/**
+ * Sends a link by email, or in local dev (no mailer, DEV_SIGNIN=1, loopback) logs it and returns
+ * HTML showing it on the page. Returns "" once mailed, or null when sending failed.
+ */
+export async function sendLink(
+  req: Request,
+  env: Cloudflare.Env,
+  d: Pick<Deps, "mailer" | "meter">,
+  msg: { to: string; subject: string; text: string; link: string },
+): Promise<string | null> {
+  if (!d.mailer) {
+    if (!devSignIn(req, env)) return null;
+    console.log(`Link for ${msg.to}: ${msg.link}`);
+    return `<p>Local dev, no email sent: <a id="dev-link" href="${esc(msg.link)}">link</a></p>`;
+  }
+  try {
+    await d.mailer.send({ to: msg.to, subject: msg.subject, text: msg.text });
+    d.meter?.({ kind: "email", account: msg.to });
+    return "";
+  } catch (e) {
+    console.error(JSON.stringify({ mail_failed: msg.subject, error: String(e) }));
+    return null;
+  }
+}
+
 function html(body: string, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(page("Sign in", body), {
     status,
@@ -94,7 +119,8 @@ ${err}<form method="post" action="/app/sign-in">
 <input type="hidden" name="next" value="${esc(next)}">
 <p><label for="email">Email</label>
 <input id="email" name="email" type="text" inputmode="email" autocomplete="email" required value="${esc(opts.email ?? "")}"></p>
-<p><button type="submit">Email me a link</button></p></form>`;
+<p><button type="submit">Email me a link</button></p></form>
+<p><a href="/terms">Terms</a> | <a href="/privacy">Privacy</a></p>`;
 }
 
 export function registerSignInRoutes<E extends AppEnv>(
@@ -141,16 +167,16 @@ export function registerSignInRoutes<E extends AppEnv>(
     if (secret) {
       const origin = new URL(c.req.url).origin;
       const link = `${origin}/app/sign-in/link?t=${secret}&next=${encodeURIComponent(next)}`;
-      if (d.mailer) {
-        await d.mailer.send({
-          to: email,
-          subject: "Your OKF sign-in link",
-          text: `Open this link to sign in to OKF:\n\n${link}\n\nIt works once, within ${LINK_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
-        });
-      } else {
-        console.log(`Sign-in link for ${email}: ${link}`);
-        shown = `<p>Local dev, no email sent: <a id="dev-link" href="${esc(link)}">sign-in link</a></p>`;
+      const sent = await sendLink(c.req.raw, c.env, d, {
+        to: email,
+        link,
+        subject: "Your OKF sign-in link",
+        text: `Open this link to sign in to OKF:\n\n${link}\n\nIt works once, within ${LINK_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
+      });
+      if (sent === null) {
+        return html("<h1>Could not send email</h1><p>Try again in a few minutes.</p>", 502);
       }
+      shown = sent;
     }
     // The same answer whether or not the email has an account, or has asked too often.
     return html(`<h1>Check your email</h1>
@@ -174,7 +200,7 @@ export function registerSignInRoutes<E extends AppEnv>(
     const d = deps(c.env);
     const form = await c.req.formData();
     const next = safeNext(String(form.get("next") ?? ""));
-    const email = await d.sessions.consumeLink(String(form.get("t") ?? ""));
+    const email = (await d.sessions.consumeLink(String(form.get("t") ?? "")))?.email;
     if (!email) {
       return html(
         `<h1>This link has expired</h1><p>Sign-in links work once, within ${LINK_MINUTES} minutes.</p><p><a href="/app/sign-in?next=${esc(encodeURIComponent(next))}">Get a new link</a></p>`,
