@@ -885,7 +885,7 @@ export function registerUiRoutes<E extends AppEnv>(
       ?.send({
         to: old,
         subject: "Your OKF email changed",
-        text: `Your OKF account now signs in with ${link.email}. If you did not do this, reply to this email.\n`,
+        text: `Your OKF account now signs in with ${link.email}.\n`,
       })
       .catch((e) =>
         console.error(JSON.stringify({ mail_failed: "email change notice", error: String(e) })),
