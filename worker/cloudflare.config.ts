@@ -29,13 +29,13 @@ const PRODUCTION: Deployment = {
   mailFrom: "noreply@mail.tempra.dev",
 };
 
-/** Not created yet: the resources need the operator's go-ahead (see README, Staging). */
+/** Staging: no Cloudflare Access, so sign-in is by email link only (v2 spec: Operations). */
 const STAGING: Deployment = {
   name: "okf-service-staging",
-  d1: { name: "okf-accounts-staging", id: "" },
+  d1: { name: "okf-accounts-staging", id: "e158a54a-c209-48d6-9265-9a688cffedb8" },
   r2: "okf-blobs-staging",
-  kv: "",
-  mailFrom: "",
+  kv: "f205ae5ac0af4c3aa1f3a8848ff903f5",
+  mailFrom: "noreply@mail.tempra.dev",
 };
 
 export default defineConfig(({ mode }) => {
