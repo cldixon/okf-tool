@@ -198,9 +198,10 @@ teaches the workflow to agents that load skills.
   files no library has used for 31 days (longer than the restore window). It emails `OPERATOR_EMAIL` a
   digest when an export is stale, maintenance is overdue, a library is over 80% full, or the sweep was
   skipped.
-- **Email.** Sign-in links, email changes and the digest go through Cloudflare Email Service. Set
-  `mailFrom` for the deployment in `cloudflare.config.ts` once a sending domain is onboarded; until
-  then there is no mailer.
+- **Email.** Sign-in links, email changes and the digest go through Cloudflare Email Service, from
+  `mailFrom` in `cloudflare.config.ts` (a domain onboarded for Email Sending; empty means no mailer).
+  The digest address is the `OPERATOR_EMAIL` secret:
+  `bunx cf workers secrets update OPERATOR_EMAIL --worker okf-service --type secret_text --text <email>`.
 - **Staging.** `bun run deploy --mode staging` deploys `okf-service-staging` with its own D1, R2 and KV,
   once their ids are filled in under `STAGING` in `cloudflare.config.ts`.
 - **Accounts.** `bun run admin users` lists accounts and their libraries; `bun run admin transfer

@@ -9,6 +9,8 @@ interface AuthEnv {
   ACCESS_TEAM_DOMAIN?: string;
   /** The audience tag of the Access application covering /app/* (secret). */
   ACCESS_AUD?: string;
+  /** Where the daily digest goes (secret, so the address stays out of the repository). */
+  OPERATOR_EMAIL?: string;
   /** Local dev and the gate: "1" shows sign-in links on the page (loopback hosts only). */
   DEV_SIGNIN?: string;
   /** Injected by the OAuth provider into the default handler's env. */

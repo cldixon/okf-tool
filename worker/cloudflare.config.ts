@@ -25,7 +25,8 @@ const PRODUCTION: Deployment = {
   d1: { name: "okf-accounts", id: "c36c4e44-2d34-4053-9fee-3ac7f1ad6c0c" },
   r2: "okf-blobs",
   kv: "0b8fe9060b9645749d11d6083793295a",
-  mailFrom: "",
+  // mail.tempra.dev is onboarded for Cloudflare Email Sending.
+  mailFrom: "noreply@mail.tempra.dev",
 };
 
 /** Not created yet: the resources need the operator's go-ahead (see README, Staging). */
@@ -93,8 +94,7 @@ export default defineConfig(({ mode }) => {
         // Metering: one data point per request, write and email (v2 spec: Metering).
         USAGE: bindings.analyticsEngineDataset({ name: "okf_usage" }),
 
-        // Where the daily digest goes; empty sends none.
-        OPERATOR_EMAIL: bindings.text(""),
+        // The daily digest goes to OPERATOR_EMAIL, a secret (typed in src/env.d.ts); unset sends none.
         MAIL_FROM: bindings.text(d.mailFrom),
         ...(d.mailFrom
           ? { EMAIL: bindings.sendEmail({ allowedSenderAddresses: [d.mailFrom] }) }

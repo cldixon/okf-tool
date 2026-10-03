@@ -76,7 +76,8 @@ export async function sendLink(
   d: Pick<Deps, "mailer" | "meter">,
   msg: { to: string; subject: string; text: string; link: string },
 ): Promise<string | null> {
-  if (!d.mailer) {
+  // Local dev shows the link even when a mailer is bound, so nothing real is sent from cf dev.
+  if (!d.mailer || devSignIn(req, env)) {
     if (!devSignIn(req, env)) return null;
     console.log(`Link for ${msg.to}: ${msg.link}`);
     return `<p>Local dev, no email sent: <a id="dev-link" href="${esc(msg.link)}">link</a></p>`;
