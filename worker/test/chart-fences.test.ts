@@ -262,7 +262,7 @@ describe("Vega-Lite fences (TEMPRA-207)", () => {
     expect(svg).toContain("<path");
     // The href encoding's link is taken out; the dark theme's ground is drawn.
     expect(svg).not.toContain("example.com");
-    expect(svg).toContain("#1b1b1d");
+    expect(svg).toContain("#1d1d1f");
     await expect(
       chartSvg(JSON.stringify({ data: { url: "/x.csv" }, mark: "bar" }), "light", 0),
     ).rejects.toThrow("not made inline");

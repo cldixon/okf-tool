@@ -204,7 +204,7 @@ describe("SVG fences (TEMPRA-206)", () => {
       0,
     );
     expect(plain).toStartWith(
-      `<svg width="20" height="10" color="#1a1a1b" font-family="${attr(FONT)}"`,
+      `<svg width="20" height="10" color="#161618" font-family="${attr(FONT)}"`,
     );
     expect(FONT).toStartWith('"Inter"');
     const own = svgFigure(

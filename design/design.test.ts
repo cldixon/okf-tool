@@ -87,7 +87,7 @@ test("every --tempra-* a stylesheet reads is defined", () => {
 // Two tiers: the palette's primitives hold the raw colours, the colour roles point at them, and
 // only tokens.css reads a primitive, so a theme or the palette changes in one place.
 const PRIMITIVE =
-  /^--tempra-(white|black|grey-(warm|cool)|orange|blue|aqua|yellow|magenta|green|violet|red)(-|$)/;
+  /^--tempra-(white|black|grey|orange|blue|aqua|yellow|magenta|green|violet|red)(-|$)/;
 
 test("colour roles point at palette primitives, never at raw values", () => {
   const tokens = readFileSync(join(import.meta.dir, "src", "tokens.css"), "utf8").replace(
