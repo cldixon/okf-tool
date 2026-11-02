@@ -1,8 +1,11 @@
 /*
- * Tempra design tokens: the one place values live (TEMPRA-8). Every name is
- * --tempra-<group>-<name>: color, focus, font, text (sizes), weight, leading, measure, space,
- * size, radius, motion, shadow. Take 2 of the design (TEMPRA-53, design/handoff/layout-take-2)
- * set structure and type: neutral greys, a type scale, radii and one soft shadow. Take 3
+ * Tempra design tokens: the one place values live (TEMPRA-8). Two tiers: the palette's
+ * primitives (--tempra-white, --tempra-grey-warm-*, --tempra-grey-cool-*, --tempra-orange-* and
+ * the chart hues), raw values that only this file reads, and the roles every stylesheet uses, each
+ * named --tempra-<group>-<name>: color, focus, font, text (sizes), weight, leading, measure, space,
+ * size, radius, motion, shadow. A colour role is light-dark() over two primitives. Take 2 of the
+ * design (TEMPRA-53, design/handoff/layout-take-2) set structure and type: neutral greys, a type
+ * scale, radii and one soft shadow. Take 3
  * (TEMPRA-106) set the frame's sizes and squarer corners, and take 4 (TEMPRA-113,
  * design/handoff/layout-take-4) the top bar, the wider sidebar and the panel. The one colour before
  * the palette is the agent's: the change dot that pulses while an agent writes, and its ink. The
@@ -18,23 +21,95 @@
 :root {
   color-scheme: light dark;
 
+  /* Palette: the primitives (TEMPRA-251), one tier below the colours. Raw values with
+     no role, each named by its family and its OKLCH lightness x1000, as the space scale is named by
+     its px: --tempra-grey-warm-964 is #f3f3f1 at L 0.964. Only the colour tokens below read them;
+     a stylesheet never does (design.test.ts), so a theme or the palette (TEMPRA-1) changes which
+     primitive a role points at, here, and nothing else. Two greys: warm (hue about 107) for the
+     light scheme's surfaces and lines, cool (hue 286) for ink and the dark scheme's surfaces. Each
+     value the colours used is kept exactly, near twins included (cool-287 and cool-286, cool-601
+     and cool-594); folding them into a ramp is the palette's call. */
+  --tempra-white: #ffffff;
+
+  /* Palette: warm greys */
+  --tempra-grey-warm-964: #f3f3f1;
+  --tempra-grey-warm-951: #efefeb;
+  --tempra-grey-warm-943: #ececea;
+  --tempra-grey-warm-933: #e9e9e6;
+  --tempra-grey-warm-930: #e8e8e4;
+  --tempra-grey-warm-909: #e1e1dd;
+  --tempra-grey-warm-899: #dededa;
+  --tempra-grey-warm-893: #dcdcd6;
+  --tempra-grey-warm-863: #d2d2ce;
+
+  /* Palette: cool greys */
+  --tempra-grey-cool-717: #a3a3a7;
+  --tempra-grey-cool-687: #9a9a9e;
+  --tempra-grey-cool-635: #8a8a8e;
+  --tempra-grey-cool-601: #808084;
+  --tempra-grey-cool-594: #7e7e82;
+  --tempra-grey-cool-519: #68686c;
+  --tempra-grey-cool-494: #616165;
+  --tempra-grey-cool-358: #3c3c40;
+  --tempra-grey-cool-350: #3a3a3d;
+  --tempra-grey-cool-342: #38383c;
+  --tempra-grey-cool-287: #2a2a2e;
+  --tempra-grey-cool-286: #2a2a2d;
+  --tempra-grey-cool-253: #222225;
+  --tempra-grey-cool-223: #1b1b1d;
+  --tempra-grey-cool-218: #1a1a1b;
+  --tempra-grey-cool-183: #121214;
+  --tempra-grey-cool-164: #0e0e0f;
+  --tempra-grey-cool-145: #0a0a0b;
+
+  /* Palette: orange, the agent's (and the chart's second series) */
+  --tempra-orange-728: #f0884a;
+  --tempra-orange-680: #e8722a;
+  --tempra-orange-671: #eb6834;
+  --tempra-orange-622: #d95926;
+  --tempra-orange-509: #9e4a1a;
+
+  /* Palette: the chart series' other hues (TEMPRA-217), a light and a dark step each */
+  --tempra-blue-622: #3987e5;
+  --tempra-blue-575: #2a78d6;
+  --tempra-aqua-669: #1baf7a;
+  --tempra-aqua-621: #199e70;
+  --tempra-yellow-764: #eda100;
+  --tempra-yellow-670: #c98500;
+  --tempra-magenta-716: #e87ba4;
+  --tempra-magenta-622: #d55181;
+  --tempra-green-529: #008300;
+  --tempra-violet-670: #9085e9;
+  --tempra-violet-527: #6250d6;
+  --tempra-red-669: #e66767;
+  --tempra-red-623: #e34948;
+
   /* Color: surfaces */
-  --tempra-color-bg: light-dark(#ffffff, #1b1b1d); /* the page, panels, pills */
-  --tempra-color-ground: light-dark(#f3f3f1, #121214); /* the page under them, inset fills */
-  --tempra-color-hover: light-dark(#e9e9e6, #222225);
-  --tempra-color-selected: light-dark(#e1e1dd, #2a2a2e);
-  --tempra-color-selection: light-dark(#dededa, #3a3a3d);
+  --tempra-color-bg: light-dark(
+    var(--tempra-white),
+    var(--tempra-grey-cool-223)
+  ); /* the page, panels, pills */
+  --tempra-color-ground: light-dark(
+    var(--tempra-grey-warm-964),
+    var(--tempra-grey-cool-183)
+  ); /* the page under them, inset fills */
+  --tempra-color-hover: light-dark(var(--tempra-grey-warm-933), var(--tempra-grey-cool-253));
+  --tempra-color-selected: light-dark(var(--tempra-grey-warm-909), var(--tempra-grey-cool-287));
+  --tempra-color-selection: light-dark(var(--tempra-grey-warm-899), var(--tempra-grey-cool-350));
 
   /* Color: text, in three steps. Text people read is text or muted, at least 4.5:1 on every
      surface in light and dark (TEMPRA-132; design/contrast.test.ts). Faint is under that: icons,
      rules and disabled controls only, never words. */
-  --tempra-color-text: light-dark(#1a1a1b, #ececea);
-  --tempra-color-muted: light-dark(#616165, #9a9a9e);
-  --tempra-color-faint: light-dark(#a3a3a7, #68686c);
+  --tempra-color-text: light-dark(var(--tempra-grey-cool-218), var(--tempra-grey-warm-943));
+  --tempra-color-muted: light-dark(var(--tempra-grey-cool-494), var(--tempra-grey-cool-687));
+  --tempra-color-faint: light-dark(var(--tempra-grey-cool-717), var(--tempra-grey-cool-519));
 
   /* Color: lines */
-  --tempra-color-border: light-dark(#e8e8e4, #2a2a2d);
-  --tempra-color-border-strong: light-dark(#d2d2ce, #3c3c40);
+  --tempra-color-border: light-dark(var(--tempra-grey-warm-930), var(--tempra-grey-cool-286));
+  --tempra-color-border-strong: light-dark(
+    var(--tempra-grey-warm-863),
+    var(--tempra-grey-cool-358)
+  );
 
   /* Focus (TEMPRA-132): a 2px ring in the text colour on every control focused by keyboard
      (:focus-visible), until the palette (TEMPRA-1) designs its own. A field's ring sits closer. */
@@ -44,22 +119,25 @@
 
   /* Color: the agent's (the only colour before the palette): the change dot, pulsing while an
      agent writes now (take 4), and Tempra's own agent's round mark */
-  --tempra-color-agent: light-dark(#e8722a, #f0884a);
+  --tempra-color-agent: light-dark(var(--tempra-orange-680), var(--tempra-orange-728));
   /* The same colour deep enough to sit in words (TEMPRA-219): the highlight that moves across
      the name of a file an agent is at now, and its static mark under reduced motion. At least
      4.5:1 on every surface, as text is (design/contrast.test.ts). */
-  --tempra-color-agent-ink: light-dark(#9e4a1a, #f0884a);
+  --tempra-color-agent-ink: light-dark(var(--tempra-orange-509), var(--tempra-orange-728));
   /* A letter on the agent colour: Tempra's own agent's round mark (TEMPRA-223). Dark in both
      schemes, at least 4.5:1 on the colour (design/contrast.test.ts). */
-  --tempra-color-on-agent: light-dark(#1a1a1b, #1a1a1b);
+  --tempra-color-on-agent: light-dark(var(--tempra-grey-cool-218), var(--tempra-grey-cool-218));
 
   /* Color: commented text in a concept's body (TEMPRA-223), greys only: an open thread's quote on
      a soft fill over a solid mid-grey underline, the thread in focus on a deeper fill with an ink
      underline. Text keeps at least 4.5:1 on both fills, and the underline 3:1 on the soft fill
      and the page (design/contrast.test.ts). */
-  --tempra-color-comment: light-dark(#efefeb, #2a2a2e);
-  --tempra-color-comment-active: light-dark(#dcdcd6, #38383c);
-  --tempra-color-comment-line: light-dark(#7e7e82, #808084);
+  --tempra-color-comment: light-dark(var(--tempra-grey-warm-951), var(--tempra-grey-cool-287));
+  --tempra-color-comment-active: light-dark(
+    var(--tempra-grey-warm-893),
+    var(--tempra-grey-cool-342)
+  );
+  --tempra-color-comment-line: light-dark(var(--tempra-grey-cool-594), var(--tempra-grey-cool-601));
 
   /* Color: chart series (TEMPRA-217). The agreed exception to "no colour until the palette"
      besides the agent's, for a Vega-Lite chart's series and categories only: greys cannot tell
@@ -68,21 +146,33 @@
      pairs apart under protanopia and deuteranopia, every pair apart to normal vision; three light
      steps sit under 3:1 on white, so a chart keeps its legend (design/contrast.test.ts). The
      palette (TEMPRA-1) may replace them. */
-  --tempra-color-chart-1: light-dark(#2a78d6, #3987e5); /* blue */
-  --tempra-color-chart-2: light-dark(#eb6834, #d95926); /* orange */
-  --tempra-color-chart-3: light-dark(#1baf7a, #199e70); /* aqua */
-  --tempra-color-chart-4: light-dark(#eda100, #c98500); /* yellow */
-  --tempra-color-chart-5: light-dark(#e87ba4, #d55181); /* magenta */
-  --tempra-color-chart-6: light-dark(#008300, #008300); /* green */
-  --tempra-color-chart-7: light-dark(#6250d6, #9085e9); /* violet */
-  --tempra-color-chart-8: light-dark(#e34948, #e66767); /* red */
+  --tempra-color-chart-1: light-dark(var(--tempra-blue-575), var(--tempra-blue-622)); /* blue */
+  --tempra-color-chart-2: light-dark(
+    var(--tempra-orange-671),
+    var(--tempra-orange-622)
+  ); /* orange */
+  --tempra-color-chart-3: light-dark(var(--tempra-aqua-669), var(--tempra-aqua-621)); /* aqua */
+  --tempra-color-chart-4: light-dark(
+    var(--tempra-yellow-764),
+    var(--tempra-yellow-670)
+  ); /* yellow */
+  --tempra-color-chart-5: light-dark(
+    var(--tempra-magenta-716),
+    var(--tempra-magenta-622)
+  ); /* magenta */
+  --tempra-color-chart-6: light-dark(var(--tempra-green-529), var(--tempra-green-529)); /* green */
+  --tempra-color-chart-7: light-dark(
+    var(--tempra-violet-527),
+    var(--tempra-violet-670)
+  ); /* violet */
+  --tempra-color-chart-8: light-dark(var(--tempra-red-623), var(--tempra-red-669)); /* red */
 
   /* Color: a dimmed page behind an overlaid panel, the phone's drawer or sheet, or a dialog */
   --tempra-color-scrim: light-dark(rgb(20 20 22 / 0.2), rgb(0 0 0 / 0.5));
 
   /* Color: the dark frame an attachment is shown on (take 4, board 28), and a mark on it */
-  --tempra-color-frame: light-dark(#0e0e0f, #0a0a0b);
-  --tempra-color-frame-ink: light-dark(#8a8a8e, #8a8a8e);
+  --tempra-color-frame: light-dark(var(--tempra-grey-cool-164), var(--tempra-grey-cool-145));
+  --tempra-color-frame-ink: light-dark(var(--tempra-grey-cool-635), var(--tempra-grey-cool-635));
 
   /* Color: links are text, underlined in running text (no colour until the palette) */
   --tempra-color-link: var(--tempra-color-text);

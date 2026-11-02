@@ -83,3 +83,46 @@ test("every --tempra-* a stylesheet reads is defined", () => {
     }
   }
 });
+
+// Two tiers: the palette's primitives hold the raw colours, the colour roles point at them, and
+// only tokens.css reads a primitive, so a theme or the palette changes in one place.
+const PRIMITIVE =
+  /^--tempra-(white|black|grey-(warm|cool)|orange|blue|aqua|yellow|magenta|green|violet|red)(-|$)/;
+
+test("colour roles point at palette primitives, never at raw values", () => {
+  const tokens = readFileSync(join(import.meta.dir, "src", "tokens.css"), "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  for (const [, name, value] of tokens.matchAll(/^\s*(--tempra-[a-z0-9-]+):\s*([^;]+);/gm)) {
+    const n = name as string;
+    const v = value as string;
+    if (PRIMITIVE.test(n)) {
+      expect(v, `${n} is a raw colour`).toMatch(/^#[0-9a-f]{6}$/);
+    } else if (n.startsWith("--tempra-color-") && /light-dark\(/.test(v)) {
+      // The scrim's and the shadow's see-through blacks stay literal until the palette.
+      if (n === "--tempra-color-scrim") continue;
+      expect(v, `${n} names a raw colour`).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(|hsl\(|oklch\(/i);
+    }
+  }
+});
+
+test("only tokens.css reads a palette primitive", () => {
+  const src = (f: string) => readFileSync(join(import.meta.dir, "src", f), "utf8");
+  for (const f of [
+    "fonts.css",
+    "base.css",
+    "prose.css",
+    "reader.css",
+    "workspace.css",
+    "concept.css",
+    "comments.css",
+    "views.css",
+    "public.css",
+    "panel.css",
+  ]) {
+    for (const [, name] of src(f).matchAll(/var\((--tempra-[a-z0-9-]+)/g)) {
+      expect(PRIMITIVE.test(name as string), `${f} reads the primitive ${name}`).toBe(false);
+    }
+  }
+});

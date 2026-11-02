@@ -8,13 +8,23 @@ import { join } from "node:path";
 
 const tokens = readFileSync(join(import.meta.dir, "src", "tokens.css"), "utf8");
 
-/** A token's light and dark values, from `--name: light-dark(#light, #dark)`. */
+/** A palette primitive's value, from `--tempra-<name>: #hex;`. */
+function primitive(name: string): string {
+  const m = tokens.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`, "i"));
+  if (!m) throw new Error(`no palette value for --${name}`);
+  return m[1] as string;
+}
+
+/** A colour token's light and dark values, from `--name: light-dark(var(--a), var(--b))`. */
 function pair(name: string): [string, string] {
   const m = tokens.match(
-    new RegExp(`--tempra-${name}:\\s*light-dark\\((#[0-9a-f]{6}),\\s*(#[0-9a-f]{6})\\)`, "i"),
+    new RegExp(
+      `--tempra-${name}:\\s*light-dark\\(\\s*var\\((--[a-z0-9-]+)\\),\\s*var\\((--[a-z0-9-]+)\\)\\s*\\)`,
+      "i",
+    ),
   );
   if (!m) throw new Error(`no light-dark() colour for --tempra-${name}`);
-  return [m[1] as string, m[2] as string];
+  return [primitive((m[1] as string).slice(2)), primitive((m[2] as string).slice(2))];
 }
 
 function luminance(hex: string): number {
