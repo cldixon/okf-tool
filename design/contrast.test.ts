@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Text people read meets WCAG AA (4.5:1) in light and dark (TEMPRA-132, X-5): the text and muted
-// greys on every surface text sits on. Faint is for icons and rules only, so it is not held to it;
-// the focus ring is the text colour, so it has the text's contrast.
+// greys on every surface text sits on. Faint is for icons and rules only, so it is not held to it.
+// The focus ring and the agent's dot are seen, not read: 3:1 (WCAG 1.4.11, 2.4.13).
 
 const tokens = readFileSync(join(import.meta.dir, "src", "tokens.css"), "utf8");
 
@@ -98,9 +98,23 @@ describe("text contrast (WCAG AA)", () => {
     });
   }
 
-  test("the focus ring is the text colour", () => {
-    expect(tokens).toMatch(/--tempra-focus-ring:[^;]*var\(--tempra-color-text\)/);
+  // The focus ring (TEMPRA-1, the palette's blue) and the agent's change dot: 3:1 on every
+  // surface they can sit on, and the ring on a text selection too.
+  test("the focus ring is the focus colour", () => {
+    expect(tokens).toMatch(/--tempra-focus-ring:[^;]*var\(--tempra-color-focus\)/);
   });
+  for (const [mode, i] of Object.entries(scheme)) {
+    for (const surface of [...surfaces, "color-selection"]) {
+      test(`color-focus on ${surface}, ${mode}: at least 3:1`, () => {
+        expect(contrast(pair("color-focus")[i], pair(surface)[i])).toBeGreaterThanOrEqual(3);
+      });
+    }
+    for (const surface of surfaces) {
+      test(`color-agent on ${surface}, ${mode}: at least 3:1`, () => {
+        expect(contrast(pair("color-agent")[i], pair(surface)[i])).toBeGreaterThanOrEqual(3);
+      });
+    }
+  }
 });
 
 // Chart series (TEMPRA-217): the one set of colours beside the change dot, for a chart's series.
