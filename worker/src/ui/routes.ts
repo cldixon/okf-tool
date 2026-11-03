@@ -12,7 +12,7 @@ import { basename, dirname } from "../okf/paths";
 import { fromThisSite } from "../origin";
 import { byteRange } from "../range";
 import { LINK_MINUTES, readCookie, SESSION_COOKIE } from "../session";
-import { signedIn, signedInTo } from "../signin";
+import { devSignIn, signedIn, signedInTo } from "../signin";
 import { OkfError } from "../store/errors";
 import {
   type Authorized,
@@ -384,6 +384,13 @@ export function registerUiRoutes<E extends AppEnv>(
   for (const path of ["/welcome", "/agents", "/account", "/invitations"]) {
     get(path, shell);
   }
+  // The design components' catalogue (TEMPRA-252), for local dev only: a 404 everywhere else,
+  // before sign-in is asked for.
+  app.get("/_dev/design", async (c, next) => {
+    if (!devSignIn(c.req.raw, c.env)) throw new OkfError(404, "no_route", "No such route.");
+    await next();
+  });
+  get("/_dev/design", shell);
   // There is no Inbox page (TEMPRA-189): notifications are the bell's panel, on every page.
   app.get("/inbox", (c) => c.redirect("/", 302));
   // Email settings are one switch on the Account page (TEMPRA-189).

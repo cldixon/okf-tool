@@ -228,6 +228,19 @@ describe("the app's pages (TEMPRA-9)", () => {
   });
 });
 
+describe("the design components' catalogue (TEMPRA-252)", () => {
+  test("/_dev/design is the app's shell in local dev only, a 404 everywhere else", async () => {
+    const s = setup();
+    expect((await page(s, "/_dev/design")).status).toBe(404);
+    expect((await s.anon.request("/_dev/design")).status).toBe(404);
+    Object.assign(s.env, { DEV_SIGNIN: "1" });
+    const r = await page(s, "/_dev/design");
+    expect(r.status).toBe(200);
+    expect(r.html).toContain('<div id="root"></div>');
+    expect((await s.app.request("https://app.example.com/_dev/design")).status).toBe(404);
+  });
+});
+
 describe("Activity's Download (TEMPRA-115)", () => {
   test("the ledger as JSON lines, every event in order, as a download", async () => {
     const s = setup();
