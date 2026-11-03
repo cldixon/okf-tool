@@ -1354,7 +1354,9 @@ details > summary {
 .concept .prose figure.figure-wide {
   --figure-reach: min(
     var(--tempra-size-figure-wide),
-    var(--figure-column) - var(--doc-pad) - var(--doc-end)
+    var(--figure-column) -
+    var(--doc-pad) -
+    var(--doc-end)
   );
 }
 
