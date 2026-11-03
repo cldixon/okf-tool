@@ -21,7 +21,7 @@ export interface MailDeps {
   notifications: Notifications;
   /** Where the batches go: MAIL_QUEUE (TEMPRA-89), whose consumer sends and meters them. */
   outbox: Outbox | null;
-  /** The app's origin for links: https://app.tempra.dev. */
+  /** The app's origin for links: https://tempra.dev. */
   origin: string;
   now: Date;
 }

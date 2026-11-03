@@ -1,6 +1,8 @@
 /**
- * The tempra-site Worker: serves the static build (dist/) through the ASSETS binding, redirects
- * www.tempra.dev to the apex, and adds security headers. Nothing else runs here.
+ * The tempra-site Worker: serves the static build (dist/) through the ASSETS binding and adds
+ * security headers. Nothing else runs here. It has no host of its own since TEMPRA-276: the app's
+ * Worker owns tempra.dev (and redirects www) and asks this one, through its SITE service binding,
+ * for `/` when nobody is signed in and for the site's own paths.
  */
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -18,11 +20,6 @@ const SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.hostname === "www.tempra.dev") {
-      url.hostname = "tempra.dev";
-      return Response.redirect(url.toString(), 301);
-    }
     const asset = await env.ASSETS.fetch(request);
     const response = new Response(asset.body, asset);
     for (const [name, value] of Object.entries(HEADERS)) response.headers.set(name, value);

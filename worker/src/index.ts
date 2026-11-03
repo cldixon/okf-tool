@@ -9,6 +9,7 @@ import { agentSpendThisMonth } from "./costs";
 import { routedDb, withD1Session } from "./d1session";
 import { type Caller, callerOf, FEED_SOCKETS_PER_ACCOUNT } from "./feed";
 import { deleteVariants, imagesService, r2VariantCache } from "./images";
+import type { SiteService } from "./legal";
 import { type Library, refuseFeed } from "./library";
 import { healthDigest } from "./library-health";
 import { d1SentLog, handleMailMessage, type MailJob, type Outbox, queueOutbox } from "./mail-queue";
@@ -192,6 +193,7 @@ const depsFor = (env: Env): Deps => {
     },
     meter,
     // Not bound in local dev (cloudflare.config.ts): every render answers "render unavailable".
+    site: (env as unknown as { SITE?: SiteService }).SITE ?? null,
     renderDiagram: serviceRenderer((env as unknown as { RENDER?: RenderService }).RENDER, meter),
     posterFrame: servicePoster((env as unknown as { RENDER?: RenderService }).RENDER, meter),
     // Each blob put is recorded in D1 first, so the sweep never lists the bucket (TEMPRA-81).

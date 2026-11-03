@@ -1,5 +1,7 @@
 // The landing page at tempra.dev (tempra-dev library: delivery/site). A static Astro build served
-// as Workers static assets. Workers Builds deploys it: the production branch runs
+// as Workers static assets. Since TEMPRA-276 it has no host of its own: the app's Worker owns
+// tempra.dev and www.tempra.dev (worker/cloudflare.config.ts) and reaches this one through its
+// SITE service binding, for `/` when nobody is signed in and for the site's own paths. Workers Builds deploys it: the production branch runs
 // `wrangler deploy`, every other branch `wrangler preview`, which posts Preview URLs on the PR.
 // Unlike the app (worker/, configured for cf in cloudflare.config.ts), this Worker has no bindings
 // or data, so it uses Cloudflare's built-in previews and a plain Wrangler config.
@@ -11,14 +13,11 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    // The Worker sees every request first: it redirects www and adds security headers.
+    // The Worker sees every request first: it adds security headers.
     "run_worker_first": true,
     "not_found_handling": "404-page"
   },
-  "routes": [
-    { "pattern": "tempra.dev", "custom_domain": true },
-    { "pattern": "www.tempra.dev", "custom_domain": true }
-  ],
+  // No routes: the app's Worker serves tempra.dev and calls this one by service binding.
   // No workers.dev URL for production; Previews still get their own URLs.
   "workers_dev": false,
   "preview_urls": true,

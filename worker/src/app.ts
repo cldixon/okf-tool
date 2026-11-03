@@ -21,7 +21,7 @@ import { bundleStream } from "./export-bundle";
 import { type FetchFn, fetchBlob } from "./fetch-source";
 import type { Images } from "./images";
 import { registerInboxApi } from "./inbox-api";
-import { registerLegalRoutes } from "./legal";
+import { registerLegalRoutes, type SiteService } from "./legal";
 import { deleteLibrary } from "./lifecycle";
 import type { Outbox } from "./mail-queue";
 import type { ManagedDeps } from "./managed/agent";
@@ -121,6 +121,12 @@ export interface Deps extends UsageDeps {
    * fetch. Tests pass a double.
    */
   fetch?: FetchFn;
+  /**
+   * The landing page's Worker (site/, the SITE service binding; TEMPRA-276, legal.ts): `/` for
+   * people signed out and the site's own paths. Absent (local dev, tests), signed-out `/` goes to
+   * sign-in and /terms and /privacy redirect to tempra.dev.
+   */
+  site?: SiteService | null;
   /** Checks for /healthz: each dependency's name and "ok" or what failed. */
   health?: () => Promise<Record<string, string>>;
   /** Nightly exports in R2 (spec: Backups and recovery), for the UI. */
@@ -1627,7 +1633,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // ------------------------------------------------------------------ apps (OAuth consent)
 
   // /mcp itself is served by the OAuth provider (worker.ts), which checks tokens first.
-  registerLegalRoutes(app);
+  registerLegalRoutes(app, deps);
   registerSignInRoutes(app, deps);
   registerWaitlistRoutes(app, deps);
   registerAppRoutes(app, deps);
