@@ -1,7 +1,7 @@
 /*
  * A concept's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
- * bar): the text (title, description, byline, body, sources) centred in its column, and on the
- * right its contents, or one panel in their place (Comments, History, Properties). The page's
+ * bar): the text (title, description, byline, body, sources) at the end of its column, a gap
+ * from the outline as Linear's docs set it (TEMPRA-277), and on the right its contents, or one panel in their place (Comments, History, Properties). The page's
  * width decides what fits (container queries on `page`, the page's scroller): under 1100px the
  * contents keep a narrower column of their own down to 700px (TEMPRA-150), and hide below that
  * (On this page under the byline); a panel takes the column down to 960px and overlays the page
@@ -31,18 +31,30 @@
   grid-template-columns: [text] minmax(0, 1fr);
 }
 
-/* The text, centred in its column, --doc-max wide at most (padding included), --doc-pad from its
-   edges; a wide or full figure reads both. */
+/* The text, --doc-max wide at most (padding included), at the end of its column: --doc-end from
+   the outline or the panel (room for a block's comment mark, reader/reading.ts), --doc-pad from
+   the column's other edge, and the spare room on the far side. With nothing beside it (the
+   rules below) it is centred, --doc-pad each side. A wide or full figure reads them all, and
+   --doc-align: 1 at the end, 0.5 centred. */
 .concept .doc {
   --doc-pad: var(--tempra-space-page);
-  --doc-max: calc(var(--tempra-size-column-text) + 2 * var(--tempra-space-page));
+  --doc-end: var(--tempra-space-56);
+  --doc-align: 1;
+  --doc-max: calc(var(--tempra-size-column-text) + var(--tempra-space-page) + var(--doc-end));
   grid-row: 1;
   grid-column: text;
-  justify-self: center;
+  justify-self: end;
   width: 100%;
   max-width: var(--doc-max);
   min-width: 0;
-  padding: var(--tempra-space-40) var(--doc-pad) 140px; /* one-off: room under the text for the page's actions */
+  padding: var(--tempra-space-40) var(--doc-end) 140px var(--doc-pad); /* one-off: room under the text for the page's actions */
+}
+
+/* Nothing beside the text: centred. */
+.concept.markdown-on:not(.panel-open) .doc {
+  --doc-end: var(--doc-pad);
+  --doc-align: 0.5;
+  justify-self: center;
 }
 
 /* The Markdown view is wider than the text: the file's lines are long. */
@@ -585,6 +597,12 @@
     display: block;
   }
 
+  .concept .doc {
+    --doc-end: var(--doc-pad);
+    --doc-align: 0.5;
+    justify-self: center;
+  }
+
   .concept-panel {
     position: fixed;
     top: var(--tempra-size-topbar);
@@ -630,6 +648,12 @@
   .concept .doc {
     --doc-pad: var(--tempra-space-32);
   }
+
+  .concept:not(.panel-open):not(.markdown-on) .doc {
+    --doc-end: var(--tempra-space-56);
+    --doc-align: 1;
+    justify-self: end;
+  }
 }
 
 /* What an overlaid panel dims: the page, the top bar and the sidebar, which are inert while it
@@ -655,6 +679,12 @@
 
   .concept.panel-open .concept-side {
     display: block;
+  }
+
+  .concept.panel-open .doc {
+    --doc-end: var(--tempra-space-56);
+    --doc-align: 1;
+    justify-self: end;
   }
 
   .concept.panel-open .concept-panel {

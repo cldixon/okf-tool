@@ -27,7 +27,8 @@
    * The library's file tree (tempra-dev: app/workspace). The whole index (paths, titles,
    * sequences; no bodies; Workspace loads it in one small request and keeps it following the
    * feed) is here at once, so opening a folder never waits. A folder (named for people) is a
-   * group, not a page: its row opens and closes it (TEMPRA-138), and a
+   * group, not a page: its row (its name as a section's label, the chevron at its end, as
+   * Linear's docs draw it; TEMPRA-277) opens and closes it (TEMPRA-138), and a
    * folder's address reveals it here. Every folder starts open; the ones the person closed are
    * remembered on this browser, and the open file is revealed and marked. A closed folder rolls
    * up the marks of what is inside it. Change is not marked here (TEMPRA-173): Activity is where
@@ -154,7 +155,7 @@
                rows (TEMPRA-219). -->
           <div
             class={`tree-row dir${isOpen(e.path) ? " open" : ""}${inHere ? " presence" : ""}`}
-            ><span class="tree-chevron" aria-hidden="true"><Icon name="chevron" /></span><button
+            ><button
               type="button"
               class="tree-name"
               aria-expanded={isOpen(e.path)}
@@ -164,7 +165,10 @@
               onclick={() => toggle(e.path)}
               >{folderName(e.path)}</button
             >{#if inHere}<span class="visually-hidden">{presenceWordsInside[inHere.kind]}</span
-              >{/if}{#if !isOpen(e.path)}{@render rolledUp(e.path)}{/if}</div
+              >{/if}{#if !isOpen(e.path)}{@render rolledUp(e.path)}{/if}<span
+              class="tree-chevron"
+              aria-hidden="true"><Icon name="chevron" /></span
+            ></div
           >{#if isOpen(e.path)}<ul>{@render rows(e.path)}</ul>{/if}</li
         >
       {:else}

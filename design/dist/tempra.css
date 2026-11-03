@@ -167,21 +167,29 @@
      a stylesheet never does (design.test.ts), so a theme changes which primitive a role points at,
      here, and nothing else. The palette (TEMPRA-1, "Graphite"): one neutral grey ramp, barely
      cool (OKLCH chroma 0.004, hue 286), serves both schemes; orange is the agent's and nothing
-     else's; the focus ring is the chart's blue, seen only on keyboard focus. */
+     else's; the focus ring is the chart's blue, seen only on keyboard focus. Five greys come from
+     Linear's docs (TEMPRA-277, drawn in Paper first): the light ground (980), the text (285) and
+     the dark hairline (264), a touch bluer than the ramp; and the two muted greys (515, 691),
+     Linear's own nudged in OKLCH to clear 4.5:1 on the hover and selected fills. */
   --tempra-white: #ffffff;
 
   /* Palette: greys, one ramp for light and dark */
+  --tempra-grey-980: #f9f8f9;
   --tempra-grey-974: #f6f6f9;
   --tempra-grey-956: #f0f0f3;
   --tempra-grey-929: #e7e7ea;
   --tempra-grey-901: #dedee0;
   --tempra-grey-871: #d4d4d7;
   --tempra-grey-720: #a4a4a7;
+  --tempra-grey-691: #989ca4;
   --tempra-grey-601: #808082;
+  --tempra-grey-515: #67666e;
   --tempra-grey-500: #636365;
   --tempra-grey-380: #424244;
   --tempra-grey-321: #323335;
+  --tempra-grey-285: #282a2f;
   --tempra-grey-269: #262628;
+  --tempra-grey-264: #23252a;
   --tempra-grey-232: #1d1d1f;
   --tempra-grey-201: #161618;
   --tempra-grey-169: #0f0f11;
@@ -216,11 +224,11 @@
   /* Color: surfaces */
   --tempra-color-bg: light-dark(
     var(--tempra-white),
-    var(--tempra-grey-232)
+    var(--tempra-grey-141)
   ); /* the page, panels, pills */
   --tempra-color-ground: light-dark(
-    var(--tempra-grey-974),
-    var(--tempra-grey-201)
+    var(--tempra-grey-980),
+    var(--tempra-grey-232)
   ); /* the page under them, inset fills */
   --tempra-color-hover: light-dark(var(--tempra-grey-956), var(--tempra-grey-269));
   --tempra-color-selected: light-dark(var(--tempra-grey-929), var(--tempra-grey-321));
@@ -229,12 +237,12 @@
   /* Color: text, in three steps. Text people read is text or muted, at least 4.5:1 on every
      surface in light and dark (TEMPRA-132; design/contrast.test.ts). Faint is under that: icons,
      rules and disabled controls only, never words. */
-  --tempra-color-text: light-dark(var(--tempra-grey-201), var(--tempra-grey-956));
-  --tempra-color-muted: light-dark(var(--tempra-grey-500), var(--tempra-grey-720));
+  --tempra-color-text: light-dark(var(--tempra-grey-285), var(--tempra-grey-974));
+  --tempra-color-muted: light-dark(var(--tempra-grey-515), var(--tempra-grey-691));
   --tempra-color-faint: light-dark(var(--tempra-grey-720), var(--tempra-grey-500));
 
   /* Color: lines */
-  --tempra-color-border: light-dark(var(--tempra-grey-929), var(--tempra-grey-321));
+  --tempra-color-border: light-dark(var(--tempra-grey-929), var(--tempra-grey-264));
   --tempra-color-border-strong: light-dark(var(--tempra-grey-871), var(--tempra-grey-380));
 
   /* Focus: a 2px ring in the focus colour on every control focused by keyboard (:focus-visible),
@@ -297,7 +305,7 @@
   --tempra-color-scrim: light-dark(rgb(20 20 22 / 0.2), rgb(0 0 0 / 0.5));
 
   /* Color: the dark frame an attachment is shown on (take 4, board 28), and a mark on it */
-  --tempra-color-frame: light-dark(var(--tempra-grey-169), var(--tempra-grey-141));
+  --tempra-color-frame: light-dark(var(--tempra-grey-169), var(--tempra-grey-232));
   --tempra-color-frame-ink: light-dark(var(--tempra-grey-601), var(--tempra-grey-601));
 
   /* Color: links are text, underlined in running text (no colour until the palette) */
@@ -1328,9 +1336,11 @@ details > summary {
  * Figure markup (TEMPRA-161; tempra-dev: app/media, Figure markup). Width: `--figure-width`, set on
  * the figure through the CSSOM, caps its images (max-width only, so an image is never drawn wider
  * than its own pixels). Placement, on a concept's page: wide and full reach past the text,
- * centred on the text's column (the page's width, 100cqi of `page`, less --concept-side; the
- * text is --doc-max wide at most with --doc-pad each side, concept.css), never past its padding;
- * wide stops at --tempra-figure-wide. Elsewhere they keep the text's width.
+ * within the text's column (the page's width, 100cqi of `page`, less --concept-side; the text is
+ * --doc-max wide at most, --doc-pad from the column's start and --doc-end from its end,
+ * concept.css), never past its padding: from the text's end edge leftwards when the text sits at
+ * the column's end (--doc-align 1), centred with it when it is centred (0.5); wide stops at
+ * --tempra-figure-wide. Elsewhere they keep the text's width.
  */
 .prose figure.figure-sized:not(.figure-group) .figure-media,
 .prose figure.figure-sized:not(.figure-group) .figure-broken {
@@ -1342,11 +1352,14 @@ details > summary {
 }
 
 .concept .prose figure.figure-wide {
-  --figure-reach: min(var(--tempra-size-figure-wide), var(--figure-column) - 2 * var(--doc-pad));
+  --figure-reach: min(
+    var(--tempra-size-figure-wide),
+    var(--figure-column) - var(--doc-pad) - var(--doc-end)
+  );
 }
 
 .concept .prose figure.figure-full {
-  --figure-reach: calc(var(--figure-column) - 2 * var(--doc-pad));
+  --figure-reach: calc(var(--figure-column) - var(--doc-pad) - var(--doc-end));
 }
 
 @container page (width >= 0px) {
@@ -1356,9 +1369,11 @@ details > summary {
     width: var(--figure-w);
     max-width: none;
     margin-left: calc(
-      (min(var(--figure-column), var(--doc-max)) - var(--figure-w)) /
-      2 -
-      var(--doc-pad)
+      var(--doc-align) *
+      (min(var(--figure-column), var(--doc-max)) - var(--figure-w)) -
+      var(--doc-pad) -
+      (2 * var(--doc-align) - 1) *
+      var(--doc-end)
     );
   }
 }
@@ -3086,8 +3101,9 @@ a.button.pill-button {
 }
 
 /* The tree: nested lists, one row per folder or file, indented a step a level. A folder's row is
-   one button that opens and closes it (TEMPRA-138): its chevron (turning) and its name, no count;
-   a page's or a file's row is a link, a file's with a small icon. */
+   one button that opens and closes it (TEMPRA-138): its name as a section's label and its chevron
+   (turning) at the row's end, as Linear's docs draw it (TEMPRA-277), no count; a page's or a
+   file's row is a link, a file's with a small icon. */
 .tree,
 .tree ul {
   margin: 0;
@@ -3096,7 +3112,7 @@ a.button.pill-button {
 }
 
 .tree ul {
-  padding-left: var(--tempra-space-12);
+  padding-left: var(--tempra-space-16);
 }
 
 .tree li {
@@ -3109,7 +3125,7 @@ a.button.pill-button {
   gap: var(--tempra-space-06);
   min-height: var(--tempra-size-row);
   margin-bottom: 1px;
-  padding: 0 var(--tempra-space-10) 0 var(--tempra-space-04);
+  padding: 0 var(--tempra-space-10);
   border-radius: var(--tempra-radius-row);
   font-size: var(--tempra-text-ui);
   white-space: nowrap;
@@ -3133,7 +3149,7 @@ a.button.pill-button {
   border-radius: inherit;
 }
 
-/* A folder's chevron: drawn beside its name, the row's button takes the click (TEMPRA-138). */
+/* A folder's chevron: drawn at the row's end, the row's button takes the click (TEMPRA-138). */
 .tree-chevron {
   flex: none;
   display: flex;
@@ -3178,6 +3194,7 @@ button.tree-name {
   background: none;
   color: var(--tempra-color-text);
   font: inherit;
+  font-weight: var(--tempra-weight-medium);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
@@ -3207,6 +3224,11 @@ button.tree-name {
   justify-content: center;
   width: var(--tempra-size-icon);
   color: var(--tempra-color-faint);
+}
+
+/* A page has no icon: its name starts where a folder's does. */
+.tree-leaf:empty {
+  display: none;
 }
 
 /* Marks: open comments (a count), a clock (stale) or an hourglass (stale soon); a closed folder
@@ -3624,8 +3646,8 @@ ul.events {
 
 /*
  * A concept's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
- * bar): the text (title, description, byline, body, sources) centred in its column, and on the
- * right its contents, or one panel in their place (Comments, History, Properties). The page's
+ * bar): the text (title, description, byline, body, sources) at the end of its column, a gap
+ * from the outline as Linear's docs set it (TEMPRA-277), and on the right its contents, or one panel in their place (Comments, History, Properties). The page's
  * width decides what fits (container queries on `page`, the page's scroller): under 1100px the
  * contents keep a narrower column of their own down to 700px (TEMPRA-150), and hide below that
  * (On this page under the byline); a panel takes the column down to 960px and overlays the page
@@ -3655,18 +3677,30 @@ ul.events {
   grid-template-columns: [text] minmax(0, 1fr);
 }
 
-/* The text, centred in its column, --doc-max wide at most (padding included), --doc-pad from its
-   edges; a wide or full figure reads both. */
+/* The text, --doc-max wide at most (padding included), at the end of its column: --doc-end from
+   the outline or the panel (room for a block's comment mark, reader/reading.ts), --doc-pad from
+   the column's other edge, and the spare room on the far side. With nothing beside it (the
+   rules below) it is centred, --doc-pad each side. A wide or full figure reads them all, and
+   --doc-align: 1 at the end, 0.5 centred. */
 .concept .doc {
   --doc-pad: var(--tempra-space-page);
-  --doc-max: calc(var(--tempra-size-column-text) + 2 * var(--tempra-space-page));
+  --doc-end: var(--tempra-space-56);
+  --doc-align: 1;
+  --doc-max: calc(var(--tempra-size-column-text) + var(--tempra-space-page) + var(--doc-end));
   grid-row: 1;
   grid-column: text;
-  justify-self: center;
+  justify-self: end;
   width: 100%;
   max-width: var(--doc-max);
   min-width: 0;
-  padding: var(--tempra-space-40) var(--doc-pad) 140px; /* one-off: room under the text for the page's actions */
+  padding: var(--tempra-space-40) var(--doc-end) 140px var(--doc-pad); /* one-off: room under the text for the page's actions */
+}
+
+/* Nothing beside the text: centred. */
+.concept.markdown-on:not(.panel-open) .doc {
+  --doc-end: var(--doc-pad);
+  --doc-align: 0.5;
+  justify-self: center;
 }
 
 /* The Markdown view is wider than the text: the file's lines are long. */
@@ -4209,6 +4243,12 @@ ul.events {
     display: block;
   }
 
+  .concept .doc {
+    --doc-end: var(--doc-pad);
+    --doc-align: 0.5;
+    justify-self: center;
+  }
+
   .concept-panel {
     position: fixed;
     top: var(--tempra-size-topbar);
@@ -4254,6 +4294,12 @@ ul.events {
   .concept .doc {
     --doc-pad: var(--tempra-space-32);
   }
+
+  .concept:not(.panel-open):not(.markdown-on) .doc {
+    --doc-end: var(--tempra-space-56);
+    --doc-align: 1;
+    justify-self: end;
+  }
 }
 
 /* What an overlaid panel dims: the page, the top bar and the sidebar, which are inert while it
@@ -4279,6 +4325,12 @@ ul.events {
 
   .concept.panel-open .concept-side {
     display: block;
+  }
+
+  .concept.panel-open .doc {
+    --doc-end: var(--tempra-space-56);
+    --doc-align: 1;
+    justify-self: end;
   }
 
   .concept.panel-open .concept-panel {
