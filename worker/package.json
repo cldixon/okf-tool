@@ -10,6 +10,7 @@
     "test": "bun test",
     "seed": "bun scripts/seed.ts",
     "gate": "bun scripts/gate.ts",
+    "site-shots": "bun scripts/site-shots.ts",
     "logs": "bun scripts/logs.ts",
     "costs": "bun scripts/costs.ts",
     "admin": "bun scripts/admin.ts",

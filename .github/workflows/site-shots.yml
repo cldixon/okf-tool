@@ -1,0 +1,42 @@
+name: Site screenshots
+
+# The landing page's screenshots of the app (TEMPRA-226): `bun run site-shots` on a runner with
+# Chrome, the PNGs kept as the run's `site-shots` artifact. It runs when a pull request changes the
+# look (the design package) or the shots themselves, and on demand from the Actions tab; nothing is
+# committed: copy the artifact into site/public/shots/ when the look should change on tempra.dev.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - design/src/**
+      - worker/scripts/site-shots.ts
+      - worker/scripts/site-shots/**
+      - .github/workflows/site-shots.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-shots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shots:
+    name: Landing-page screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: google-chrome --version
+      - run: bun run site-shots --out "$RUNNER_TEMP/site-shots"
+        env:
+          CF_SEND_TELEMETRY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-shots
+          path: ${{ runner.temp }}/site-shots
+          if-no-files-found: error

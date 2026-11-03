@@ -1,4 +1,5 @@
 ---
+import Shot from "../components/Shot.astro";
 import Base from "../layouts/Base.astro";
 import { APP } from "../site";
 
@@ -44,6 +45,12 @@ const steps = [
       <a class="button" href={`${APP}/sign-in`}>Sign in</a>
     </p>
     <p class="muted">Tempra is in private beta.</p>
+    <Shot
+      name="concept"
+      alt="Tempra showing a page about checkout latency with a line chart of the daily 95th percentile. Beside it, a comment on the sentence about the rise asks whether it is the retry change, and Claude Code answers in the thread."
+      caption="A page an agent wrote, with its chart, and a question answered in the thread."
+      eager
+    />
   </section>
 
   <section aria-labelledby="features">
@@ -58,6 +65,11 @@ const steps = [
         ))
       }
     </ul>
+    <Shot
+      name="presence"
+      alt="Tempra's workspace with a decision page open. In the sidebar, the two pages an agent is reading shimmer."
+      caption="Where an agent is reading, shown live in the sidebar while you read."
+    />
   </section>
 
   <section aria-labelledby="start">

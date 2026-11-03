@@ -1,0 +1,39 @@
+---
+/**
+ * A screenshot of the app (TEMPRA-226): light or dark with the page, at 1x and 2x, from
+ * public/shots/, which `bun run site-shots` (in the repository's root) makes again in one step.
+ */
+interface Props {
+  /** The shot's name in public/shots/: {name}-{light,dark}[@2x].png, each 1440 by 900 at 1x. */
+  name: string;
+  alt: string;
+  caption: string;
+  /** The first shot on the page loads early; later ones wait until they are near. */
+  eager?: boolean;
+}
+
+const { name, alt, caption, eager = false } = Astro.props;
+const set = (scheme: "light" | "dark") =>
+  `/shots/${name}-${scheme}.png 1440w, /shots/${name}-${scheme}@2x.png 2880w`;
+// The wide page's width (960px) where the window has room (public.css .shot), else the window
+// less its margins.
+const sizes = "(min-width: 992px) 960px, calc(100vw - 32px)";
+---
+
+<figure class="shot">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset={set("dark")} sizes={sizes} />
+    <img
+      src={`/shots/${name}-light.png`}
+      srcset={set("light")}
+      sizes={sizes}
+      width="1440"
+      height="900"
+      alt={alt}
+      loading={eager ? "eager" : "lazy"}
+      fetchpriority={eager ? "high" : "auto"}
+      decoding="async"
+    />
+  </picture>
+  <figcaption>{caption}</figcaption>
+</figure>

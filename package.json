@@ -21,6 +21,7 @@
     "check": "bun run lint && bun run typecheck && bun run test",
     "seed": "bun run --filter worker seed",
     "gate": "bun run --cwd worker gate",
+    "site-shots": "bun run --cwd worker site-shots",
     "logs": "bun run --filter worker logs",
     "costs": "bun run --filter worker costs",
     "preview": "bun run --filter worker preview",

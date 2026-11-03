@@ -22,6 +22,8 @@ coverage/
 .wrangler/
 # bun run gate: a throwaway cf dev project per run (worker/.gate/run-*)
 .gate/
+# bun run site-shots: the same, for the landing page's screenshots (worker/.site-shots/run-*)
+.site-shots/
 .dev.vars
 .dev.vars.*
 !.dev.vars.sample

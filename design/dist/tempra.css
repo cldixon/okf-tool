@@ -5754,6 +5754,32 @@ a.activity-download {
   line-height: var(--tempra-leading-base);
 }
 
+/* Screenshots of the app (TEMPRA-226): wider than the column where the window has room (the
+   wide page's width, centred on it), the full column on a phone; light or dark with the page.
+   Made by `bun run site-shots`, served from site/public/shots/. */
+.shot {
+  --shot-width: min(var(--tempra-size-page-wide), 100vw - 2 * var(--tempra-space-16));
+
+  width: var(--shot-width);
+  margin: var(--tempra-space-32) 0 0 calc((100% - var(--shot-width)) / 2);
+}
+
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--tempra-color-border);
+  border-radius: var(--tempra-radius-box);
+}
+
+.shot figcaption {
+  margin-top: var(--tempra-space-08);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  line-height: var(--tempra-leading-base);
+  text-align: center;
+}
+
 /* Steps: numbered in the muted grey, one to a line. */
 .steps {
   margin: var(--tempra-space-16) 0 var(--tempra-space-24);
