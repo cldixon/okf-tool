@@ -50,7 +50,7 @@
   {#if canWrite || !heading}
     <p class="empty-wait" aria-live="polite">
       {#if latest}
-        <span class="change-dot" aria-hidden="true"></span><span>Last write by {who ? actorText(who) : actorAgentName(latest.actor)}, <Moment ts={latest.ts} />{latest.note ? `: ${clip(latest.note, 80)}` : ""}</span>
+        <span>Last write by {who ? actorText(who) : actorAgentName(latest.actor)}, <Moment ts={latest.ts} />{latest.note ? `: ${clip(latest.note, 80)}` : ""}</span>
       {:else}
         <span class="change-dot live" aria-hidden="true"></span><span>Waiting for the first write…</span>
       {/if}

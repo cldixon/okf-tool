@@ -2062,8 +2062,8 @@ body.ground {
   color: var(--tempra-color-text);
 }
 
-/* The change dot (the one colour): pulsing (.live) for an agent writing now; solid beside an
-   empty library's last write. Nothing marks what changed since the person looked (TEMPRA-173). */
+/* The change dot (the one colour): only ever pulsing (.live), for an agent writing now
+   (TEMPRA-119). Nothing marks what changed since the person looked (TEMPRA-173). */
 .change-dot {
   display: inline-block;
   width: var(--tempra-size-dot);
