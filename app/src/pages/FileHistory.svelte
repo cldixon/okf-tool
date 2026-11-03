@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { Chip, Icon } from "@tempra/design/components";
   import AgentName from "../AgentName.svelte";
-  import Icon from "../Icon.svelte";
   import Moment from "../Moment.svelte";
   import { relativeTime } from "../ui";
   import { baseName, type Urls } from "../urls";
@@ -17,7 +17,7 @@
   ><h2 id="file-history" class="view-section-title">File history</h2
   ><ol>
     {#each props.versions as v (v.seq)}<li class={v.current ? "current" : undefined}
-        ><span class="attachment-version-when"><Moment ts={v.ts} />{#if v.current}<span class="chip">Current</span>{/if}</span
+        ><span class="attachment-version-when"><Moment ts={v.ts} />{#if v.current}<Chip>Current</Chip>{/if}</span
         ><span class="attachment-version-who">{v.what} by <AgentName who={props.name(v.actor, v.by)} /></span
         ><span class="attachment-version-size muted">{sizeText(v.size, v.width, v.height)}</span
         ><a class="attachment-version-download" href={props.urls.pinned(v.seq).download(props.path)} download={baseName(props.path)}

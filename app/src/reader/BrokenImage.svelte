@@ -1,6 +1,6 @@
 <script lang="ts">
   /** What an image can't show: the box that keeps its place, saying why, its path and alt text. */
-  import Icon from "../Icon.svelte";
+  import { Icon } from "@tempra/design/components";
   import type { ImageFigure } from "./prepare";
 
   let { figure, atom }: { figure: ImageFigure; atom?: boolean } = $props();

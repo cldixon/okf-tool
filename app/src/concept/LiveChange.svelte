@@ -1,7 +1,6 @@
 <script lang="ts">
+  import { Icon, Menu } from "@tempra/design/components";
   import { useAgentNames } from "../agents.svelte.ts";
-  import Icon from "../Icon.svelte";
-  import Menu from "../Menu.svelte";
   import { relativeTime } from "../ui";
   import { useNow } from "../ui.svelte.ts";
   import type { Urls } from "../urls";

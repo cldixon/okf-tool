@@ -13,7 +13,7 @@
    * character in `docText`, so comment anchors and the diff are unchanged. One that fails to play
    * is the broken box, saying so.
    */
-  import Icon from "../Icon.svelte";
+  import { Icon } from "@tempra/design/components";
   import { baseName } from "../urls";
   import BrokenImage from "./BrokenImage.svelte";
   import { useOpenFigure } from "./open-figure";

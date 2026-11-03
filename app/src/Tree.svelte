@@ -1,8 +1,8 @@
 <script lang="ts">
+  import { Icon } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { actorText } from "./agents";
   import { useActors } from "./agents.svelte.ts";
-  import Icon from "./Icon.svelte";
   import {
     activeFolders,
     type Presence,

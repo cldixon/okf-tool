@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Tile } from "@tempra/design/components";
   import { api, post } from "./api";
   import {
     INBOX_EVENT,
@@ -13,11 +14,11 @@
     withNames,
   } from "./inbox";
   import { useAgentLabels, usePageTitles } from "./inbox.svelte.ts";
-  import LibraryTile from "./LibraryTile.svelte";
   import { useAction, useLoad } from "./load.svelte.ts";
   import Moment from "./Moment.svelte";
   import { librariesChanged } from "./role";
   import { navigate } from "./router";
+  import { tileLetter } from "./ui";
   import { useMe } from "./ui.svelte.ts";
   import { urlsOf } from "./urls";
 
@@ -72,9 +73,9 @@
   {#each items as i (i.id)}
     {#snippet about()}
       {#if i.kind === "quota"}
-        <LibraryTile name="Tempra" />
+        <Tile letter="T" size="small" />
       {:else}
-        <LibraryTile name={i.library_title || urlsOf(i.library).slug} shared={handle !== null && urlsOf(i.library).owner !== handle} />
+        <Tile letter={tileLetter(i.library_title || urlsOf(i.library).slug)} size="small" shared={handle !== null && urlsOf(i.library).owner !== handle} />
       {/if}
       <span class="bell-item-what"><strong>{itemTitle(i, titles.current)}</strong><span class="bell-item-detail">{itemDetail(i)}</span></span>
       <span class="bell-item-where">{itemLibrary(i, handle)}{" · "}<Moment ts={i.created} /></span>

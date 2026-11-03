@@ -7,8 +7,7 @@
    * each is placed through the CSSOM (`--mark-x`, `--mark-y`; CSP: no style attribute) in the
    * right gutter beside its block, or under the block's end where there is no gutter.
    */
-  import Icon from "../Icon.svelte";
-  import { plural } from "../ui";
+  import { CommentMark } from "@tempra/design/components";
   import { type BlockMark, blockMarks, type Highlight, type MarkPlace, placeMark } from "./reading";
 
   let {
@@ -69,12 +68,10 @@
 </script>
 
 <div class="comment-marks" bind:this={layer}
-  >{#each marks as m (m.key)}<button
-      type="button"
-      class={m.place.end ? "comment-mark end" : "comment-mark"}
-      aria-label={plural(m.count, "comment")}
-      title={plural(m.count, "open comment")}
+  >{#each marks as m (m.key)}<CommentMark
+      count={m.count}
+      class={m.place.end ? "end" : undefined}
       {@attach at(m.place)}
-      onclick={() => onOpen(m.first)}><Icon name="comments" size={14} /><span>{m.count}</span></button
-    >{/each}</div
+      onclick={() => onOpen(m.first)}
+    />{/each}</div
 >

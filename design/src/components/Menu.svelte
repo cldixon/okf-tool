@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { type Snippet, tick } from "svelte";
+  import { tick } from "svelte";
+  import type { MenuProps } from "./types";
 
   /**
    * A button that opens a list of links under it. It closes on a choice, a click elsewhere,
@@ -7,21 +8,7 @@
    * button opens it at its first (or last) choice; in the list Up, Down, Home and End move
    * between the choices (F-16, TEMPRA-133).
    */
-  let props: {
-    /** The button's content. */
-    label: Snippet;
-    /** The button's accessible name, when its content is not one (the avatar). */
-    name?: string;
-    title?: string;
-    buttonClass?: string;
-    /** A class for the list, for one that has a shape of its own (the libraries, the bell). */
-    listClass?: string;
-    align?: "start" | "end";
-    /** Opens above its button (a menu at the bottom of the sidebar). */
-    up?: boolean;
-    /** The list's content; it is handed a way to close the menu (after an action that waits). */
-    children: Snippet<[() => void]>;
-  } = $props();
+  let props: MenuProps = $props();
 
   const id = $props.id();
   let open = $state(false);

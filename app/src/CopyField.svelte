@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from "./Icon.svelte";
+  import { IconButton } from "@tempra/design/components";
   import { useCopy } from "./ui.svelte.ts";
 
   /** A value to copy (the MCP URL, a token's secret): the text in mono, a Copy button at its end. */
@@ -9,13 +9,10 @@
 
 <span class="copy-field">
   <code {id}>{value}</code>
-  <button
-    type="button"
-    class="icon-button"
-    aria-label={`Copy ${label}`}
+  <IconButton
+    icon={copied.state === "copied" ? "check" : "copy"}
+    label={`Copy ${label}`}
     title={copied.state === "copied" ? "Copied" : "Copy"}
     onclick={() => void copied.copy(value)}
-  >
-    <Icon name={copied.state === "copied" ? "check" : "copy"} />
-  </button>
+  />
 </span>

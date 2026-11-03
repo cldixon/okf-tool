@@ -1,10 +1,9 @@
 <script lang="ts">
-  import Icon from "./Icon.svelte";
-  import LibraryTile from "./LibraryTile.svelte";
-  import Menu from "./Menu.svelte";
+  import { Icon, Menu, Tile } from "@tempra/design/components";
   import { isShared, libraryLabel, type ReachableLibrary } from "./role";
   import { useLibraries } from "./role.svelte.ts";
   import { byKind } from "./sidebar";
+  import { tileLetter } from "./ui";
   import { Urls } from "./urls";
 
   /**
@@ -23,7 +22,7 @@
     class="menu-lib"
     href={new Urls(l.owner, l.slug).tree("")}
     aria-current={here(l) ? "page" : undefined}
-    ><LibraryTile name={l.title || l.slug} shared={isShared(l)} /><span
+    ><Tile letter={tileLetter(l.title || l.slug)} size="small" shared={isShared(l)} /><span
       >{libraryLabel(l)}</span
     >{#if isShared(l)}<span class="menu-lib-role"
         >{l.role === "write" ? "Write" : "Read"}</span

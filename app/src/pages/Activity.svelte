@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { Icon, Notice, Segmented } from "@tempra/design/components";
   import { activityKey, loadActivity } from "../activity";
   import { useLiveWrites } from "../activity.svelte.ts";
-  import Icon from "../Icon.svelte";
   import { useFeed, useTrailing } from "../live.svelte.ts";
   import { useLoad } from "../load.svelte.ts";
   import PageColumn from "../PageColumn.svelte";
@@ -9,7 +9,7 @@
   import { type Done, navigate } from "../router";
   import Status from "../Status.svelte";
   import { plural } from "../ui";
-  import type { ActivityFilters, Urls } from "../urls";
+  import type { ActivityFilters, ActivityView, Urls } from "../urls";
   import EventFilters from "./EventFilters.svelte";
   import EveryEvent from "./EveryEvent.svelte";
   import Older from "./Older.svelte";
@@ -83,22 +83,18 @@
     </div>
   </header>
   {#if done?.kind === "revert"}
-    <div class="notice ok">Reverted: {plural(done.n ?? 0, "change")}, recorded as a new change by you.</div>
+    <Notice tone="ok">Reverted: {plural(done.n ?? 0, "change")}, recorded as a new change by you.</Notice>
   {/if}
   <div class="view-filters activity-filters">
-    <fieldset class="segmented">
-      <legend class="visually-hidden">View</legend>
-      <button
-        type="button"
-        aria-pressed={view === "summary"}
-        onclick={() => view !== "summary" && go({ view: "summary" }, false)}>Summary</button
-      >
-      <button
-        type="button"
-        aria-pressed={view === "events"}
-        onclick={() => view !== "events" && go({ view: "events" }, false)}>Every event</button
-      >
-    </fieldset>
+    <Segmented
+      label="View"
+      options={[
+        { value: "summary", label: "Summary" },
+        { value: "events", label: "Every event" },
+      ]}
+      value={view}
+      onchange={(v) => go({ view: v as ActivityView }, false)}
+    />
     <WhoFilter
       {urls}
       {view}

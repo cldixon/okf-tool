@@ -638,6 +638,26 @@ textarea {
   line-height: var(--tempra-leading-base);
 }
 
+/* A search box with its glyph inside (SearchField): the input's own look, room at its start. */
+.search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.search-field > svg {
+  position: absolute;
+  left: var(--tempra-space-10);
+  color: var(--tempra-color-muted);
+  pointer-events: none;
+}
+
+.search-field > input {
+  width: 100%;
+  padding-left: calc(var(--tempra-space-10) + var(--tempra-size-icon) + var(--tempra-space-06));
+}
+
 fieldset {
   border: 1px solid var(--tempra-color-border);
   border-radius: var(--tempra-radius-box);
@@ -2088,6 +2108,12 @@ body.ground {
   line-height: 1;
 }
 
+/* In a compact row (a collapsed thread). */
+.avatar-mark.small {
+  width: var(--tempra-size-avatar-small);
+  height: var(--tempra-size-avatar-small);
+}
+
 .avatar-mark.agent {
   background: var(--tempra-color-text);
   color: var(--tempra-color-bg);
@@ -2605,12 +2631,9 @@ a.button.pill-button {
   color: var(--tempra-color-text);
 }
 
-/* The bell: how many notifications wait, as a small badge on its corner. */
-.bell .badge {
-  position: absolute;
-  top: calc(-1 * var(--tempra-space-04));
-  right: calc(-1 * var(--tempra-space-04));
-  display: grid;
+/* A count on a control's corner (Badge): the bell's notifications. */
+.badge {
+  display: inline-grid;
   place-items: center;
   min-width: var(--tempra-size-badge);
   height: var(--tempra-size-badge);
@@ -2621,6 +2644,12 @@ a.button.pill-button {
   font-size: var(--tempra-text-initial);
   font-weight: var(--tempra-weight-strong);
   line-height: 1;
+}
+
+.bell .badge {
+  position: absolute;
+  top: calc(-1 * var(--tempra-space-04));
+  right: calc(-1 * var(--tempra-space-04));
 }
 
 /*
@@ -2971,6 +3000,18 @@ a.button.pill-button {
   color: var(--tempra-color-bg);
   font-size: var(--tempra-text-name);
   font-weight: var(--tempra-weight-strong);
+}
+
+/* Tile's sizes: small in a row (the sidebar, a menu, the bell), large on a card's cover. */
+.lib-tile.small {
+  width: var(--tempra-size-tile-small);
+  height: var(--tempra-size-tile-small);
+  font-size: var(--tempra-text-label);
+}
+
+.lib-tile.large {
+  width: var(--tempra-size-tile-large);
+  height: var(--tempra-size-tile-large);
 }
 
 .nav {
@@ -5573,6 +5614,71 @@ a.activity-download {
     height: auto;
     box-shadow: var(--tempra-shadow);
   }
+}
+
+/* ---------- The components' catalogue (/_dev/design, local dev only; TEMPRA-252) ---------- */
+
+/* Each theme's column draws the same components; `.theme-light` and `.theme-dark` set the
+   colour scheme on a part of the page, so the tokens' light-dark() values follow it. */
+.theme-light {
+  color-scheme: light;
+}
+
+.theme-dark {
+  color-scheme: dark;
+}
+
+.catalogue {
+  padding: var(--tempra-space-32) var(--tempra-space-16);
+}
+
+.catalogue-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--tempra-size-panel), 1fr));
+  gap: var(--tempra-space-16);
+}
+
+.catalogue-theme {
+  padding: var(--tempra-space-20);
+  border: 1px solid var(--tempra-color-border);
+  border-radius: var(--tempra-radius-box);
+  background: var(--tempra-color-bg);
+  color: var(--tempra-color-text);
+}
+
+.catalogue-item {
+  padding: var(--tempra-space-16) 0;
+  border-top: 1px solid var(--tempra-color-border);
+}
+
+.catalogue-item:first-of-type {
+  border-top: 0;
+}
+
+.catalogue-item > h2 {
+  margin: 0 0 var(--tempra-space-10);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-medium);
+}
+
+.catalogue-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tempra-space-10);
+}
+
+/* A comment mark and a panel's head out of their places: in the flow. */
+.catalogue-row .comment-mark {
+  position: static;
+  margin: 0;
+}
+
+.catalogue-row .panel-head {
+  flex: 1;
+  border: 1px solid var(--tempra-color-border);
 }
 
 /*

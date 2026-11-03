@@ -176,6 +176,26 @@ textarea {
   line-height: var(--tempra-leading-base);
 }
 
+/* A search box with its glyph inside (SearchField): the input's own look, room at its start. */
+.search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.search-field > svg {
+  position: absolute;
+  left: var(--tempra-space-10);
+  color: var(--tempra-color-muted);
+  pointer-events: none;
+}
+
+.search-field > input {
+  width: 100%;
+  padding-left: calc(var(--tempra-space-10) + var(--tempra-size-icon) + var(--tempra-space-06));
+}
+
 fieldset {
   border: 1px solid var(--tempra-color-border);
   border-radius: var(--tempra-radius-box);

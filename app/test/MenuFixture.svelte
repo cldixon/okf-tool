@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Menu from "../src/Menu.svelte";
+  import { Menu } from "@tempra/design/components";
   import Portal from "../src/Portal.svelte";
 
   /** A Menu with three choices, and a Portal into `target`, as pages use them. */

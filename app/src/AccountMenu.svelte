@@ -1,8 +1,7 @@
 <script lang="ts">
+  import { Icon, Menu } from "@tempra/design/components";
   import Avatar from "./Avatar.svelte";
   import { personInitials } from "./chrome";
-  import Icon from "./Icon.svelte";
-  import Menu from "./Menu.svelte";
   import ThemeChoice from "./ThemeChoice.svelte";
   import { useTheme } from "./theme.svelte.ts";
   import type { Me } from "./ui";

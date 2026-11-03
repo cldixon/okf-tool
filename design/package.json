@@ -2,21 +2,41 @@
   "name": "@tempra/design",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
   "exports": {
     ".": "./dist/tempra.ts",
     "./tempra.css": "./dist/tempra.css",
     "./pele": "./dist/pele.ts",
     "./panel": "./dist/panel.ts",
+    "./components": "./src/components/index.ts",
     "./fonts/*": "./fonts/*",
     "./favicon.svg": "./favicon.svg"
   },
   "scripts": {
     "build": "bun build.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "rm -rf .svelte-check && svelte-check --tsgo --tsconfig ./tsconfig.json --threshold error"
+  },
+  "peerDependencies": {
+    "@lucide/svelte": "^1.61.0",
+    "svelte": "^5.57.2"
+  },
+  "peerDependenciesMeta": {
+    "@lucide/svelte": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@lucide/svelte": "^1.61.0",
     "@types/bun": "^1.4.2",
-    "typescript": "^7.0.2"
+    "@typescript/native": "npm:typescript@7",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.7",
+    "typescript": "~6"
   }
 }

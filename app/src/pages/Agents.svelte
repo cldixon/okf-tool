@@ -1,11 +1,10 @@
 <script lang="ts">
+  import { Button, Chip, ComposeDialog, Dialog } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { api, field, post } from "../api";
-  import ComposeDialog from "../ComposeDialog.svelte";
   import ConfirmDialog from "../ConfirmDialog.svelte";
   import CopyField from "../CopyField.svelte";
   import { useConfirm } from "../confirm.svelte.ts";
-  import Dialog from "../Dialog.svelte";
   import { useAction, useLoad } from "../load.svelte.ts";
   import { isShared, LIBRARY_NAMES_URL, type ReachableLibrary } from "../role";
   import Status from "../Status.svelte";
@@ -154,7 +153,7 @@
                   >{a.access === "write" ? "Read and write" : "Read only"}{#if a.tiers === "files"}<div class="small muted">file tools only</div>{/if}{#if a.create_libraries}<div class="small muted">can create libraries</div>{/if}</td
                 >
                 <td>
-                  <button type="button" disabled={action.busy} onclick={() => revokeApp(a)}>Revoke…</button>
+                  <Button disabled={action.busy} onclick={() => revokeApp(a)}>Revoke…</Button>
                 </td>
               </tr>
             {/each}
@@ -162,8 +161,8 @@
               <tr>
                 <td class="name"
                   ><strong>{t.actor}</strong><div class="small muted">
-                    Token · {#if t.revoked}<span class="chip bad">revoked</span>{:else if !live(t)}<span
-                        class="chip warn">expired</span
+                    Token · {#if t.revoked}<Chip tone="bad">revoked</Chip>{:else if !live(t)}<Chip tone="warn"
+                        >expired</Chip
                       >{:else if t.expires}{`expires ${day(t.expires)}`}{:else}no expiry{/if}
                   </div></td
                 >
@@ -173,7 +172,7 @@
                 >
                 <td>
                   {#if live(t)}
-                    <button type="button" disabled={action.busy} onclick={() => revokeToken(t)}>Revoke…</button>
+                    <Button disabled={action.busy} onclick={() => revokeToken(t)}>Revoke…</Button>
                   {/if}
                 </td>
               </tr>
@@ -254,7 +253,7 @@
       <CopyField value={command(minted)} label="the Claude Code command" />
     </p>
     <p class="actions">
-      <button type="button" class="primary" onclick={() => (minted = null)}>Done</button>
+      <Button variant="primary" onclick={() => (minted = null)}>Done</Button>
     </p>
   {/if}
 </Dialog>

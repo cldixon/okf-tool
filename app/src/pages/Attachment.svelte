@@ -1,11 +1,11 @@
 <script lang="ts">
+  import { Icon } from "@tempra/design/components";
   import AgentName from "../AgentName.svelte";
   import AtNotice from "../AtNotice.svelte";
   import { useActors } from "../agents.svelte.ts";
   import { api } from "../api";
   import { type FileJson, type HistoryEvent, isConceptPath, type Links } from "../concept/data";
   import { useTitleOf } from "../frame.svelte.ts";
-  import Icon from "../Icon.svelte";
   import { attachmentSource, mediaKind } from "../images";
   import { useLoad } from "../load.svelte.ts";
   import Moment from "../Moment.svelte";

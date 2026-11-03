@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from "../Icon.svelte";
+  import { Icon } from "@tempra/design/components";
   import { day, plural } from "../ui";
   import type { Urls } from "../urls";
   import type { Namer } from "./byline";

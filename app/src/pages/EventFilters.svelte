@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { Icon } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { KINDS } from "../activity";
-  import Icon from "../Icon.svelte";
 
   /** Every event's own filters: the kind, and text to find in the path or the note. */
   let {

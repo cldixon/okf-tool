@@ -1,19 +1,13 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import Icon from "./Icon.svelte";
+  import IconButton from "./IconButton.svelte";
   import { modal } from "./modal";
+  import type { DialogProps } from "./types";
 
   /**
    * A small modal dialog in the top layer: a title, a close button, its content. Escape, the
    * close button or a click on the backdrop closes it, and the focus goes back where it was.
    */
-  let props: {
-    title: string;
-    open: boolean;
-    onClose(): void;
-    wide?: boolean;
-    children: Snippet;
-  } = $props();
+  let props: DialogProps = $props();
   const titleId = $props.id();
 </script>
 
@@ -32,9 +26,7 @@
     <div class="dialog-box">
       <div class="dialog-head">
         <h2 id={titleId}>{props.title}</h2>
-        <button type="button" class="icon-button touch" aria-label="Close" title="Close" onclick={() => props.onClose()}>
-          <Icon name="close" />
-        </button>
+        <IconButton icon="close" label="Close" touch onclick={() => props.onClose()} />
       </div>
       <div class="dialog-body">{@render props.children()}</div>
     </div>
