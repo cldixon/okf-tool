@@ -11,8 +11,9 @@
    *
    * A modal <dialog> (showModal: the top layer, focus kept inside, Escape), its look in reader.css.
    */
+
+  import { Icon } from "@tempra/design/components";
   import { untrack } from "svelte";
-  import Icon from "../Icon.svelte";
   import DiagramStage from "./DiagramStage.svelte";
   import ImageStage from "./ImageStage.svelte";
   import { type FigureView, factsLine, type ImageFacts } from "./lightbox";

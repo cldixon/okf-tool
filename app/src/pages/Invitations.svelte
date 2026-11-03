@@ -1,11 +1,11 @@
 <script lang="ts">
+  import { Tile } from "@tempra/design/components";
   import Avatar from "../Avatar.svelte";
   import { api, post } from "../api";
-  import LibraryTile from "../LibraryTile.svelte";
   import { useAction, useLoad } from "../load.svelte.ts";
   import Moment from "../Moment.svelte";
   import Status from "../Status.svelte";
-  import { day } from "../ui";
+  import { day, tileLetter } from "../ui";
   import { useTitle } from "../ui.svelte.ts";
   import { Urls } from "../urls";
   import type { PendingInvitation } from "./account";
@@ -47,7 +47,7 @@
               >
             </p>
             <div class="invitation-card">
-              <LibraryTile name={i.slug} shared /><div class="invitation-library">
+              <Tile letter={tileLetter(i.slug)} shared /><div class="invitation-library">
                 <strong>{i.owner}/{i.slug}</strong><span>Open until {day(i.expires)}</span>
               </div>
             </div>

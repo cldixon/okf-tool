@@ -1,8 +1,7 @@
 <script lang="ts">
+  import { Badge, Icon, Menu } from "@tempra/design/components";
   import BellList from "./BellList.svelte";
-  import Icon from "./Icon.svelte";
   import { useOpenCount } from "./inbox.svelte.ts";
-  import Menu from "./Menu.svelte";
 
   /**
    * The bell (TEMPRA-189): the person's notifications, on every page. What waits is a badge; the
@@ -22,7 +21,7 @@
 >
   {#snippet label()}
     <Icon name="bell" />
-    {#if n > 0}<span class="badge" aria-hidden="true">{n > 99 ? "99+" : n}</span>{/if}
+    <Badge count={n} />
   {/snippet}
   {#snippet children(close: () => void)}
     <BellList {close} />

@@ -11,8 +11,9 @@
    * text (`data-skip`). A diagram that fails shows its source as the default code block would,
    * where comments can anchor, with a quiet notice under it.
    */
+
+  import { Icon } from "@tempra/design/components";
   import type { Code } from "mdast";
-  import Icon from "../Icon.svelte";
   import Caption from "./Caption.svelte";
   import { drawDiagram, fenceAlt, figureLang } from "./diagram";
   import { useOpenFigure } from "./open-figure";

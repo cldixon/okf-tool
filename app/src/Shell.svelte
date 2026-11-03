@@ -20,7 +20,7 @@
   import Brand from "./Brand.svelte";
   import { NARROW } from "./frame";
   import { provideFrame, useMedia } from "./frame.svelte.ts";
-  import Icon from "./Icon.svelte";
+  import { Icon, IconButton } from "@tempra/design/components";
   import { usePrefetchLinks } from "./links.svelte.ts";
   import { here } from "./location.svelte.ts";
   import { lastNavigation } from "./router";
@@ -225,13 +225,12 @@
       >{/if}<!-- On a phone, the mark and the library's name; the page's title names the page
         (TEMPRA-140, TEMPRA-145). --><div class="ws-topbar-place"
         ><Brand library={props.library} short /></div
-      >{#if !showSidebar && props.onHide}<button
-          type="button"
-          class="icon-button show-sidebar"
-          aria-label="Show sidebar"
-          title="Show sidebar"
-          onclick={() => props.onHide?.(false)}><Icon name="sidebar" /></button
-        >{/if}<!-- The page's path, from the page (a concept's folders and title; TEMPRA-145). --><div
+      >{#if !showSidebar && props.onHide}<IconButton
+          icon="sidebar"
+          label="Show sidebar"
+          class="show-sidebar"
+          onclick={() => props.onHide?.(false)}
+        />{/if}<!-- The page's path, from the page (a concept's folders and title; TEMPRA-145). --><div
         class="topbar-path"
         bind:this={pathSlot}
         hidden={here.held}
@@ -252,13 +251,14 @@
     <!-- On a phone the drawer's head: the desktop's bar over the sidebar (the mark, the
       library and its switcher, search) and × (TEMPRA-141, TEMPRA-145); then its sidebar. -->
     <div class="drawer-head"
-      ><Brand library={props.library} onSearch={props.onSearch} /><button
-        type="button"
-        class="icon-button touch drawer-close"
-        aria-label="Close menu"
+      ><Brand library={props.library} onSearch={props.onSearch} /><IconButton
+        icon="close"
+        label="Close menu"
         title="Close"
-        onclick={() => (drawer = false)}><Icon name="close" /></button
-      ></div>
+        touch
+        class="drawer-close"
+        onclick={() => (drawer = false)}
+      /></div>
     {@render props.sidebar()}
   </section>{/if}
   <!-- A move that waits past the hold says so, quietly (TEMPRA-194); the page draws Loading…. -->

@@ -1,14 +1,13 @@
 <script lang="ts">
+  import { ComposeDialog, PillButton, Tile } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { api, field, post } from "../api";
-  import ComposeDialog from "../ComposeDialog.svelte";
-  import Icon from "../Icon.svelte";
-  import LibraryTile from "../LibraryTile.svelte";
   import { useAction, useLoad } from "../load.svelte.ts";
   import PageBar from "../PageBar.svelte";
   import { isShared, libraryLabel } from "../role";
   import { navigate } from "../router";
   import Status from "../Status.svelte";
+  import { tileLetter } from "../ui";
   import { useMe, useTitle } from "../ui.svelte.ts";
   import { Urls } from "../urls";
   import { cardFacts, type Library, slugFrom } from "./libraries";
@@ -62,9 +61,7 @@
 </script>
 
 {#snippet newLibrary(className: string)}
-  <button type="button" class={className} aria-haspopup="dialog" onclick={() => (creating = true)}
-    ><Icon name="plus" />New library</button
-  >
+  <PillButton icon="plus" label="New library" class={className} aria-haspopup="dialog" onclick={() => (creating = true)} />
 {/snippet}
 
 {#snippet barNew()}{@render newLibrary("tool-pill primary bar-new")}{/snippet}
@@ -78,7 +75,7 @@
         {@const facts = cardFacts(l)}
         <li>
           <a class="lib-card" href={new Urls(l.owner, l.slug).tree("")}
-            ><span class="lib-card-cover"><LibraryTile name={l.title || l.slug} shared={isShared(l)} /></span
+            ><span class="lib-card-cover"><Tile letter={tileLetter(l.title || l.slug)} size="large" shared={isShared(l)} /></span
             ><span class="lib-card-body"
               ><span class="lib-card-name"><span>{libraryLabel(l)}</span></span
               >{#if l.description}<span class="lib-card-desc">{l.description}</span>{/if}{#if facts.length > 0}<span

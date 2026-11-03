@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { PanelHead } from "@tempra/design/components";
   import type { Snippet } from "svelte";
-  import Icon from "../Icon.svelte";
   import { DRAG_TO_CLOSE, PANEL_TITLES, type PanelName } from "./panel";
 
   /**
@@ -20,13 +20,15 @@
 </script>
 
 <aside class={`concept-panel panel-${props.name}`} aria-label={title} id={`panel-${props.name}`}
-  ><!-- svelte-ignore a11y_no_static_element_interactions --><header
-    class="panel-head"
-    onpointerdown={(e) => {
+  ><PanelHead
+    {title}
+    count={props.count}
+    onClose={() => props.onClose()}
+    onpointerdown={(e: PointerEvent) => {
       if (e.pointerType === "mouse" || (e.target as Element).closest("button")) return;
       drag = { id: e.pointerId, y: e.clientY };
     }}
-    onpointerup={(e) => {
+    onpointerup={(e: PointerEvent) => {
       const from = drag;
       drag = null;
       if (from && from.id === e.pointerId && e.clientY - from.y > DRAG_TO_CLOSE) props.onClose();
@@ -34,14 +36,5 @@
     onpointercancel={() => {
       drag = null;
     }}
-    ><span class="panel-grip" aria-hidden="true"></span
-    ><!-- Takes the focus when the person opens the panel (C-25). --><h2 tabindex="-1">{title}</h2
-    >{#if props.count}<span class="count">{props.count}</span>{/if}<button
-      type="button"
-      class="icon-button touch"
-      aria-label={`Close ${title.toLowerCase()}`}
-      title="Close"
-      onclick={() => props.onClose()}><Icon name="close" /></button
-    ></header
-  ><div class="panel-body">{@render props.children()}</div></aside
+  /><!-- Its h2 takes the focus when the person opens the panel (C-25). --><div class="panel-body">{@render props.children()}</div></aside
 >

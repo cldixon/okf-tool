@@ -4,7 +4,7 @@
 </script>
 
 <script lang="ts">
-  import Icon from "../Icon.svelte";
+  import { Button, PillButton } from "@tempra/design/components";
   import { useLoad } from "../load.svelte.ts";
   import Status from "../Status.svelte";
   import { baseName, type Urls } from "../urls";
@@ -27,16 +27,14 @@
 
 <section class="raw-markdown" aria-label="Markdown"
   ><div class="raw-head"
-    ><button type="button" class="pill-button" onclick={() => onBack()}><Icon name="previous" /> Back to page</button
-    ><code class="raw-path">{path}</code
-    ><button
-      type="button"
+    ><PillButton icon="previous" label="Back to page" onclick={() => onBack()} /><code class="raw-path">{path}</code
+    ><Button
       aria-pressed={wrap}
       onclick={() => {
         wrapped = !wrap;
         wrap = !wrap;
-      }}>Wrap lines</button
-    ><a class="button pill-button" href={urls.raw(path)} download={baseName(path)}><Icon name="download" /> Download</a></div
+      }}>Wrap lines</Button
+    ><PillButton icon="download" label="Download" href={urls.raw(path)} download={baseName(path)} /></div
   ><Status loaded={loaded.current}
     >{#snippet children(text: string)}<pre class={wrap ? "raw-file wrap" : "raw-file"}>{#each text.replace(/\n$/, "").split("\n") as line, i (i)}<span class="raw-line">{line}{"\n"}</span>{/each}</pre>{/snippet}</Status
   ></section

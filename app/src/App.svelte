@@ -6,6 +6,13 @@
     return settingsChunk;
   };
 
+  /** The components' catalogue (/_dev/design, local dev only), a chunk of its own. */
+  let designChunk: Promise<typeof import("./pages/Design.svelte")> | null = null;
+  const design = () => {
+    designChunk ??= import("./pages/Design.svelte");
+    return designChunk;
+  };
+
   /** The pages that lay out their column themselves (a concept's columns, the person's views). */
   const OWN_COLUMN = new Set(["file", "directory", "activity"]);
 </script>
@@ -145,7 +152,10 @@
   {/if}
 {/snippet}
 
-{#if libraryUrls && place}
+{#if route?.page === "design"}
+  <!-- The catalogue draws every component in light and dark, with no frame around it. -->
+  {#await design() then D}<D.default />{/await}
+{:else if libraryUrls && place}
   <!-- A library's pages share one workspace, kept mounted while the person moves within it. -->
   {#key libraryKey}
     <Workspace urls={libraryUrls} {place} me={me.current}>

@@ -94,6 +94,9 @@ export const commentKey = () =>
     ? "⌥⌘M"
     : "Ctrl Alt M";
 
+/** A library's letter for its tile: the first of its name, upper case. */
+export const tileLetter = (name: string) => (name.trim()[0] ?? "?").toUpperCase();
+
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** An element id for a footnote label or source id (as the server's anchorId). */

@@ -1,6 +1,5 @@
 <script lang="ts">
-  import Icon from "../Icon.svelte";
-  import Menu from "../Menu.svelte";
+  import { Icon, Menu } from "@tempra/design/components";
   import { useCopy } from "../ui.svelte.ts";
   import { baseName, type Urls } from "../urls";
   import type { PanelName } from "./panel";

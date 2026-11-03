@@ -1,13 +1,10 @@
 <script lang="ts">
+  import { Segmented } from "@tempra/design/components";
   import { THEMES, type Theme } from "./theme.svelte.ts";
 
   /** System, Light, Dark as one segmented control (the avatar's menu, the Account page). */
   let { value, onChange }: { value: Theme; onChange(theme: Theme): void } = $props();
+  const options = THEMES.map(([key, label]) => ({ value: key, label }));
 </script>
 
-<fieldset class="segmented">
-  <legend class="visually-hidden">Theme</legend>
-  {#each THEMES as [key, label] (key)}
-    <button type="button" aria-pressed={value === key} data-stay onclick={() => onChange(key)}>{label}</button>
-  {/each}
-</fieldset>
+<Segmented label="Theme" {options} {value} onchange={(v) => onChange(v as Theme)} />

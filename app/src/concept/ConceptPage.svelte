@@ -10,7 +10,7 @@
   import { highlightsOf, placeThreads, type Thread } from "../comments/data";
   import { useDraft } from "../comments/data.svelte.ts";
   import { useFrame } from "../frame.svelte.ts";
-  import Icon from "../Icon.svelte";
+  import { Icon } from "@tempra/design/components";
   import { attachmentSource } from "../images";
   import { here } from "../location.svelte.ts";
   import PageBar from "../PageBar.svelte";

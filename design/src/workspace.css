@@ -167,6 +167,12 @@ body.ground {
   line-height: 1;
 }
 
+/* In a compact row (a collapsed thread). */
+.avatar-mark.small {
+  width: var(--tempra-size-avatar-small);
+  height: var(--tempra-size-avatar-small);
+}
+
 .avatar-mark.agent {
   background: var(--tempra-color-text);
   color: var(--tempra-color-bg);
@@ -684,12 +690,9 @@ a.button.pill-button {
   color: var(--tempra-color-text);
 }
 
-/* The bell: how many notifications wait, as a small badge on its corner. */
-.bell .badge {
-  position: absolute;
-  top: calc(-1 * var(--tempra-space-04));
-  right: calc(-1 * var(--tempra-space-04));
-  display: grid;
+/* A count on a control's corner (Badge): the bell's notifications. */
+.badge {
+  display: inline-grid;
   place-items: center;
   min-width: var(--tempra-size-badge);
   height: var(--tempra-size-badge);
@@ -700,6 +703,12 @@ a.button.pill-button {
   font-size: var(--tempra-text-initial);
   font-weight: var(--tempra-weight-strong);
   line-height: 1;
+}
+
+.bell .badge {
+  position: absolute;
+  top: calc(-1 * var(--tempra-space-04));
+  right: calc(-1 * var(--tempra-space-04));
 }
 
 /*
@@ -1050,6 +1059,18 @@ a.button.pill-button {
   color: var(--tempra-color-bg);
   font-size: var(--tempra-text-name);
   font-weight: var(--tempra-weight-strong);
+}
+
+/* Tile's sizes: small in a row (the sidebar, a menu, the bell), large on a card's cover. */
+.lib-tile.small {
+  width: var(--tempra-size-tile-small);
+  height: var(--tempra-size-tile-small);
+  font-size: var(--tempra-text-label);
+}
+
+.lib-tile.large {
+  width: var(--tempra-size-tile-large);
+  height: var(--tempra-size-tile-large);
 }
 
 .nav {

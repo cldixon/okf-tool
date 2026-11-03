@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { Dialog } from "@tempra/design/components";
   import type { Confirming } from "./confirm.svelte.ts";
-  import Dialog from "./Dialog.svelte";
 
   let { asking }: { asking: Confirming } = $props();
   const ask = $derived(asking.ask);

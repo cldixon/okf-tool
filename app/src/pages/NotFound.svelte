@@ -1,10 +1,10 @@
 <script lang="ts">
+  import { Icon } from "@tempra/design/components";
   import { actorText } from "../agents";
   import { useActors } from "../agents.svelte.ts";
   import { ApiError, api } from "../api";
   import type { HistoryEvent } from "../concept/data";
   import { useFrame, useTitleOf } from "../frame.svelte.ts";
-  import Icon from "../Icon.svelte";
   import { useLoad } from "../load.svelte.ts";
   import Moment from "../Moment.svelte";
   import PageColumn from "../PageColumn.svelte";

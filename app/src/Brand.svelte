@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from "./Icon.svelte";
+  import { SearchButton } from "@tempra/design/components";
   import LibrarySwitcher from "./LibrarySwitcher.svelte";
   import type { BrandLibrary } from "./Shell.svelte";
   import { switcherKey } from "./ui";
@@ -21,11 +21,7 @@
   >{:else}<a class="brand-name" href="/">Tempra</a>{/if}{#if props.library && !props.short}<LibrarySwitcher
     urls={props.library.urls}
     name={props.library.name}
-  />{/if}{#if props.onSearch && !props.short}<button
-    type="button"
-    class="icon-button search-button"
-    aria-label="Search"
-    aria-keyshortcuts="Control+K Meta+K"
-    title={`Search (${switcherKey()})`}
-    onclick={props.onSearch}><Icon name="search" /></button
-  >{/if}
+  />{/if}{#if props.onSearch && !props.short}<SearchButton
+    shortcut={switcherKey()}
+    onclick={props.onSearch}
+  />{/if}

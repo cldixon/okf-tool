@@ -1,7 +1,6 @@
 <script lang="ts">
+  import { Icon, Menu } from "@tempra/design/components";
   import type { Snippet } from "svelte";
-  import Icon from "../Icon.svelte";
-  import Menu from "../Menu.svelte";
   import { plural } from "../ui";
 
   /*

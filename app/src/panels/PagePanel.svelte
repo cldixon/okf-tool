@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Chip } from "@tempra/design/components";
   import Reader from "../Reader.svelte";
   import { prepare } from "../reader/prepare";
   import { localTime, relativeTime } from "../ui";
@@ -49,9 +50,9 @@
               >{bylineName(page.byline)}{" · edited "}<time datetime={page.byline.at} title={localTime(page.byline.at)}
                 >{relativeTime(page.byline.at)}</time
               ></span
-            >{/if}{#if page.concept.status && page.concept.status !== "stable"}<span class="chip"
-              >{page.concept.status[0]?.toUpperCase()}{page.concept.status.slice(1)}</span
-            >{/if}{#if page.concept.stale}<span class="chip">Stale</span>{/if}
+            >{/if}{#if page.concept.status && page.concept.status !== "stable"}<Chip
+              >{page.concept.status[0]?.toUpperCase()}{page.concept.status.slice(1)}</Chip
+            >{/if}{#if page.concept.stale}<Chip>Stale</Chip>{/if}
         </p>
       {/if}
     </header>

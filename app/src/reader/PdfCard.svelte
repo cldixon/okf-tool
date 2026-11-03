@@ -1,6 +1,6 @@
 <script lang="ts">
   /** A PDF's card: its name, type and size, Open and Download. Also the full-screen view's. */
-  import Icon from "../Icon.svelte";
+  import { Icon } from "@tempra/design/components";
   import { formatSize } from "../ui";
   import { baseName } from "../urls";
   import BrokenImage from "./BrokenImage.svelte";

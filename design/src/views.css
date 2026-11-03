@@ -795,3 +795,68 @@ a.activity-download {
     box-shadow: var(--tempra-shadow);
   }
 }
+
+/* ---------- The components' catalogue (/_dev/design, local dev only; TEMPRA-252) ---------- */
+
+/* Each theme's column draws the same components; `.theme-light` and `.theme-dark` set the
+   colour scheme on a part of the page, so the tokens' light-dark() values follow it. */
+.theme-light {
+  color-scheme: light;
+}
+
+.theme-dark {
+  color-scheme: dark;
+}
+
+.catalogue {
+  padding: var(--tempra-space-32) var(--tempra-space-16);
+}
+
+.catalogue-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--tempra-size-panel), 1fr));
+  gap: var(--tempra-space-16);
+}
+
+.catalogue-theme {
+  padding: var(--tempra-space-20);
+  border: 1px solid var(--tempra-color-border);
+  border-radius: var(--tempra-radius-box);
+  background: var(--tempra-color-bg);
+  color: var(--tempra-color-text);
+}
+
+.catalogue-item {
+  padding: var(--tempra-space-16) 0;
+  border-top: 1px solid var(--tempra-color-border);
+}
+
+.catalogue-item:first-of-type {
+  border-top: 0;
+}
+
+.catalogue-item > h2 {
+  margin: 0 0 var(--tempra-space-10);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-medium);
+}
+
+.catalogue-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tempra-space-10);
+}
+
+/* A comment mark and a panel's head out of their places: in the flow. */
+.catalogue-row .comment-mark {
+  position: static;
+  margin: 0;
+}
+
+.catalogue-row .panel-head {
+  flex: 1;
+  border: 1px solid var(--tempra-color-border);
+}

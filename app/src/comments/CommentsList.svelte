@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Segmented } from "@tempra/design/components";
   import { threadElementId } from "../concept/panel";
   import { usePresence } from "../presence.svelte.ts";
   import type { Urls } from "../urls";
@@ -75,10 +76,14 @@
 </script>
 
 <div class="comments-list" bind:this={list}
-  ><fieldset class="segmented"
-    ><legend class="visually-hidden">Threads</legend><button type="button" aria-pressed={tab === "open"} onclick={() => (tab = "open")}>Open</button
-    ><button type="button" aria-pressed={tab === "resolved"} onclick={() => (tab = "resolved")}>Resolved {resolved.length}</button></fieldset
-  >{#if props.error}<p class="small warn">Could not load the comments: {props.error}</p>{/if}{#if tab === "open" && props.draft}<NewComment
+  ><Segmented
+    label="Threads"
+    options={[
+      { value: "open", label: "Open" },
+      { value: "resolved", label: `Resolved ${resolved.length}` },
+    ]}
+    bind:value={tab}
+  />{#if props.error}<p class="small warn">Could not load the comments: {props.error}</p>{/if}{#if tab === "open" && props.draft}<NewComment
       urls={props.urls}
       path={props.path}
       draft={props.draft}

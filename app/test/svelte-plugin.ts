@@ -2,7 +2,8 @@
  * Lets `bun test` import Svelte (TEMPRA-176): `.svelte` components and `.svelte.ts` rune modules
  * compiled with svelte/compiler for the client, as Vite compiles them, so the tests mount them
  * into happy-dom. `bun test --conditions browser` (the package's test script) resolves `svelte`
- * to its client runtime.
+ * to its client runtime. The filters match by extension wherever a file lives, so the design
+ * package's components (`@tempra/design/components`, design/src/components/) compile the same way.
  */
 import { plugin } from "bun";
 import { compile, compileModule } from "svelte/compiler";

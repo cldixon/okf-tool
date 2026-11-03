@@ -7,6 +7,8 @@ export type Route =
   | { page: "agents"; newToken: boolean; library: string | null }
   | { page: "account"; done: string | null }
   | { page: "invitations" }
+  /** The design components' catalogue (TEMPRA-252); the Worker serves it in local dev only. */
+  | { page: "design" }
   /** A page that moved: the app replaces the URL with `to` (as the server answers with a 308). */
   | { page: "redirect"; to: string }
   /** The library's settings, one page; `section` from a former tab's URL, moved to its anchor. */
@@ -90,6 +92,7 @@ export function match(url: URL): Route | null {
   // Email settings are one switch on the Account page (TEMPRA-189).
   if (path === "/notifications") return { page: "redirect", to: "/account#email" };
   if (path === "/invitations") return { page: "invitations" };
+  if (path === "/_dev/design") return { page: "design" };
   // The Inbox page went (TEMPRA-189): notifications are the bell's panel, on every page.
   if (path === "/inbox") return { page: "redirect", to: "/" };
   const m = /^\/([^/]+)\/([^/]+)\/(.*)$/.exec(path);
