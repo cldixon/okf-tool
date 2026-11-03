@@ -176,6 +176,18 @@ textarea {
   line-height: var(--tempra-leading-base);
 }
 
+/* A field that cannot be changed: muted on the ground's grey, never faded (TEMPRA-132). */
+input:disabled,
+select:disabled,
+textarea:disabled,
+.field input:disabled,
+.field select:disabled {
+  border-color: var(--tempra-color-border);
+  background: var(--tempra-color-ground);
+  color: var(--tempra-color-muted);
+  cursor: default;
+}
+
 /* A search box with its glyph inside (SearchField): the input's own look, room at its start. */
 .search-field {
   position: relative;
@@ -323,9 +335,17 @@ details > summary {
 .notice {
   margin: var(--tempra-space-08) 0;
   padding: var(--tempra-space-10) var(--tempra-space-12);
+  border: 1px solid transparent;
   border-radius: var(--tempra-radius-box);
   background: var(--tempra-color-ground);
   font-size: var(--tempra-text-ui);
+}
+
+/* Something done (saved, reverted): quieter than an error, outlined on the page in muted text. */
+.notice.ok {
+  border-color: var(--tempra-color-border);
+  background: transparent;
+  color: var(--tempra-color-muted);
 }
 
 .chip {
