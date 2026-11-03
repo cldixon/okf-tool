@@ -71,6 +71,11 @@ export interface Deployment {
   limiters?: { write: string; request: string; session: string };
   /** False: no daily sweep and digest. */
   cron?: false;
+  /**
+   * The operator's portal (TEMPRA-278, admin/): its Worker and host, behind Cloudflare Access. It
+   * calls this Worker's `Operator` entrypoint; /waitlist sends the operator there. Unset: none.
+   */
+  admin?: { name: string; host: string };
 }
 
 const PRODUCTION: Deployment = {
@@ -92,6 +97,7 @@ const PRODUCTION: Deployment = {
   mailFrom: "noreply@mail.tempra.dev",
   // The contact address on the landing page's Terms and Privacy.
   inboundMail: { zone: "tempra.dev", routes: [{ address: "hello@tempra.dev", to: "operator" }] },
+  admin: { name: "tempra-admin", host: "admin.tempra.dev" },
 };
 
 const STAGING: Deployment = {
@@ -108,6 +114,8 @@ const STAGING: Deployment = {
   agentQueue: "tempra-agent-staging",
   mailQueue: "tempra-mail-staging",
   mailFrom: "noreply@mail.tempra.dev",
+  // One level under the zone, so the zone's certificate covers it.
+  admin: { name: "tempra-admin-staging", host: "admin-staging.tempra.dev" },
   // Staging's traffic and counters stay out of production's (TEMPRA-76). Datasets are created on
   // first write and namespaces are only ids, so neither needs a resource made.
   usage: "tempra_usage_staging",
@@ -252,6 +260,8 @@ export default defineConfig(({ mode }) => {
       exports: {
         Library: exports.durableObject({ storage: "sqlite" }),
         AccountFeeds: exports.durableObject({ storage: "sqlite" }),
+        // The operator's portal's RPC entrypoint (TEMPRA-278), bound by admin/ as OPERATOR.
+        Operator: exports.worker(),
       },
 
       env: {
@@ -323,6 +333,8 @@ export default defineConfig(({ mode }) => {
         // The landing page (site/), by service binding: signed-out `/` and the site's paths.
         // Not bound locally: cf dev runs this Worker alone.
         ...(local || !d.site ? {} : { SITE: bindings.worker({ worker: d.site }) }),
+        // The operator's portal (TEMPRA-278), where /waitlist sends the operator; "" for none.
+        ADMIN_ORIGIN: bindings.text(local || !d.admin ? "" : `https://${d.admin.host}`),
         ...(d.mailFrom
           ? { EMAIL: bindings.sendEmail({ allowedSenderAddresses: [d.mailFrom] }) }
           : {}),

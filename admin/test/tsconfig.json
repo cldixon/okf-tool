@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": ["bun"] },
+  "include": [
+    "../.cloudflare/types/index.d.ts",
+    "../src/**/*.ts",
+    "../dist/*.ts",
+    "../scripts/**/*.ts",
+    "../build.ts",
+    "./**/*.ts"
+  ]
+}
