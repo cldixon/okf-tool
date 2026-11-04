@@ -544,17 +544,32 @@ a.button.pill-button {
   border-right: 1px solid var(--tempra-color-border);
 }
 
+.brand-lockup {
+  gap: var(--tempra-space-08);
+  font-size: var(--tempra-text-name);
+}
+
+/* The mark: a link to the library list, its front plate on the name's cap line (.mark-lockup),
+   taking a click or a tap over a control's area around it (the mark is about 13px). */
 .brand-mark {
-  width: var(--tempra-size-tile-large);
-  height: var(--tempra-size-tile-large);
+  display: flex;
+  flex: none;
+  border-radius: var(--tempra-radius-row);
   text-decoration: none;
 }
 
-/* A hairline between the mark and the library's name. */
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  inset: calc((var(--tempra-size-mark) - var(--tempra-size-control)) / 2);
+}
+
+/* A hairline between the mark and the library's name, centred on the name. */
 .brand-sep {
   flex: none;
+  align-self: center;
   width: 1px;
-  height: 20px; /* one-off: shorter than the mark */
+  height: 20px; /* one-off: shorter than the bar's controls */
   margin: 0 var(--tempra-space-02);
   background: var(--tempra-color-border);
 }
@@ -577,7 +592,7 @@ a.button.pill-button {
 /* The switcher's ⌄, right beside the name. */
 .lib-switch {
   flex: none;
-  width: var(--tempra-size-tile-large); /* as tall as the mark beside it */
+  width: var(--tempra-size-tile-large); /* one of the bar's small controls */
   height: var(--tempra-size-tile-large);
   margin-left: calc(-1 * var(--tempra-space-04));
   color: var(--tempra-color-muted);
@@ -1047,8 +1062,7 @@ a.button.pill-button {
   }
 }
 
-.lib-tile,
-.wordmark-tile {
+.lib-tile {
   display: grid;
   flex: none;
   place-items: center;

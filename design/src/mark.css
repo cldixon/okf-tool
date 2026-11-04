@@ -1,0 +1,43 @@
+/*
+ * The Tempra mark (TEMPRA-279): its size, its plates' colours and its place beside a name. In
+ * tempra.css after base.css, and in both panels' stylesheets (build.ts), since a panel names its
+ * source in a chat too.
+ */
+
+/* The Tempra mark (TEMPRA-279; `Mark` in the components, `markSvg` for what has no Svelte): its
+   plates' height, its width from its view box, its plates' colours. Beside a name it is as tall as
+   --tempra-size-mark of the name's size, its box's bottom on the name's baseline (it has no text,
+   so a baseline-aligned row puts its bottom there), then dropped by --tempra-space-mark-drop, so
+   the front plate's top sits on the cap line: .mark-lockup. */
+.mark {
+  display: block;
+  flex: none;
+  width: auto;
+  height: var(--tempra-size-mark);
+  aspect-ratio: 45 / 50;
+}
+
+.mark-front {
+  fill: var(--tempra-color-mark-front);
+}
+
+.mark-mid {
+  fill: var(--tempra-color-mark-mid);
+}
+
+.mark-back {
+  fill: var(--tempra-color-mark-back);
+}
+
+/* A mark and a name on one baseline (the top bar's, the public pages' wordmark). */
+.mark-lockup {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.mark-lockup > .mark,
+.mark-lockup > :has(> .mark) {
+  position: relative;
+  top: var(--tempra-space-mark-drop);
+}

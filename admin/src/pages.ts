@@ -1,4 +1,5 @@
 import { href as designHref } from "@tempra/design";
+import { markSvg } from "@tempra/design/mark";
 import type { Day } from "./analytics";
 import type { ActivityCounts, Outcome, People } from "./operator";
 
@@ -23,6 +24,9 @@ export function when(iso: string | null): string {
 const time = (iso: string | null) =>
   iso ? `<time datetime="${esc(iso)}">${esc(when(iso))}</time>` : "–";
 
+/** The Tempra mark before the name, as on the public pages (TEMPRA-279). */
+const WORDMARK = markSvg({ small: true });
+
 export function frame(title: string, body: string): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -32,7 +36,7 @@ export function frame(title: string, body: string): string {
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="${designHref}"></head>
 <body class="public"><a class="skip-link" href="#main">Skip to content</a>
-<header class="public-head"><a class="wordmark" href="/"><span class="wordmark-tile" aria-hidden="true">T</span>Tempra admin</a>
+<header class="public-head"><a class="wordmark mark-lockup" href="/">${WORDMARK}Tempra admin</a>
 <nav class="public-nav" aria-label="Main"><a href="/cdn-cgi/access/logout">Sign out</a></nav></header>
 <main id="main" class="public-main">${body}</main></body></html>`;
 }

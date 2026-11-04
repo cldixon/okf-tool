@@ -9,11 +9,11 @@
  * main#main.public-main, footer.public-foot > nav > ul.
  */
 
-/* The wordmark: the tile with the initial, as the app's top bar draws it, and the name. It links
-   to tempra.dev. */
+/* The wordmark: the Tempra mark and the name, as the app's top bar draws them (TEMPRA-279), on
+   one baseline, the mark's front plate on the name's cap line (.mark-lockup). It links to
+   tempra.dev. */
 .wordmark {
   display: inline-flex;
-  align-items: center;
   gap: var(--tempra-space-10);
   color: var(--tempra-color-text);
   font-size: var(--tempra-text-name);

@@ -12,6 +12,7 @@
     ICONS,
     Icon,
     IconButton,
+    Mark,
     Menu,
     Notice,
     PanelHead,
@@ -140,6 +141,13 @@
     <Tile letter="S" shared />
   {/snippet}
   {@render item("Tile", tiles)}
+
+  {#snippet tempraMarks()}
+    <Mark small label="Tempra" />
+    <Mark label="Tempra" />
+    <span class="brand-lockup mark-lockup"><Mark small /><span class="brand-name">tempra-dev</span></span>
+  {/snippet}
+  {@render item("Mark", tempraMarks)}
 
   {#snippet badges()}
     <Badge count={3} />

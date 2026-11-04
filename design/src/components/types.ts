@@ -97,6 +97,13 @@ export type TileProps = {
 
 export type BadgeProps = { count: number };
 
+export type MarkProps = {
+  /** At 24px and under: the wider gap that keeps the plates apart. */
+  small?: boolean;
+  /** Names the mark (role="img"); without it, it is decorative. */
+  label?: string;
+} & Rest;
+
 export type MenuProps = {
   /** The button's content. */
   label: Snippet;

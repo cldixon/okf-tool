@@ -174,7 +174,8 @@ describe("the account's frame (AccountFrame.svelte)", () => {
     const f = draw(AccountFrame, { page: "libraries", me: null, children });
     await settle(10);
     const brand = f.host.querySelector(".topbar-brand");
-    expect(brand?.textContent).toBe("TTempra");
+    expect(brand?.textContent).toBe("Tempra");
+    expect(brand?.querySelector("a.brand-mark svg.mark")).not.toBeNull();
     expect(brand?.querySelector("button.search-button")?.getAttribute("aria-label")).toBe("Search");
     expect(f.host.querySelector("main.ws-main")?.textContent?.trim()).toBe("Page");
     expect(f.host.querySelector("section.ws-sidebar")).toBeNull();

@@ -68,6 +68,7 @@ test("every --tempra-* a stylesheet reads is defined", () => {
     "tokens.css",
     "fonts.css",
     "base.css",
+    "mark.css",
     "prose.css",
     "reader.css",
     "workspace.css",
@@ -112,6 +113,7 @@ test("only tokens.css reads a palette primitive", () => {
   for (const f of [
     "fonts.css",
     "base.css",
+    "mark.css",
     "prose.css",
     "reader.css",
     "workspace.css",
@@ -124,5 +126,31 @@ test("only tokens.css reads a palette primitive", () => {
     for (const [, name] of src(f).matchAll(/var\((--tempra-[a-z0-9-]+)/g)) {
       expect(PRIMITIVE.test(name as string), `${f} reads the primitive ${name}`).toBe(false);
     }
+  }
+});
+
+// The favicon cannot read the stylesheet, so it carries the mark's colours itself (TEMPRA-279):
+// they must be the palette's, the ones the mark's colour roles point at, light and dark.
+test("the favicon's plates are the mark's colour roles, light and dark", () => {
+  const tokens = readFileSync(join(import.meta.dir, "src", "tokens.css"), "utf8");
+  const favicon = readFileSync(join(import.meta.dir, "favicon.svg"), "utf8");
+  const hex = (name: string) =>
+    new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`).exec(tokens)?.[1] as string;
+  const role = (r: string) => {
+    const m = new RegExp(
+      `--tempra-color-mark-${r}:\\s*light-dark\\(var\\(--([a-z0-9-]+)\\),\\s*var\\(--([a-z0-9-]+)\\)\\)`,
+    ).exec(tokens);
+    if (!m) throw new Error(`no --tempra-color-mark-${r}`);
+    return [hex(m[1] as string), hex(m[2] as string)];
+  };
+  const [light, dark] = favicon.split("@media(prefers-color-scheme:dark)") as [string, string];
+  for (const [cls, r] of [
+    ["b", "back"],
+    ["m", "mid"],
+    ["f", "front"],
+  ] as const) {
+    const [l, d] = role(r);
+    expect(light).toContain(`.${cls}{fill:${l}}`);
+    expect(dark).toContain(`.${cls}{fill:${d}}`);
   }
 });

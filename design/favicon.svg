@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2.5 0 50 50">
 <title>Tempra</title>
-<style>text{fill:#161618;font:600 28px -apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Helvetica,sans-serif}@media(prefers-color-scheme:dark){text{fill:#f0f0f3}}</style>
-<text x="16" y="26" text-anchor="middle">T</text></svg>
+<style>.b{fill:#bcbcbf}.m{fill:#808082}.f{fill:#161618}@media(prefers-color-scheme:dark){.b{fill:#636365}.m{fill:#a4a4a7}.f{fill:#f0f0f3}}</style>
+<path class="b" d="M0 14H1.9V45.6H36V50H0Z"/><path class="m" d="M4.5 7H6.4V38.6H40.5V43H4.5Z"/><path class="f" d="M9 0H33L45 12V36H9Z"/></svg>

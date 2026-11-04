@@ -7,6 +7,8 @@
  * panel itself, over a small `PanelHost`, so it can be tested without a host.
  */
 
+import { markSvg } from "@tempra/design/mark";
+
 /** What `prepare_upload` puts in its result's `structuredContent.upload`. */
 export interface PreparedUpload {
   /** The `/ul/` URL: one PUT, until `expires`. */
@@ -104,6 +106,14 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   return e;
 };
 
+/** The panel's heading, after the Tempra mark (TEMPRA-279), which says whose panel it is. */
+function heading(text: string): HTMLHeadingElement {
+  const h = el("h1", { className: "mark-lockup" });
+  h.innerHTML = markSvg({ small: true, label: "Tempra" });
+  h.append(text);
+  return h;
+}
+
 /**
  * Draws the panel into `root` and returns `show`, which the host's tool result calls with the
  * prepared upload. Until then it waits.
@@ -158,7 +168,7 @@ export function mountUploadPanel(
       actions.append(open);
     }
     root.replaceChildren(
-      el("h1", { text: "Upload a file" }),
+      heading("Upload a file"),
       el(
         "p",
         {},

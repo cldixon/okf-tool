@@ -40,6 +40,7 @@
   --tempra-grey-929: #e7e7ea;
   --tempra-grey-901: #dedee0;
   --tempra-grey-871: #d4d4d7;
+  --tempra-grey-797: #bcbcbf;
   --tempra-grey-720: #a4a4a7;
   --tempra-grey-691: #989ca4;
   --tempra-grey-601: #808082;
@@ -168,6 +169,14 @@
   --tempra-color-frame: light-dark(var(--tempra-grey-169), var(--tempra-grey-232));
   --tempra-color-frame-ink: light-dark(var(--tempra-grey-601), var(--tempra-grey-601));
 
+  /* Color: the Tempra mark's three plates (TEMPRA-279), front to back: graphite in light, silver
+     in dark, as the logo's finishes are; the dark back plate a step up from the handoff's so it
+     holds 3:1 on the dark page. The light back plate (797) is the handoff's #bdbdb9 at the ramp's
+     hue. */
+  --tempra-color-mark-front: light-dark(var(--tempra-grey-201), var(--tempra-grey-956));
+  --tempra-color-mark-mid: light-dark(var(--tempra-grey-601), var(--tempra-grey-720));
+  --tempra-color-mark-back: light-dark(var(--tempra-grey-797), var(--tempra-grey-500));
+
   /* Color: links are text, underlined in running text (no colour until the palette) */
   --tempra-color-link: var(--tempra-color-text);
   --tempra-color-link-visited: var(--tempra-color-text);
@@ -290,7 +299,12 @@
   --tempra-size-avatar-large: 32px; /* at the head of the account menu */
   --tempra-size-tile: 24px; /* a library's initial */
   --tempra-size-tile-small: 20px; /* in a row: the sidebar, a menu, the bell */
-  --tempra-size-tile-large: 28px; /* the Tempra mark, a library card's cover */
+  --tempra-size-tile-large: 28px; /* a library card's cover */
+  /* The Tempra mark beside a name (TEMPRA-279), in em of the name's size: its plates 1.2 × Inter's
+     cap height (0.727em), the front plate's top on the cap line, so the plates behind hang below
+     the baseline by 0.2 × the cap, as a descender does. */
+  --tempra-size-mark: 0.873em;
+  --tempra-space-mark-drop: 0.145em;
   --tempra-size-badge: 16px; /* the bell's count */
   --tempra-size-dot: 6px; /* an agent's change, the agent replying */
   --tempra-size-fab: 56px; /* a page's actions, floating */

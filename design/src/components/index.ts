@@ -18,6 +18,7 @@ import DialogC from "./Dialog.svelte";
 import FieldC from "./Field.svelte";
 import IconC from "./Icon.svelte";
 import IconButtonC from "./IconButton.svelte";
+import MarkC from "./Mark.svelte";
 import MenuC from "./Menu.svelte";
 import NoticeC from "./Notice.svelte";
 import PanelHeadC from "./PanelHead.svelte";
@@ -39,6 +40,7 @@ import type {
   FieldProps,
   IconButtonProps,
   IconProps,
+  MarkProps,
   MenuProps,
   NoticeProps,
   PanelHeadProps,
@@ -55,6 +57,7 @@ import type {
 type NoExports = {};
 
 export { type Glyph, ICONS } from "./icons";
+export { MARK_PATHS, MARK_VIEWBOX, type MarkPaths, markSvg } from "./mark";
 export { modal } from "./modal";
 export type * from "./types";
 
@@ -68,6 +71,7 @@ export const Dialog = DialogC as Component<DialogProps>;
 export const Field = FieldC as Component<FieldProps>;
 export const Icon = IconC as Component<IconProps>;
 export const IconButton = IconButtonC as Component<IconButtonProps>;
+export const Mark = MarkC as Component<MarkProps>;
 export const Menu = MenuC as Component<MenuProps>;
 export const Notice = NoticeC as Component<NoticeProps>;
 export const PanelHead = PanelHeadC as Component<PanelHeadProps>;

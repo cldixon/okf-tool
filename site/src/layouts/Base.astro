@@ -6,6 +6,7 @@
  */
 import "@tempra/design/tempra.css";
 import favicon from "@tempra/design/favicon.svg?url";
+import { markSvg } from "@tempra/design/mark";
 import { APP, SITE_NAME } from "../site";
 
 interface Props {
@@ -43,7 +44,7 @@ const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.sit
   <body class="public">
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="public-head">
-      <a class="wordmark" href="/"><span class="wordmark-tile" aria-hidden="true">T</span>Tempra</a>
+      <a class="wordmark mark-lockup" href="/"><Fragment set:html={markSvg({ small: true })} />Tempra</a>
       <nav class="public-nav" aria-label="Main">
         <a href={`${APP}/sign-in`}>Sign in</a>
         <a class="button primary" href={`${APP}/request-access`}>Request access</a>
