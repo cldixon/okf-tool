@@ -1,7 +1,10 @@
 /** What every page of the site shares: where the app is, the name, and who to write to. */
 
-/** The app, where people sign in and request access. */
-export const APP = "https://app.tempra.dev";
+/**
+ * The app, where people sign in and request access: the same host since TEMPRA-276 (the app's
+ * Worker serves tempra.dev and shows this site at `/` to people signed out), so links are paths.
+ */
+export const APP = "";
 
 export const SITE_NAME = "Tempra";
 
@@ -15,7 +18,7 @@ export const CONTACT = "hello@tempra.dev";
 export const PAGES = ["/", "/terms", "/privacy"] as const;
 
 /** When Terms and Privacy last changed, shown at the top of each. */
-export const LEGAL_UPDATED = { iso: "2026-10-31", text: "31 October 2026" } as const;
+export const LEGAL_UPDATED = { iso: "2026-11-03", text: "3 November 2026" } as const;
 
 /** What deleting does, word for word the same on Terms and Privacy. */
 export const DELETION =

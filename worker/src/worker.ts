@@ -1,6 +1,7 @@
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { type AgentKey, agentName, connectionAgent, tokenAgent } from "./agents";
 import { actedBy, createApp, type Deps } from "./app";
+import { hostRedirect, hostsFrom } from "./hosts";
 import { imagesService } from "./images";
 import { handleMcp, type McpContext } from "./mcp/server";
 import { notifying, postComment } from "./notify";
@@ -211,6 +212,10 @@ export function createWorker(deps: (env: Cloudflare.Env) => Deps): {
         url.protocol = "https:";
         return Response.redirect(url.toString(), 308);
       }
+      // www to the apex, and a browser's page load on the former host to the same path here
+      // (TEMPRA-276, hosts.ts); agents and OAuth on the former host are served in place.
+      const moved = hostRedirect(request, hostsFrom(env));
+      if (moved) return moved;
       return providerFor(url.origin).fetch(request, env, ctx);
     },
   };

@@ -8,12 +8,6 @@ const env = {
   },
 };
 
-test("www redirects to the apex, keeping path and query", async () => {
-  const r = await worker.fetch(new Request("https://www.tempra.dev/a/b?x=1"), env);
-  expect(r.status).toBe(301);
-  expect(r.headers.get("Location")).toBe("https://tempra.dev/a/b?x=1");
-});
-
 test("the apex serves assets with security headers", async () => {
   const r = await worker.fetch(new Request("https://tempra.dev/"), env);
   expect(await r.text()).toBe("asset /");

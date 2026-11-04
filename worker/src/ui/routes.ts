@@ -6,6 +6,7 @@ import { type LibraryClient, WORKER_ATTACHMENT_CAP } from "../client";
 import { nightlyBundle } from "../export-bundle";
 import { isRouteName } from "../handles";
 import { VARIANT_EDGES } from "../images";
+import { fromSite } from "../legal";
 import { mailKey } from "../mail-queue";
 import { esc, messagePage, type Onward, PAGE_HEADERS, page } from "../oauth/pages";
 import { basename, dirname } from "../okf/paths";
@@ -109,7 +110,11 @@ function errorPage(status: number, message: string, onward?: Onward): Response {
  * one of the service's route names (`/api/...`, `/.well-known/...`) is not a page: plain 404. One
  * whose owner is a handle released by a rename redirects to the account's current handle.
  */
-function ui(deps: (env: Cloudflare.Env) => Deps, handler: (p: Page) => Promise<Response>) {
+function ui(
+  deps: (env: Cloudflare.Env) => Deps,
+  handler: (p: Page) => Promise<Response>,
+  signedOut?: (c: C, d: Deps) => Promise<Response> | null,
+) {
   return async (c: C) => {
     const owner = c.req.param("owner");
     if (owner !== undefined && isRouteName(owner)) return c.notFound();
@@ -121,7 +126,7 @@ function ui(deps: (env: Cloudflare.Env) => Deps, handler: (p: Page) => Promise<R
       owner !== undefined && slug !== undefined
         ? await signedInTo(c.req.raw, d, owner, slug)
         : await signedIn(c.req.raw, d);
-    if (who instanceof Response) return who;
+    if (who instanceof Response) return (await signedOut?.(c, d)) ?? who;
     const [user, found] = "found" in who ? [who.user, who.found] : [who, undefined];
     try {
       return await handler({ c, user, found, deps: d });
@@ -343,8 +348,11 @@ export function registerUiRoutes<E extends AppEnv>(
   deps: (env: Cloudflare.Env) => Deps,
   uploads: { open: typeof openUploadGrant; receive: typeof receiveUpload },
 ) {
-  const get = (path: string, handler: (p: Page) => Promise<Response>) =>
-    app.get(path, ui(deps, handler) as never);
+  const get = (
+    path: string,
+    handler: (p: Page) => Promise<Response>,
+    signedOut?: (c: C, d: Deps) => Promise<Response> | null,
+  ) => app.get(path, ui(deps, handler, signedOut) as never);
   /**
    * The SPA's shell, with the page's first API answers in it (TEMPRA-175, boot.ts): each made in
    * process through this app as the person (the same cookie, so the same checks, limits and
@@ -374,13 +382,18 @@ export function registerUiRoutes<E extends AppEnv>(
     return shell(p, { kind: "library", owner: ref.owner, slug: ref.slug });
   };
 
-  get("/", async (p) => {
-    // First run: no libraries yet, own or shared (v2 spec: Onboarding; tempra-dev: v2/sharing).
-    if ((await p.deps.accounts.reachable(p.user.id)).length === 0) {
-      return p.c.redirect("/welcome", 302);
-    }
-    return shell(p);
-  });
+  get(
+    "/",
+    async (p) => {
+      // First run: no libraries yet, own or shared (v2 spec: Onboarding; tempra-dev: v2/sharing).
+      if ((await p.deps.accounts.reachable(p.user.id)).length === 0) {
+        return p.c.redirect("/welcome", 302);
+      }
+      return shell(p);
+    },
+    // Signed out, the root is the landing page (TEMPRA-276, legal.ts), when the site is bound.
+    (c, d) => (d.site ? fromSite(d.site, c.req.raw) : null),
+  );
   for (const path of ["/welcome", "/agents", "/account", "/invitations"]) {
     get(path, shell);
   }

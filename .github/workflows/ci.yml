@@ -237,6 +237,8 @@ jobs:
         working-directory: worker
         run: |
           curl -fsS --retry 10 --retry-delay 6 --retry-all-errors https://staging.tempra.dev/healthz
+          # Signed out, the root is the landing page (TEMPRA-276).
+          curl -fsS https://staging.tempra.dev/ | grep -q '/request-access"'
           if [ -n "$SMOKE_TOKEN" ]; then
             bun scripts/mcp-smoke.ts --url https://staging.tempra.dev --token "$SMOKE_TOKEN"
           fi
@@ -255,7 +257,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: production
-      url: https://app.tempra.dev
+      url: https://tempra.dev
     env:
       CF_SEND_TELEMETRY: "false"
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -291,7 +293,13 @@ jobs:
         name: Check production
         working-directory: worker
         run: |
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors https://tempra.dev/healthz
+          # The former host stays for existing connections (TEMPRA-276), www redirects, and the
+          # root is the landing page to someone signed out.
           curl -fsS --retry 10 --retry-delay 6 --retry-all-errors https://app.tempra.dev/healthz
+          test "$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' https://www.tempra.dev/)" = "301 https://tempra.dev/"
+          curl -fsS https://tempra.dev/ | grep -q '/request-access"'
           if [ -n "$SMOKE_TOKEN" ]; then
+            bun scripts/mcp-smoke.ts --url https://tempra.dev --token "$SMOKE_TOKEN" --read-only
             bun scripts/mcp-smoke.ts --url https://app.tempra.dev --token "$SMOKE_TOKEN" --read-only
           fi

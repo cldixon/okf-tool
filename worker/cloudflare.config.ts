@@ -17,8 +17,21 @@ export interface Deployment {
    * per deployment, deployed before this one by scripts/deploy.ts.
    */
   render: string;
-  /** The custom domain that serves everything: /app, /api, /mcp and OAuth. */
+  /** The custom domain that serves everything: the app, /api, /mcp and OAuth. */
   host: string;
+  /**
+   * Former hosts kept attached (TEMPRA-276, tempra-dev `decisions/the-app-at-tempra-dev.md`): a
+   * browser's page load there is sent to the same path on `host`; agents, OAuth and downloads are
+   * served in place, since existing connections are bound to them (src/hosts.ts).
+   */
+  aliases?: string[];
+  /** Hosts that only redirect to `host` with a 301 (www). */
+  redirects?: string[];
+  /**
+   * The landing page's Worker (site/, `tempra-site`), bound as SITE: `/` for people signed out
+   * and the site's own paths (src/site.ts). Unset: signed-out `/` goes to sign-in.
+   */
+  site?: string;
   d1: { name: string; id: string };
   /**
    * The account database's read replication (TEMPRA-85, tempra-dev `v2/read-replication.md`), a
@@ -63,7 +76,11 @@ export interface Deployment {
 const PRODUCTION: Deployment = {
   name: "tempra",
   render: "tempra-render",
-  host: "app.tempra.dev",
+  // The app at the apex, the landing page its signed-out home (TEMPRA-276).
+  host: "tempra.dev",
+  aliases: ["app.tempra.dev"],
+  redirects: ["www.tempra.dev"],
+  site: "tempra-site",
   d1: { name: "tempra-accounts", id: "60dcce9c-4a20-44db-8d49-1ee040225c4d" },
   readReplication: "auto",
   r2: "tempra-blobs",
@@ -81,6 +98,8 @@ const STAGING: Deployment = {
   name: "tempra-staging",
   render: "tempra-render-staging",
   host: "staging.tempra.dev",
+  // Production's landing page, so staging shows what tempra.dev will.
+  site: "tempra-site",
   d1: { name: "tempra-accounts-staging", id: "d66e1ceb-591e-419d-ba51-9cc32b87f658" },
   readReplication: "auto",
   r2: "tempra-blobs-staging",
@@ -106,6 +125,7 @@ export function previewDeployment(pr: string, ids: { d1?: string; kv?: string } 
     name: `tempra-pr-${pr}`,
     render: `tempra-render-pr-${pr}`,
     host: `pr-${pr}.tempra.dev`,
+    site: "tempra-site",
     d1: { name: `tempra-accounts-pr-${pr}`, id: ids.d1 ?? "" },
     r2: `tempra-blobs-pr-${pr}`,
     kv: ids.kv ?? "",
@@ -181,8 +201,10 @@ export default defineConfig(({ mode }) => {
       // Worker's script nor counted or metered by it; anything else reaches the Worker.
       assets: { htmlHandling: "none", notFoundHandling: "none" },
 
-      // One host per deployment (v2 spec: Operations); no workers.dev, so no second origin.
-      domains: local ? [] : [d.host],
+      // The deployment's host, its aliases and its redirects (TEMPRA-276, src/hosts.ts); no
+      // workers.dev, so no other origin. In CI, cf deploy takes over a domain another Worker
+      // holds (the landing page held tempra.dev and www until TEMPRA-276).
+      domains: local ? [] : [d.host, ...(d.aliases ?? []), ...(d.redirects ?? [])],
       workersDev: false,
 
       // The daily blob sweep, operator digest and people's digests (v2 spec: A3), after the
@@ -294,6 +316,13 @@ export default defineConfig(({ mode }) => {
         MAIL_FROM: bindings.text(d.mailFrom),
         // Links in mail sent from the crons, which have no request to take an origin from.
         APP_ORIGIN: bindings.text(local ? "http://localhost:8787" : `https://${d.host}`),
+        // Hosts besides APP_ORIGIN's (TEMPRA-276, src/hosts.ts): aliases served for agents and
+        // OAuth with browsers' page loads sent on, and hosts that only redirect.
+        ALIAS_HOSTS: bindings.text(local ? "" : (d.aliases ?? []).join(",")),
+        REDIRECT_HOSTS: bindings.text(local ? "" : (d.redirects ?? []).join(",")),
+        // The landing page (site/), by service binding: signed-out `/` and the site's paths.
+        // Not bound locally: cf dev runs this Worker alone.
+        ...(local || !d.site ? {} : { SITE: bindings.worker({ worker: d.site }) }),
         ...(d.mailFrom
           ? { EMAIL: bindings.sendEmail({ allowedSenderAddresses: [d.mailFrom] }) }
           : {}),
