@@ -1,6 +1,6 @@
 /*
- * Comments on a concept (take 4, TEMPRA-114; tempra-dev: app/comments): the threads in the
- * Comments panel (its frame is concept.css's), Open and Resolved n, a draft at the top while one
+ * Comments on a page (take 4, TEMPRA-114; tempra-dev: app/comments): the threads in the
+ * Comments panel (its frame is page.css's), Open and Resolved n, a draft at the top while one
  * is written, the active thread as a card, the others compact (their quote, then who, the first
  * words, when). Lines and greys only: no colour.
  */
@@ -288,7 +288,7 @@ section.thread.open {
   }
 }
 
-/* A mark beside each block of a concept's body that holds open threads (TEMPRA-223): the comment
+/* A mark beside each block of a page's body that holds open threads (TEMPRA-223): the comment
    glyph and the count in muted grey, in the right gutter by the block's first line, or under the
    block's end where there is no gutter (a phone). A layer over the body, outside its text, placed
    by the app through --mark-x and --mark-y. Greys and lines only. */

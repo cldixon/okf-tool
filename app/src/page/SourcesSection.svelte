@@ -7,7 +7,7 @@
   import type { JsonObject, Sources as SourcesData } from "./data";
 
   /**
-   * The concept's sources as a section at the end of the body (take 3; tempra-dev: app/reader,
+   * The page's sources as a section at the end of the body (take 3; tempra-dev: app/reader,
    * Sources), numbered as the footnote markers and their cards number them, then any footnotes that
    * cite no source. Not part of the document's text: it sits after the reader, outside it.
    */

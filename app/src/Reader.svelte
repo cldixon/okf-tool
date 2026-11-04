@@ -1,6 +1,6 @@
 <script lang="ts" generics="C">
   /**
-   * A concept body in the reader (tempra-dev: app/reader): the stored tree drawn as elements
+   * A page body in the reader (tempra-dev: app/reader): the stored tree drawn as elements
    * (reader/Body.svelte), with the overlays a person reads with. Comment quotes are drawn with the
    * CSS Custom Highlight API, so drawing or clearing one never touches the body; hovering or
    * focusing a footnote marker or a link shows a card; selecting text shows a small toolbar

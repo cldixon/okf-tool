@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * A concept body drawn from its stored tree (tempra-dev: app/reader): what body.ts works out,
+   * A page body drawn from its stored tree (tempra-dev: app/reader): what body.ts works out,
    * drawn by Blocks.svelte. `hideFirst` keeps a leading heading that repeats the title in the DOM,
    * hidden, so offsets stay where the text has them.
    */

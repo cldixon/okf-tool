@@ -1,5 +1,5 @@
 /*
- * A concept's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
+ * A page's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
  * bar): the text (title, description, byline, body, sources) at the end of its column, a gap
  * from the outline as Linear's docs set it (TEMPRA-277), and on the right its contents, or one panel in their place (Comments, History, Properties). The page's
  * width decides what fits (container queries on `page`, the page's scroller): under 1100px the
@@ -10,24 +10,24 @@
 
 /* The right column is the panel's width whether it holds the contents or a panel, so opening a
    panel takes the contents' space and never moves the text (C-17). */
-/* --concept-side is the right column's width in each layout below, so a wide or full figure
+/* --page-side is the right column's width in each layout below, so a wide or full figure
    (prose.css, TEMPRA-161) knows the text's column: the page's width (100cqi of `page`) less it. */
-.concept {
-  --concept-side: var(--tempra-size-panel);
+.page-view {
+  --page-side: var(--tempra-size-panel);
 }
 
-.concept-grid {
+.page-grid {
   display: grid;
-  grid-template-columns: [text] minmax(0, 1fr) [side] var(--concept-side);
+  grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   min-height: 100%;
 }
 
 /* The Markdown view has no contents (its headings lead nowhere there): the file takes the room. */
-.concept.markdown-on:not(.panel-open) {
-  --concept-side: 0px;
+.page-view.markdown-on:not(.panel-open) {
+  --page-side: 0px;
 }
 
-.concept.markdown-on:not(.panel-open) .concept-grid {
+.page-view.markdown-on:not(.panel-open) .page-grid {
   grid-template-columns: [text] minmax(0, 1fr);
 }
 
@@ -36,7 +36,7 @@
    the column's other edge, and the spare room on the far side. With nothing beside it (the
    rules below) it is centred, --doc-pad each side. A wide or full figure reads them all, and
    --doc-align: 1 at the end, 0.5 centred. */
-.concept .doc {
+.page-view .doc {
   --doc-pad: var(--tempra-space-page);
   --doc-end: var(--tempra-space-56);
   --doc-align: 1;
@@ -51,14 +51,14 @@
 }
 
 /* Nothing beside the text: centred. */
-.concept.markdown-on:not(.panel-open) .doc {
+.page-view.markdown-on:not(.panel-open) .doc {
   --doc-end: var(--doc-pad);
   --doc-align: 0.5;
   justify-self: center;
 }
 
 /* The Markdown view is wider than the text: the file's lines are long. */
-.concept.markdown-on .doc {
+.page-view.markdown-on .doc {
   --doc-max: calc(
     var(--tempra-measure) +
     2 *
@@ -67,7 +67,7 @@
   );
 }
 
-.concept-side {
+.page-side {
   grid-row: 1;
   grid-column: side;
   min-width: 0;
@@ -75,7 +75,7 @@
 
 /* The contents: the page's headings in small grey type, nested, kept in view; the section in
    view marked with a rule. No heading over them. */
-.concept-contents {
+.page-contents {
   position: sticky;
   top: 0;
   max-width: calc(var(--tempra-size-contents) + 2 * var(--tempra-space-page));
@@ -155,7 +155,7 @@
 
 /* ---------- A panel: in the contents' column, its title, a count and × ---------- */
 
-.concept-panel {
+.page-aside {
   position: sticky;
   top: 0;
   display: flex;
@@ -397,7 +397,7 @@
 
 /* The changes in the text (take 4, board 22): a hairline warm rule left of each changed block,
    insertions underlined on a grey ground, deletions struck through in grey (prose.css). */
-.concept
+.page-view
   .prose
   > :is(p, ul, ol, blockquote, pre, h2, h3, h4, h5, h6, .table):has(
     ins.diff-added,
@@ -575,21 +575,21 @@
 
 /* No room beside the text: the contents move under the byline, and a panel overlays the page. */
 @container page (width < 1100px) {
-  .concept {
-    --concept-side: 0px;
+  .page-view {
+    --page-side: 0px;
   }
 
-  .concept-grid,
-  .concept.panel-open .concept-grid {
+  .page-grid,
+  .page-view.panel-open .page-grid {
     grid-template-columns: [text] minmax(0, 1fr);
   }
 
   /* Its column is gone: what it holds is hidden (the contents) or fixed (a panel). */
-  .concept-side {
+  .page-side {
     display: contents;
   }
 
-  .concept-contents {
+  .page-contents {
     display: none;
   }
 
@@ -597,13 +597,13 @@
     display: block;
   }
 
-  .concept .doc {
+  .page-view .doc {
     --doc-end: var(--doc-pad);
     --doc-align: 0.5;
     justify-self: center;
   }
 
-  .concept-panel {
+  .page-aside {
     position: fixed;
     top: var(--tempra-size-topbar);
     right: 0;
@@ -621,35 +621,35 @@
    open panel still takes the column from 960px and overlays below that (the rules around this),
    and the text moves over for it. */
 @container page (700px <= width < 1100px) {
-  .concept:not(.panel-open):not(.markdown-on) {
-    --concept-side: calc(var(--tempra-size-contents) + var(--tempra-space-24));
+  .page-view:not(.panel-open):not(.markdown-on) {
+    --page-side: calc(var(--tempra-size-contents) + var(--tempra-space-24));
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .concept-grid {
+  .page-view:not(.panel-open):not(.markdown-on) .page-grid {
     grid-template-columns: [text] minmax(0, 1fr) [side] calc(
         var(--tempra-size-contents) +
         var(--tempra-space-24)
       );
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .concept-side {
+  .page-view:not(.panel-open):not(.markdown-on) .page-side {
     display: block;
   }
 
-  .concept:not(.panel-open) .concept-contents {
+  .page-view:not(.panel-open) .page-contents {
     display: block;
     padding-right: var(--tempra-space-24);
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .toc-inline {
+  .page-view:not(.panel-open):not(.markdown-on) .toc-inline {
     display: none;
   }
 
-  .concept .doc {
+  .page-view .doc {
     --doc-pad: var(--tempra-space-32);
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .doc {
+  .page-view:not(.panel-open):not(.markdown-on) .doc {
     --doc-end: var(--tempra-space-56);
     --doc-align: 1;
     justify-self: end;
@@ -669,25 +669,25 @@
    sidebar shown): an open panel takes a column again and the text moves over for it, so nothing
    (On this page included) runs under it. Narrower than this, it overlays. */
 @container page (960px <= width < 1100px) {
-  .concept.panel-open {
-    --concept-side: var(--tempra-size-panel);
+  .page-view.panel-open {
+    --page-side: var(--tempra-size-panel);
   }
 
-  .concept.panel-open .concept-grid {
+  .page-view.panel-open .page-grid {
     grid-template-columns: [text] minmax(0, 1fr) [side] var(--tempra-size-panel);
   }
 
-  .concept.panel-open .concept-side {
+  .page-view.panel-open .page-side {
     display: block;
   }
 
-  .concept.panel-open .doc {
+  .page-view.panel-open .doc {
     --doc-end: var(--tempra-space-56);
     --doc-align: 1;
     justify-self: end;
   }
 
-  .concept.panel-open .concept-panel {
+  .page-view.panel-open .page-aside {
     position: sticky;
     top: 0;
     right: auto;
@@ -717,7 +717,7 @@
 /* A phone (take 4, boards 33 and 35): one column with a 16px gutter, "On this page" as a closed
    disclosure under the byline, and a panel as a sheet from the bottom, the page dimmed behind. */
 @media (max-width: 900px) {
-  .concept .doc {
+  .page-view .doc {
     --doc-pad: var(--tempra-space-16);
     padding-top: var(--tempra-space-16);
     padding-bottom: var(--tempra-space-96);
@@ -745,7 +745,7 @@
     padding-bottom: var(--tempra-space-08);
   }
 
-  .concept-panel {
+  .page-aside {
     top: auto;
     right: 0;
     bottom: 0;

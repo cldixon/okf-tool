@@ -29,7 +29,7 @@
   import Contents from "./Contents.svelte";
   import { useCompare } from "./compare.svelte.ts";
   import { contentsOf } from "./contents";
-  import { bodyHref, type ConceptData, standing, titleOf } from "./data";
+  import { bodyHref, type PageData, standing, titleOf } from "./data";
   import type { ReadHistory } from "./reads";
   import { figureViewOf } from "./figures";
   import HistoryList from "./HistoryList.svelte";
@@ -49,7 +49,7 @@
   import VersionBar from "./VersionBar.svelte";
 
   /**
-   * A concept's page (take 4, TEMPRA-114; tempra-dev: app/reader, app/comments,
+   * A page (take 4, TEMPRA-114; tempra-dev: app/reader, app/comments,
    * decisions/one-panel-from-the-top-bar): its path and ⋯ in the top bar, its actions (Comment,
    * Check) floating at its bottom right (TEMPRA-172, decisions/a-pages-actions-float), the
    * title, description and byline, the body in the reader and its sources at the end, centred in
@@ -60,7 +60,7 @@
    */
   let props: {
     urls: Urls;
-    data: ConceptData;
+    data: PageData;
     head: number;
     compare: Compare | null;
     /** Null while they load, or when they failed (`threadsError`). */
@@ -75,7 +75,7 @@
   } = $props();
 
   const urls = $derived(props.urls);
-  const c = $derived(props.data.concept);
+  const c = $derived(props.data.file);
   const sources = $derived(props.data.sources);
   const links = $derived(props.data.links);
   const actors = useActors(() => props.urls);
@@ -218,7 +218,7 @@
       return;
     }
     const measure = () => {
-      const el = panelBox?.querySelector(".concept-panel");
+      const el = panelBox?.querySelector(".page-aside");
       overlaid = el ? getComputedStyle(el).position === "fixed" : false;
     };
     measure();
@@ -328,7 +328,7 @@
   const mayVerify = $derived(role.current !== null && role.current !== "read");
   const hasContents = $derived(contents.length >= 2);
   const classes = $derived(
-    ["concept", panel ? "panel-open" : "", markdown ? "markdown-on" : ""].filter(Boolean).join(" "),
+    ["page-view", panel ? "panel-open" : "", markdown ? "markdown-on" : ""].filter(Boolean).join(" "),
   );
 </script>
 
@@ -345,11 +345,11 @@
     onMarkdown={setMarkdown}
   />{/snippet}
 <div class={classes} bind:this={page}
-  ><PageBar {path} {actions} /><div class="concept-grid"
+  ><PageBar {path} {actions} /><div class="page-grid"
     ><article class="doc" inert={modal}
       >{#if compare}<ReviewBar
           {urls}
-          concept={c}
+          page={c}
           {compare}
           standing={s}
           {name}
@@ -362,7 +362,7 @@
           notice
         />{/if}<LiveAnnouncer {urls} {live} />{#if !compare && !current}<VersionBar
           {urls}
-          concept={c}
+          page={c}
           standing={s}
           {name}
         />{/if}{#if markdown}<RawMarkdown {urls} path={c.path} hash={c.hash} onBack={() => setMarkdown(false)} />{/if}<!-- Kept mounted under the markdown, so comments keep their place. --><div
@@ -374,7 +374,7 @@
             >{#each folders as f, i (f)}<span>{#if i > 0}<span aria-hidden="true">{" / "}</span>{/if}{folderName(f)}</span>{/each}</nav
           ><h1 class="doc-title">{title}</h1
           >{#if typeof fm.description === "string"}<p class="doc-tagline">{fm.description}</p>{/if}<Byline
-            concept={c}
+            page={c}
             history={props.data.history}
             {name}
             {live}
@@ -422,7 +422,7 @@
         class="panel-scrim"
         aria-hidden="true"
         onclick={closePanel}
-      ></div>{/if}<div class="concept-side" bind:this={panelBox}
+      ></div>{/if}<div class="page-side" bind:this={panelBox}
       >{#if panel === "comments"}<Panel name="comments" count={openCount > 0 ? `${openCount} open` : null} onClose={closePanel}
           ><CommentsList
             {urls}
@@ -438,11 +438,11 @@
             onChanged={props.onCommented}
           /></Panel
         >{:else if panel === "history"}<Panel name="history" onClose={closePanel}
-          ><HistoryList {urls} concept={c} standing={s} {name} comparing={compare?.kind === "since"} /></Panel
+          ><HistoryList {urls} page={c} standing={s} {name} comparing={compare?.kind === "since"} /></Panel
         >{:else if panel === "properties"}<Panel name="properties" onClose={closePanel}
           ><PropertiesList
             {urls}
-            concept={c}
+            page={c}
             {links}
             head={props.head}
             standing={s}
@@ -453,7 +453,7 @@
             {mayVerify}
             onVerified={props.onVerified}
           /></Panel
-        >{:else if hasContents && !markdown}<nav class="concept-contents" aria-label="Contents"
+        >{:else if hasContents && !markdown}<nav class="page-contents" aria-label="Contents"
           ><Contents headings={contents} /></nav
         >{/if}</div
     ></div

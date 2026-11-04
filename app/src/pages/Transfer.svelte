@@ -24,6 +24,8 @@
   const action = useAction();
   /** What the last action did: a line, or an import with a link to it in Activity. */
   let result = $state.raw<string | { files: number; name: string } | null>(null);
+  /** Whether the download is an OKF bundle rather than the files alone. */
+  let okf = $state(false);
 
   function upload(e: SubmitEvent & { currentTarget: HTMLFormElement }) {
     e.preventDefault();
@@ -71,7 +73,10 @@
   <h3>Export</h3>
   <p>Every page and file as they are now, as one .tar bundle.</p>
   <!-- A plain link: the browser downloads the signed export link it redirects to. -->
-  <a class="button primary" href={urls.exportTar()}>Download .tar</a>
+  <p>
+    <label><input type="checkbox" bind:checked={okf} /> OKF bundle</label>
+  </p>
+  <a class="button primary" href={urls.exportTar(undefined, okf ? "okf" : undefined)}>Download .tar</a>
 </div>
 <div class="panel-box">
   <h3>Import</h3>

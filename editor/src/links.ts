@@ -1,12 +1,12 @@
 /**
- * Where a link in a concept body points, and heading anchors. The same rules as the server's
+ * Where a link in a page body points, and heading anchors. The same rules as the server's
  * (worker/src/format/paths.ts), so the reader and the server agree;
  * kept here, DOM-free, because the reader needs them in the browser.
  */
 import type { PhrasingContent } from "mdast";
 import { type Doc, type DocNode, walk } from "./tree";
 
-/** Where a link or image target written in a concept body points. */
+/** Where a link or image target written in a page body points. */
 export type LinkTarget =
   | { kind: "external"; href: string }
   | { kind: "anchor"; href: string }
@@ -16,17 +16,17 @@ export type LinkTarget =
 const SAFE_SCHEMES = /^(?:https?:|mailto:)/i;
 
 /**
- * Classifies a link target written in the concept at `conceptPath`. Returns null for schemes a
+ * Classifies a link target written in the page at `pagePath`. Returns null for schemes a
  * browser must not follow from agent-written content (javascript:, data:, and so on).
  */
-export function linkTarget(conceptPath: string, target: string): LinkTarget | null {
+export function linkTarget(pagePath: string, target: string): LinkTarget | null {
   const t = target.trim();
   if (t === "") return null;
   if (t.startsWith("#")) return { kind: "anchor", href: t };
   if (t.startsWith("//")) return { kind: "external", href: `https:${t}` };
   if (isExternal(t)) return SAFE_SCHEMES.test(t) ? { kind: "external", href: t } : null;
   const { path, anchor } = splitAnchor(t);
-  const resolved = resolveLinkPath(conceptPath, safeDecode(path));
+  const resolved = resolveLinkPath(pagePath, safeDecode(path));
   if (resolved === null) {
     // A link to the library root ("/" or "../" from the top level).
     return /^[./]*$/.test(path) ? { kind: "internal", path: "", anchor, dir: true } : null;
@@ -81,7 +81,7 @@ export function normalizePath(path: string): string | null {
   return out.length === 0 ? null : out.join("/");
 }
 
-/** Absolute targets (leading `/`) are library-relative; others are relative to the concept. */
+/** Absolute targets (leading `/`) are library-relative; others are relative to the page. */
 export function resolveLinkPath(fromPath: string, target: string): string | null {
   if (target.startsWith("/")) return normalizePath(target);
   const dir = dirname(fromPath);

@@ -88,9 +88,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
       return readTar(new Uint8Array(await new Response(body as BodyInit).arrayBuffer()));
     };
     const whole = await download();
-    expect(whole.map((f) => f.path).sort()).toEqual(
-      ["a.md", "data/x.csv", long].sort(),
-    );
+    expect(whole.map((f) => f.path).sort()).toEqual(["a.md", "data/x.csv", long].sort());
     expect(whole.find((f) => f.path === long)?.bytes).toEqual(bytes);
     expect(whole.find((f) => f.path === "data/x.csv")?.bytes).toEqual(bytes);
 

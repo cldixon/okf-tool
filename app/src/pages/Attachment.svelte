@@ -4,11 +4,11 @@
   import AtNotice from "../AtNotice.svelte";
   import { useActors } from "../agents.svelte.ts";
   import { api } from "../api";
-  import { type FileJson, type HistoryEvent, isConceptPath, type Links } from "../concept/data";
   import { useTitleOf } from "../frame.svelte.ts";
   import { attachmentSource, mediaKind } from "../images";
   import { useLoad } from "../load.svelte.ts";
   import Moment from "../Moment.svelte";
+  import { type FileJson, type HistoryEvent, isPagePath, type Links } from "../page/data";
   import Player from "../reader/Player.svelte";
   import { useLibraryTitle } from "../role.svelte.ts";
   import { useCopy } from "../ui.svelte.ts";
@@ -49,7 +49,7 @@
   );
   // The pages that use it, read for the figures it appears as and the sources citing it; a page
   // that fails to load just says less.
-  const pages = $derived(usedIn?.filter(isConceptPath).slice(0, USES_READ).join("\n") ?? null);
+  const pages = $derived(usedIn?.filter(isPagePath).slice(0, USES_READ).join("\n") ?? null);
   const uses = useLoad(
     () => `attachment uses ${urls.base} ${file.path} ${file.seq} ${pages}`,
     async () => {
@@ -60,7 +60,7 @@
           .filter(Boolean)
           .map((p) =>
             api<FileJson>(urls.api(`files/${enc(p)}`, { at: urls.at })).then(
-              (f) => (f.kind === "concept" ? figureUse(file.path, f, file.source) : null),
+              (f) => (f.kind === "page" ? figureUse(file.path, f, file.source) : null),
               () => null,
             ),
           ),

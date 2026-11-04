@@ -1,7 +1,7 @@
 /*
  * Whether the person is writing a comment: a draft open on a quote, or a comment or reply box
- * with text in it. A new version of the concept does not swap in by itself meanwhile, so what
- * they are writing is never lost (tempra-dev: app/live; concept/live.svelte.ts).
+ * with text in it. A new version of the page does not swap in by itself meanwhile, so what
+ * they are writing is never lost (tempra-dev: app/live; page/live.svelte.ts).
  */
 
 const boxes = new Set<symbol>();

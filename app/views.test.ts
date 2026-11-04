@@ -3,8 +3,8 @@ import { parseMarkdown, reconcile } from "@tempra/editor";
 import type { Component } from "svelte";
 import type { LedgerEvent, LedgerRequest } from "./src/activity";
 import { actorView } from "./src/agents";
-import type { FileJson, HistoryEvent, Json } from "./src/concept/data";
-import StatusPills from "./src/concept/StatusPills.svelte";
+import type { FileJson, HistoryEvent, Json } from "./src/page/data";
+import StatusPills from "./src/page/StatusPills.svelte";
 import Attachment from "./src/pages/Attachment.svelte";
 import AttachmentImage from "./src/pages/AttachmentImage.svelte";
 import { describedAs, figureUse, hostOf, sizeText, versionsOf } from "./src/pages/attachment";
@@ -31,7 +31,7 @@ function markup<P extends Record<string, unknown>>(component: Component<P, any, 
 }
 
 const urls = new Urls("cl_dixon", "tempra-dev");
-type ConceptFile = Extract<FileJson, { kind: "concept" }>;
+type PageFile = Extract<FileJson, { kind: "page" }>;
 const me = "human:cl_dixon";
 const agents = {
   a1: {
@@ -48,10 +48,10 @@ const hour = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 describe("the library's home (take 4)", () => {
   const files: OutlineFile[] = [
-    { path: "guide.md", kind: "concept", title: "Guide", seq: 1 },
-    { path: "decisions/a.md", kind: "concept", title: "A", seq: 5 },
-    { path: "decisions/old/b.md", kind: "concept", title: "B", seq: 30 },
-    { path: "app/reader.md", kind: "concept", title: "Reader", seq: 6 },
+    { path: "guide.md", kind: "page", title: "Guide", seq: 1 },
+    { path: "decisions/a.md", kind: "page", title: "A", seq: 5 },
+    { path: "decisions/old/b.md", kind: "page", title: "B", seq: 30 },
+    { path: "app/reader.md", kind: "page", title: "Reader", seq: 6 },
     { path: "app/shot.png", kind: "attachment", seq: 7 },
   ];
 
@@ -116,7 +116,7 @@ describe("the library's home (take 4)", () => {
     path: `app/p${seq}.md`,
     prev_hash: "h",
     hash: "h2",
-    concept_id: `c${seq}`,
+    page_id: `c${seq}`,
     meta: { by: { person: "u1", agent: "a1" } },
     ...over,
   });
@@ -318,8 +318,8 @@ describe("a video's poster on the attachment pages (TEMPRA-182)", () => {
 });
 
 describe("the image's page (TEMPRA-170)", () => {
-  const concept = (path: string, md: string, sources: Json[] = []): ConceptFile => ({
-    kind: "concept",
+  const pageFile = (path: string, md: string, sources: Json[] = []): PageFile => ({
+    kind: "page",
     path,
     seq: 3,
     hash: "h",
@@ -337,7 +337,7 @@ describe("the image's page (TEMPRA-170)", () => {
   };
 
   test("the figures a page shows the file as, and the source entry citing it", () => {
-    const page = concept(
+    const page = pageFile(
       "app/media.md",
       [
         "![A diagram](/app/other.png)",
@@ -362,9 +362,9 @@ describe("the image's page (TEMPRA-170)", () => {
       cites: "Vendor diagram",
     });
     // An uploaded file is cited by its own path.
-    const own = concept("a.md", "![x](/app/fig.png)", [{ id: "s", resource: "/app/fig.png" }]);
+    const own = pageFile("a.md", "![x](/app/fig.png)", [{ id: "s", resource: "/app/fig.png" }]);
     expect(figureUse("app/fig.png", own, null).cites).toBe("/app/fig.png");
-    expect(figureUse("app/fig.png", concept("b.md", "No figures."), source)).toEqual({
+    expect(figureUse("app/fig.png", pageFile("b.md", "No figures."), source)).toEqual({
       path: "b.md",
       figures: [],
       cites: null,

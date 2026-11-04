@@ -1,5 +1,5 @@
 /**
- * The concept's panels (take 4, TEMPRA-114; tempra-dev: app/reader, The panels;
+ * The page's panels (take 4, TEMPRA-114; tempra-dev: app/reader, The panels;
  * decisions/one-panel-from-the-top-bar): one at a time in the contents' column, opened from the
  * top bar's tools (or a quote, or `?panel=`), never by itself, and never remembered.
  */

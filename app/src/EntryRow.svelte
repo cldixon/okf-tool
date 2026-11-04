@@ -8,7 +8,7 @@
 
   /**
    * One Activity entry: who (avatar, name, whom an agent acts for), what they did, the note, the
-   * concepts touched, and when.
+   * pages touched, and when.
    */
   let {
     entry: e,
@@ -17,17 +17,17 @@
     now,
   }: { entry: Entry; urls: Urls; actor: ActorView; now: number } = $props();
 
-  /** How many touched concepts an entry lists before "and n more". */
+  /** How many touched pages an entry lists before "and n more". */
   const LISTED = 8;
 
   const href = (path: string, seq: number, gone: boolean) =>
     gone ? urls.pinned(seq - 1).file(path) : urls.file(path);
 </script>
 
-<!-- A piece of the sentence: text, a link to a concept (as it was, when gone), or a folder's name. -->
-{#snippet part(p: Part)}{#if typeof p === "string"}{p}{:else if "folder" in p}<!-- A folder is named, not linked: it is a group in the tree, not a page (TEMPRA-138). -->{folderName(p.folder)}{:else}{@const words = wordsText(p.words)}<a href={href(p.concept, p.seq, p.gone)}>{p.title}</a>{#if words}<span class="entry-words">{` ${words}`}</span>{/if}{/if}{/snippet}
+<!-- A piece of the sentence: text, a link to a page (as it was, when gone), or a folder's name. -->
+{#snippet part(p: Part)}{#if typeof p === "string"}{p}{:else if "folder" in p}<!-- A folder is named, not linked: it is a group in the tree, not a page (TEMPRA-138). -->{folderName(p.folder)}{:else}{@const words = wordsText(p.words)}<a href={href(p.page, p.seq, p.gone)}>{p.title}</a>{#if words}<span class="entry-words">{` ${words}`}</span>{/if}{/if}{/snippet}
 
-<!-- The concepts an entry touched, each with what happened to it. -->
+<!-- The pages an entry touched, each with what happened to it. -->
 {#snippet touchedList(touched: Touched[])}
   {@const more = touched.length - Math.min(touched.length, LISTED)}
   <ul class="entry-touched">

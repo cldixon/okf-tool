@@ -7,7 +7,7 @@ import { baseName, dirOf, enc, type Urls } from "../urls";
 import type { ReadHistory } from "./reads";
 
 /**
- * What a file's page loads (tempra-dev: app/reader): the file and, for a concept, everything its
+ * What a file's page loads (tempra-dev: app/reader): the file and, for a page, everything its
  * page shows around the body: sources, links and versions, in one request (TEMPRA-191).
  */
 
@@ -24,7 +24,7 @@ export interface Sources {
 /** GET …/files/{path} as JSON: what each kind of file is. */
 export type FileJson =
   | {
-      kind: "concept";
+      kind: "page";
       path: string;
       seq: number;
       hash: string;
@@ -81,7 +81,7 @@ export interface AttachSource {
   fetched_at: string;
 }
 
-export type Concept = Extract<FileJson, { kind: "concept" }>;
+export type PageFile = Extract<FileJson, { kind: "page" }>;
 
 export interface Links {
   inbound: { path: string; raw: string; kind: string }[];
@@ -113,9 +113,9 @@ export function actedBy(e: Pick<HistoryEvent, "meta">): ActedBy | null {
     : { person: by.person };
 }
 
-/** What a concept's page shows around its body. */
-export interface ConceptData {
-  concept: Concept;
+/** What a page shows around its body. */
+export interface PageData {
+  file: PageFile;
   sources: Sources;
   links: Links;
   history: HistoryEvent[];
@@ -123,18 +123,18 @@ export interface ConceptData {
   reads: ReadHistory | null;
 }
 
-/** What a file's page shows: the file, the head, and for a concept its context. */
+/** What a file's page shows: the file, the head, and for a page its context. */
 export interface FileData {
   file: FileJson;
   head: number;
-  extra: ConceptData | null;
+  extra: PageData | null;
 }
 
 /** Ops that change a file's content (or remove it), and so have a diff. */
 export const CONTENT_OPS = new Set(["put", "import", "revert", "delete", "attach"]);
 
-/** Whether a path can be a concept: markdown, and not a synthesized index.md or log.md. */
-export const isConceptPath = (path: string) =>
+/** Whether a path can be a page: markdown, and not a synthesized index.md or log.md. */
+export const isPagePath = (path: string) =>
   path.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(path);
 
 /** The cache key of a file's page (see useLoad). */
@@ -151,21 +151,21 @@ export function bodyHref(urls: Urls) {
   };
 }
 
-/** `GET …/page/{path}`: the file, the head, and for a concept what its page shows around it. */
+/** `GET …/page/{path}`: the file, the head, and for a page what its page shows around it. */
 type PageJson =
   | {
-      file: Concept;
+      file: PageFile;
       head: number;
       sources: Sources;
       links: Links;
       history: { events: HistoryEvent[] };
       reads?: ReadHistory | null;
     }
-  | { file: Exclude<FileJson, Concept>; head: number };
+  | { file: Exclude<FileJson, PageFile>; head: number };
 
 /**
- * Everything a file's page shows, in one request (TEMPRA-191): the file and, for a concept, its
- * sources, links and history, read by the server at one seq (and by the concept's own path,
+ * Everything a file's page shows, in one request (TEMPRA-191): the file and, for a page, its
+ * sources, links and history, read by the server at one seq (and by the page's own path,
  * however it was asked for).
  */
 export async function loadFile(urls: Urls, path: string): Promise<FileData> {
@@ -175,7 +175,7 @@ export async function loadFile(urls: Urls, path: string): Promise<FileData> {
   return {
     file,
     head,
-    extra: { concept: file, sources, links, history: history.events, reads: page.reads ?? null },
+    extra: { file, sources, links, history: history.events, reads: page.reads ?? null },
   };
 }
 
@@ -185,20 +185,20 @@ registerPage("file", (route, urls) => ({
   load: () => loadFile(urls, route.path),
 }));
 
-/** A concept's title: its frontmatter's, else its file name. */
-export function titleOf(c: Concept): string {
+/** A page's title: its frontmatter's, else its file name. */
+export function titleOf(c: PageFile): string {
   const t = c.frontmatter.title;
   return typeof t === "string" && t ? t : baseName(c.path);
 }
 
-/** A version of the concept: a content event in its history, numbered from the first. */
+/** A version of the page: a content event in its history, numbered from the first. */
 export interface Version {
   n: number;
   event: HistoryEvent;
 }
 
 /**
- * The concept's versions and where it stands with people (tempra-dev: app/reader, The byline):
+ * The page's versions and where it stands with people (tempra-dev: app/reader, The byline):
  * every content event numbered in order, the latest human verification, and how many versions
  * came after it.
  */

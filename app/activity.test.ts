@@ -34,7 +34,7 @@ const ev = (op: string, path: string, extra: Partial<LedgerEvent> = {}): LedgerE
     path,
     prev_hash: "h0",
     hash: "h1",
-    concept_id: `c:${path}`,
+    page_id: `c:${path}`,
     meta: null,
     ...extra,
   };
@@ -122,7 +122,7 @@ describe("toEntry", () => {
     expect(text(e)).toBe("imported 3 files in V2");
   });
 
-  test("moves, deletes and several events on one concept", () => {
+  test("moves, deletes and several events on one page", () => {
     const moved = toEntry(
       req([ev("move", "app/reader.md", { meta: { from_path: "old/reader.md" } })]),
       titles,
@@ -259,7 +259,7 @@ test("who works here", () => {
 });
 
 describe("Every event (take 4, TEMPRA-115)", () => {
-  test("kinds: a new concept is a write, a new version an edit, the rest by their op", () => {
+  test("kinds: a new page is a write, a new version an edit, the rest by their op", () => {
     expect(kindOf({ op: "put", prev_hash: null })).toBe("write");
     expect(kindOf({ op: "put", prev_hash: "h0" })).toBe("edit");
     for (const op of ["move", "delete", "comment", "verify", "revert", "import"]) {

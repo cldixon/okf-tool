@@ -105,14 +105,14 @@ export function placeMark(
   };
 }
 
-/** The concept reader's text, for scrolling to a quote from outside it (the Comments panel). */
-function conceptRoot(): Element | null {
+/** The page reader's text, for scrolling to a quote from outside it (the Comments panel). */
+function pageRoot(): Element | null {
   return document.querySelector(".doc .body > .prose");
 }
 
 /** Scrolls the reader to a text offset (smoothly, unless motion is reduced). */
 export function revealOffset(at: number) {
-  const root = conceptRoot();
+  const root = pageRoot();
   const point = root && pointAt(root, at);
   if (!point) return;
   const el = point.node.nodeType === 1 ? (point.node as Element) : point.node.parentElement;

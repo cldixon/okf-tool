@@ -5,7 +5,7 @@
  * over the page), a navigation sidebar with a hairline on its right, and the page as a flat
  * column. The sidebar can be hidden; under 900px it is a drawer behind a top bar. A library's
  * Settings is one of its pages; the account's pages use the same frame with a sidebar of their
- * own. A concept's own layout is in concept.css; the person's views (home, Activity, Settings,
+ * own. A page's own layout is in page.css; the person's views (home, Activity, Settings,
  * an attachment, Not found) in views.css.
  */
 body:has(> #root),
@@ -634,7 +634,7 @@ a.button.pill-button {
   display: none;
 }
 
-/* A concept's path: its folders, words not links, then its title (TEMPRA-145). */
+/* A page's path: its folders, words not links, then its title (TEMPRA-145). */
 .topbar-crumbs {
   display: flex;
   align-items: center;
@@ -663,7 +663,7 @@ a.button.pill-button {
   text-overflow: ellipsis;
 }
 
-/* The page's tools (a concept's Comments, Copy page and ⋯), from the page itself. */
+/* The page's tools (a page's Comments, Copy page and ⋯), from the page itself. */
 .topbar-tools {
   display: flex;
   flex: none;
@@ -1019,8 +1019,8 @@ a.button.pill-button {
   background: var(--tempra-color-muted);
 }
 
-/* The page: the frame's scroller. Its width, not the window's, decides a concept's columns
-   (container queries on `page`, in concept.css), so hiding the
+/* The page: the frame's scroller. Its width, not the window's, decides a page's columns
+   (container queries on `page`, in page.css), so hiding the
    sidebar widens the reading layout. */
 .ws-main {
   grid-area: main;
@@ -1402,7 +1402,7 @@ button.tree-name {
       "main";
   }
 
-  /* The bar: the menu button, the mark and the library's name, then a page's tools (a concept's
+  /* The bar: the menu button, the mark and the library's name, then a page's tools (a page's
      ⋯; its actions float at the bottom right, TEMPRA-172) and the bell; the avatar last. Search
      and the switcher are the drawer's head's, as on the desktop the bar's over the sidebar
      (TEMPRA-145). */

@@ -7,7 +7,7 @@ import { Urls } from "./src/urls";
 
 const urls = new Urls("ann", "notes");
 const file = (path: string, title: string): OutlineFile =>
-  ({ path, kind: "concept", title, seq: 1 }) as OutlineFile;
+  ({ path, kind: "page", title, seq: 1 }) as OutlineFile;
 
 describe("fileOptions", () => {
   test("recent files first, then the index's", () => {

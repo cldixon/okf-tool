@@ -9,9 +9,9 @@
   import CommentsList from "../comments/CommentsList.svelte";
   import { LIBRARY_THREADS, type Placed } from "../comments/data";
   import { useThreads } from "../comments/data.svelte.ts";
-  import PageActions from "../concept/PageActions.svelte";
-  import Panel from "../concept/Panel.svelte";
-  import { panelInUrl, threadInHash } from "../concept/panel";
+  import PageActions from "../page/PageActions.svelte";
+  import Panel from "../page/Panel.svelte";
+  import { panelInUrl, threadInHash } from "../page/panel";
   import { here } from "../location.svelte.ts";
   import { useActors } from "../agents.svelte.ts";
   import { useFrame } from "../frame.svelte.ts";
@@ -78,7 +78,7 @@
   const openCount = $derived(placed.filter((t) => t.status === "open").length);
 
   // The Comments panel: opened by the person (Comment, a link to a thread, `?panel=comments`),
-  // never by itself; it overlays the page, so it is modal while open (as a concept's is there).
+  // never by itself; it overlays the page, so it is modal while open (as a page's is there).
   let panel = $state<boolean>(untrack(() => panelInUrl() === "comments"));
   let active = $state<string | null>(untrack(() => threadInHash()));
   let panelBox: HTMLDivElement | undefined = $state();
@@ -132,7 +132,7 @@
   const people = $derived(members.people.length > 0 ? members.people : null);
   const you = $derived(handle !== null && (people?.includes(handle) ?? false));
   const agents = $derived(actors.contributors.filter((c) => c.agent).length);
-  const guide = $derived(files?.some((f) => f.path === "guide.md" && f.kind === "concept"));
+  const guide = $derived(files?.some((f) => f.path === "guide.md" && f.kind === "page"));
   const who = $derived(
     people === null ? null : whoWorksHere(you, people.length - (you ? 1 : 0), agents),
   );
@@ -142,8 +142,8 @@
 <PageColumn inert={panel}>
   <Status loaded={loaded.current}>
     {#snippet children(home)}
-      {@const empty = files === null ? home.concepts === 0 : files.length === 0}
-      {@const meta = [who, plural(home.concepts, "page")].filter((p): p is string => p !== null)}
+      {@const empty = files === null ? home.pages === 0 : files.length === 0}
+      {@const meta = [who, plural(home.pages, "page")].filter((p): p is string => p !== null)}
       <header class="view-head home-head">
         <div class="view-head-main">
           <h1 class="view-title">{name}</h1>

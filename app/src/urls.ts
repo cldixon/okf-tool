@@ -28,15 +28,15 @@ export class Urls {
   file(path: string, anchor: string | null = null) {
     return `${this.own(path) ?? this.page(`files/${enc(path)}`)}${this.q()}${anchor ?? ""}`;
   }
-  /** A concept opened in review mode: the changes since a person verified it, and Verify. */
+  /** A page opened in review mode: the changes since a person verified it, and Verify. */
   review(path: string) {
     return `${this.own(path) ?? this.page(`files/${enc(path)}`)}?review=1`;
   }
-  /** A concept with the changes since an earlier version drawn in its text. */
+  /** A page with the changes since an earlier version drawn in its text. */
   since(path: string, seq: number) {
     return `${this.own(path) ?? this.page(`files/${enc(path)}`)}?since=${seq}`;
   }
-  /** A concept with one comment thread open in its Comments panel. */
+  /** A page with one comment thread open in its Comments panel. */
   thread(path: string, id: string) {
     return this.file(path, `#thread-${encodeURIComponent(id)}`);
   }
@@ -47,7 +47,7 @@ export class Urls {
     return `${this.base}-/download/${enc(path)}${this.q()}`;
   }
   /**
-   * What changed in a concept, on its own page (take 4, TEMPRA-124): the changes since `from`
+   * What changed in a page, on its own page (take 4, TEMPRA-124): the changes since `from`
    * drawn in its text (`?since=`), or with only `to`, that version as History opens it. The old
    * Diff page's address (`-/diff/…?from=&to=`) is sent here.
    */
@@ -80,9 +80,12 @@ export class Urls {
     const view = filters.view === "events" ? "events" : undefined;
     return `${this.page("activity")}${activityQuery(filters, view)}`;
   }
-  /** The export download (a server redirect to a signed link). */
-  exportTar(at?: number) {
-    return `${this.page("export")}${query({ at })}`;
+  /**
+   * The export download (a server redirect to a signed link): the files as they are, or with
+   * `okf` an OKF bundle (with index.md and log.md) for tools that read that format.
+   */
+  exportTar(at?: number, format?: "okf") {
+    return `${this.page("export")}${query({ format, at })}`;
   }
   /** A nightly export's file (served by the server from R2). */
   nightly(date: string, file: string) {

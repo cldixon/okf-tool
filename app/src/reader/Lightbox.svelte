@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * The full-screen view of a concept's figures (tempra-dev: app/reader, Figures): over the app on
+   * The full-screen view of a page's figures (tempra-dev: app/reader, Figures): over the app on
    * the ground colour, the image (or the diagram, drawn again at the view's size) as large as
-   * fits, previous and next through the concept's figures ("fig. n of m"), Escape to close. For an
+   * fits, previous and next through the page's figures ("fig. n of m"), Escape to close. For an
    * image, Download and Open file (its attachment page; "Open original" for an external image) as
    * pills, and beneath the caption a quiet line: its path, size, the host it was fetched from, who
    * added it and what it shows (TEMPRA-170), asked of the page when the view opens

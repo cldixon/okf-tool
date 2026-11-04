@@ -8,7 +8,7 @@
   import type { Standing } from "./data";
 
   /*
-   * A concept's Check items in its page actions' menu (TEMPRA-172, after Comment): Review changes,
+   * A page's Check items in its page actions' menu (TEMPRA-172, after Comment): Review changes,
    * Mark as checked, or a quiet line saying who checked it, by the page's state; of the latest
    * version only.
    */

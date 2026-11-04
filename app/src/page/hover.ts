@@ -7,7 +7,7 @@ import type { FileJson, JsonObject, Sources } from "./data";
 
 /**
  * Cards over the body: a footnote marker shows the source it cites (or its note), an internal
- * link the target's title, type and staleness (no trust tiers: those are for agents), an
+ * link the target's title and staleness (no trust tiers: those are for agents), an
  * external link its URL. The reader asks `hover` what a card shows; `HoverCard.svelte` draws it.
  */
 export type Card =
@@ -17,7 +17,7 @@ export type Card =
   | { kind: "source"; title: string; resource: string | null; broken: boolean; stale: boolean }
   /** A line of text: an external link's URL, a missing target, a file. */
   | { kind: "text"; text: string }
-  /** A page in the library: its title, type and staleness, and description. */
+  /** A page in the library: its title, staleness and description. */
   | { kind: "page"; title: string; facts: string; description: string | null };
 
 /** What a card shows for what the pointer or focus is on (a promise for a page it loads). */
@@ -54,13 +54,13 @@ export function hoverCards(
     }
     return target.then((t): Card => {
       if (!t) return { kind: "text", text: baseName(path) };
-      if (t.kind !== "concept") return { kind: "text", text: `${baseName(t.path)} · file` };
+      if (t.kind !== "page") return { kind: "text", text: `${baseName(t.path)} · file` };
       const tfm = t.frontmatter;
-      const facts = [typeof tfm.type === "string" ? tfm.type : "", t.stale ? "Stale" : ""];
+      const facts = t.stale ? "Stale" : "";
       return {
         kind: "page",
         title: typeof tfm.title === "string" ? tfm.title : baseName(t.path),
-        facts: facts.filter(Boolean).join(" · "),
+        facts,
         description: typeof tfm.description === "string" ? tfm.description : null,
       };
     });

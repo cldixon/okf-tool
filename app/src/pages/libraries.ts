@@ -4,7 +4,7 @@ import { plural, relativeTime } from "../ui";
 /** A library as the list shows it (`GET /api/v1/libraries`), with its summary. */
 export interface Library extends ReachableLibrary {
   seq?: number;
-  concepts?: number;
+  pages?: number;
   attachments?: number;
   /** Its newest ledger event, else when it was made (TEMPRA-202); the list is ordered by it. */
   last_activity?: string | null;
@@ -30,7 +30,7 @@ export function slugFrom(name: string): string {
 export function cardFacts(l: Library): string[] {
   const facts: string[] = [];
   if (isShared(l)) facts.push(l.role === "write" ? "Write" : "Read");
-  if (typeof l.concepts === "number") facts.push(plural(l.concepts, "page"));
+  if (typeof l.pages === "number") facts.push(plural(l.pages, "page"));
   if (l.last_activity) facts.push(`active ${relativeTime(l.last_activity)}`);
   if (l.unavailable) facts.push("couldn't load just now");
   return facts;

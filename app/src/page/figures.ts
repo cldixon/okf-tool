@@ -7,8 +7,8 @@ import type { Namer } from "./byline";
 import { actedBy, type FileJson, type HistoryEvent } from "./data";
 
 /**
- * What the full-screen view says about a concept's images (tempra-dev: app/reader, Figures): the
- * concept's title, and for an image stored in the library its size, who added it, where it was
+ * What the full-screen view says about a page's images (tempra-dev: app/reader, Figures): the
+ * page's title, and for an image stored in the library its size, who added it, where it was
  * fetched from and what it shows (TEMPRA-170), asked for
  * once per image when the view first shows it. Made afresh when its inputs change (`$derived`).
  */

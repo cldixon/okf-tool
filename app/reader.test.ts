@@ -37,7 +37,7 @@ import { Urls } from "./src/urls";
 
 const FIXTURES = join(import.meta.dir, "..", "fixtures");
 
-/** Every concept body in Google's sample bundles, frontmatter removed. */
+/** Every page body in Google's sample bundles, frontmatter removed. */
 function bodies(): { file: string; body: string }[] {
   const all = (d: string): string[] =>
     readdirSync(d).flatMap((f) => {
@@ -336,7 +336,7 @@ describe("what the reader draws", () => {
   });
 });
 
-/** Internal images to a download path, external ones as they are (as the concept page does). */
+/** Internal images to a download path, external ones as they are (as the page view does). */
 const hrefs: BodyOptions["href"] = (t, _raw, kind) =>
   t === null
     ? null
@@ -426,7 +426,7 @@ describe("figures (tempra-dev: app/reader, Figures)", () => {
     expect(inline.hasAttribute("data-atom")).toBe(true);
     expect(inline.closest("figure")).toBeNull();
     expect(inline.parentElement?.tagName).toBe("P");
-    // Image paths: internal ones resolve against the concept's path.
+    // Image paths: internal ones resolve against the page's path.
     expect(p.figures[0]?.kind === "image" && p.figures[0].path).toBe("assets/tower.png");
     expect(p.figures[1]?.kind === "image" && p.figures[1].path).toBeNull();
   });
@@ -846,7 +846,7 @@ const CITED = [
   "[^b]: B.",
 ].join("\n\n");
 
-/** Markers numbered by label, as the concept page numbers sources. */
+/** Markers numbered by label, as the page view numbers sources. */
 const numbered: BodyOptions["footnote"] = (label) => ({
   href: `#src-${label}`,
   mark: String(["fronalp", "a", "b"].indexOf(label) + 1),
@@ -947,7 +947,7 @@ describe("an image with its footnote is a figure (TEMPRA-218)", () => {
 describe("right-sized images (TEMPRA-162)", () => {
   const urls = new Urls("o", "l");
   const H = (c: string) => c.repeat(64);
-  /** What the concept's JSON says of each image (`images`), as the concept page reads it. */
+  /** What the page's JSON says of each image (`images`), as the page view reads it. */
   const known: Record<string, ImageRef> = {
     "assets/signin.png": { hash: H("a"), media: "image/png", width: 2400, height: 1500 },
     "assets/wide.png": { hash: H("b"), media: "image/jpeg", width: 1000, height: 2000 },

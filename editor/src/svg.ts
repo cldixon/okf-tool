@@ -1,5 +1,5 @@
 /**
- * SVG fences (TEMPRA-206; tempra-dev: app/diagrams, app/media): SVG an agent writes in a concept is
+ * SVG fences (TEMPRA-206; tempra-dev: app/diagrams, app/media): SVG an agent writes in a page is
  * rendered media, code Tempra draws, and untrusted. This reads it as XML with no DOM and gives back
  * a sanitized SVG that the reader draws, the Worker exports and the render Worker rasterizes, the
  * same bytes everywhere, or where it does not parse.

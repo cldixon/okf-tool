@@ -19,7 +19,7 @@
   let drag: { id: number; y: number } | null = null;
 </script>
 
-<aside class={`concept-panel panel-${props.name}`} aria-label={title} id={`panel-${props.name}`}
+<aside class={`page-aside panel-${props.name}`} aria-label={title} id={`panel-${props.name}`}
   ><PanelHead
     {title}
     count={props.count}

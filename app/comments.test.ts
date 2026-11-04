@@ -1,13 +1,13 @@
 /**
  * Comments after the first @tempra demo (TEMPRA-223): every comment author's round mark, Tempra's
- * own filled with the agent colour, and Comments in the concept's ⋯ with its open count.
+ * own filled with the agent colour, and Comments in the page's ⋯ with its open count.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { flushSync } from "svelte";
 import Avatar from "./src/Avatar.svelte";
 import { actorView, agentInitial, TEMPRA_ACTOR } from "./src/agents";
-import PageMenu from "./src/concept/PageMenu.svelte";
-import type { PanelName } from "./src/concept/panel";
+import PageMenu from "./src/page/PageMenu.svelte";
+import type { PanelName } from "./src/page/panel";
 import { Urls } from "./src/urls";
 import { draw } from "./test/dom";
 
@@ -93,7 +93,7 @@ describe("a comment author's round mark", () => {
   });
 });
 
-describe("Comments in the concept's ⋯", () => {
+describe("Comments in the page's ⋯", () => {
   function menu(openCount: number) {
     const opened: PanelName[] = [];
     const d = draw(PageMenu, {

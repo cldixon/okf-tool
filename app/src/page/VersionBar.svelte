@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Urls } from "../urls";
   import type { Namer } from "./byline";
-  import type { Concept, Standing } from "./data";
+  import type { PageFile, Standing } from "./data";
   import VersionWhat from "./VersionWhat.svelte";
 
   /**
@@ -10,10 +10,10 @@
    */
   let {
     urls,
-    concept: c,
+    page: c,
     standing: s,
     name,
-  }: { urls: Urls; concept: Concept; standing: Standing; name: Namer } = $props();
+  }: { urls: Urls; page: PageFile; standing: Standing; name: Namer } = $props();
   const version = $derived(s.current);
   const before = $derived.by(() => {
     const i = version ? s.versions.indexOf(version) : -1;

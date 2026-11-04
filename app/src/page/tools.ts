@@ -2,7 +2,7 @@ import { ApiError } from "../api";
 import { enc, type Urls } from "../urls";
 
 /*
- * A concept's tools in the top bar (take 4, TEMPRA-114; tempra-dev: app/reader, Layout): ⋯, with
+ * A page's tools in the top bar (take 4, TEMPRA-114; tempra-dev: app/reader, Layout): ⋯, with
  * Copy page at its head (TEMPRA-145; on a phone since TEMPRA-118), then History, Properties, View
  * Markdown, Copy link and Download .md. Comment is in the page's actions (PageActions.svelte).
  */

@@ -11,7 +11,7 @@
    * Someone else's change to the open file, in one of two places. In the cluster (`notice` off):
    * a newer version as a pulsing glyph that opens who wrote it, Show diff and Show new version.
    * As a notice on the page (`notice`): a change the cluster cannot show, the open file moved or
-   * deleted (or not a concept), with the way to where it went.
+   * deleted (or not a page), with the way to where it went.
    */
   let { urls, live, notice = false }: { urls: Urls; live: Live; notice?: boolean } = $props();
   const names = useAgentNames(() => urls);

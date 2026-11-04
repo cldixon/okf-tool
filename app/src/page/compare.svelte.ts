@@ -25,8 +25,8 @@ export function useCompare(
       const s = seq();
       if (s === null) return null;
       const f = await api<FileJson>(urls().api(`files/${enc(path())}`, { at: s }));
-      if (f.kind !== "concept") {
-        throw new ApiError(400, "not_concept", "That version is not a page.");
+      if (f.kind !== "page") {
+        throw new ApiError(400, "not_page", "That version is not a page.");
       }
       return f.doc;
     },

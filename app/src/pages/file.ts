@@ -1,8 +1,8 @@
-import { actedBy, type FileJson, type HistoryEvent } from "../concept/data";
+import { actedBy, type FileJson, type HistoryEvent } from "../page/data";
 import { sizeText } from "./attachment";
 
 /*
- * A file's page (File.svelte): a concept in its own layout, an attachment (board 28), a
+ * A file's page (File.svelte): a page in its own layout, an attachment (board 28), a
  * synthesized file, or Not found. Its pure parts.
  */
 

@@ -2,7 +2,7 @@
   import Note from "../reader/Note.svelte";
   import type { Card } from "./hover";
 
-  /** A card over the body, as `hover` described it (concept/hover.ts). */
+  /** A card over the body, as `hover` described it (page/hover.ts). */
   let { card }: { card: Card } = $props();
 </script>
 

@@ -93,11 +93,11 @@ export function chartData(spec: ChartSpec): Record<string, unknown>[] {
 
 /**
  * Where a chart's data URLs point: the library path of each, or a problem for one that is not a
- * file in this library (`conceptPath` resolves a relative one, as links do).
+ * file in this library (`pagePath` resolves a relative one, as links do).
  */
 export function chartDataPaths(
   spec: ChartSpec,
-  conceptPath: string,
+  pagePath: string,
 ): { paths: string[]; problems: string[] } {
   const paths: string[] = [];
   const problems: string[] = [];
@@ -107,7 +107,7 @@ export function chartDataPaths(
       problems.push("a data `url` must be a path to a file in this library");
       continue;
     }
-    const t = linkTarget(conceptPath, d.url);
+    const t = linkTarget(pagePath, d.url);
     if (t?.kind !== "internal" || t.dir || !t.path) {
       problems.push(
         `data from ${d.url} is not read: a chart's data is inline (\`values\`) or a CSV, TSV or JSON file in this library`,
@@ -247,7 +247,7 @@ function valuesOf(text: string, format: Record<string, unknown>, name: string): 
  */
 export async function inlineChartData(
   spec: ChartSpec,
-  conceptPath: string,
+  pagePath: string,
   read: (path: string) => Promise<string | null>,
 ): Promise<ChartSpec> {
   const copy = JSON.parse(JSON.stringify(spec)) as ChartSpec;
@@ -259,7 +259,7 @@ export async function inlineChartData(
     >;
     let values: unknown[] | undefined;
     if (d.url !== undefined) {
-      const t = typeof d.url === "string" ? linkTarget(conceptPath, d.url) : null;
+      const t = typeof d.url === "string" ? linkTarget(pagePath, d.url) : null;
       if (t?.kind !== "internal" || t.dir || !t.path) {
         throw new ChartDataError(
           `data from ${String(d.url)} is not read: use a file in this library`,

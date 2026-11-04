@@ -5,8 +5,8 @@ import { HEADERS, moduleSource, PUBLIC } from "./build";
 import { pagePanel } from "./dist/panels";
 import { actorView, personNames } from "./src/agents";
 import { initials, nameInitials, personInitials } from "./src/chrome";
-import { versionHref } from "./src/concept/history";
-import { panelInUrl, threadInHash } from "./src/concept/panel";
+import { versionHref } from "./src/page/history";
+import { panelInUrl, threadInHash } from "./src/page/panel";
 import { followsInPlace, match, pageKey } from "./src/router";
 import { Urls } from "./src/urls";
 
@@ -21,7 +21,7 @@ describe("routes follow the server's URLs (tempra-dev: v2/urls-and-handles)", ()
     expect(at("/ann/notes/a%20b/c.md")).toMatchObject({ page: "file", path: "a b/c.md" });
   });
 
-  test("a concept in review mode, or against an earlier version (take 3)", () => {
+  test("a page in review mode, or against an earlier version (take 3)", () => {
     const urls = new Urls("ann", "notes");
     expect(at(urls.review("a/b.md"))).toMatchObject({ compare: { kind: "review" } });
     expect(at(urls.since("a/b.md", 7))).toMatchObject({ compare: { kind: "since", seq: 7 } });
@@ -207,7 +207,7 @@ describe("links followed in place (TEMPRA-129)", () => {
   });
 });
 
-describe("the concept page (TEMPRA-128)", () => {
+describe("the page view (TEMPRA-128)", () => {
   const urls = new Urls("ann", "notes");
   const v = (n: number, seq: number) => ({
     n,

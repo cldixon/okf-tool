@@ -7,19 +7,19 @@
   import type { Namer } from "./byline";
   import { changesSince } from "./checked";
   import { useCheck } from "./checked.svelte.ts";
-  import { actedBy, type Concept, type Json, type Links, type Standing } from "./data";
+  import { actedBy, type Json, type Links, type PageFile, type Standing } from "./data";
   import { type ReadHistory, readWords } from "./reads";
 
   /**
    * The Properties panel (take 4, TEMPRA-114; TEMPRA-122 and 134; tempra-dev: app/reader, The
    * panels): short and in people's words. What a reader needs (status, stale or not, who changed
-   * it last, type, tags, sources, what links here by title), then Check when there is something to
+   * it last, tags, sources, what links here by title), then Check when there is something to
    * do (decisions/take4-followups-ui-only). What agents would fix (lint, work items, broken links)
    * is theirs, through `work`, not the panel's (TEMPRA-144).
    */
   let props: {
     urls: Urls;
-    concept: Concept;
+    page: PageFile;
     links: Links;
     head: number;
     standing: Standing;
@@ -46,7 +46,7 @@
   }
 
   /** "No, until Nov 19", "Soon, on Nov 2", "Yes, since Oct 3", or "No". */
-  function staleWords(c: Concept): string {
+  function staleWords(c: PageFile): string {
     const after = text(c.frontmatter.stale_after);
     const on = after ? day(after) : null;
     if (c.stale) return on ? `Yes, since ${on}` : "Yes";
@@ -55,11 +55,10 @@
   }
 
   // What a reader asks about the page, in a fixed order.
-  const fm = $derived(props.concept.frontmatter);
+  const fm = $derived(props.page.frontmatter);
   const sources = $derived(Array.isArray(fm.sources) ? fm.sources.length : 0);
   const last = $derived(props.standing.current?.event);
   const status = $derived(text(fm.status));
-  const type = $derived(text(fm.type));
   const tags = $derived(text(fm.tags));
 
   // What links here, by title: one row per page, however many times it links here.
@@ -81,7 +80,7 @@
   );
   const check = useCheck(
     () => props.urls,
-    () => props.concept.path,
+    () => props.page.path,
     () => props.onVerified(),
   );
 </script>
@@ -89,11 +88,10 @@
 {#snippet notSet()}<span class="muted">not set</span>{/snippet}
 <dl class="facts"
   ><div class="fact"><dt>Status</dt><dd>{#if status !== null}{status}{:else}{@render notSet()}{/if}</dd></div
-  ><div class="fact"><dt>Stale</dt><dd>{staleWords(props.concept)}</dd></div
+  ><div class="fact"><dt>Stale</dt><dd>{staleWords(props.page)}</dd></div
   >{#if last}<div class="fact"
       ><dt>Last changed</dt><dd><span><AgentName who={props.name(last.actor, actedBy(last))} />, <Moment ts={last.ts} /></span></dd></div
-    >{/if}<div class="fact"><dt>Type</dt><dd>{#if type !== null}{type}{:else}{@render notSet()}{/if}</dd></div
-  >{#if tags}<div class="fact"><dt>Tags</dt><dd>{tags}</dd></div>{/if}{#if props.reads}<div class="fact"
+    >{/if}{#if tags}<div class="fact"><dt>Tags</dt><dd>{tags}</dd></div>{/if}{#if props.reads}<div class="fact"
       ><dt>Read</dt><dd>{readWords(props.reads)}</dd></div
     ><div class="fact"
       ><dt>Last read</dt><dd>{#if props.reads.last_read}<Moment ts={props.reads.last_read} />{:else}<span class="muted">not yet</span>{/if}</dd></div
@@ -107,5 +105,5 @@
     </ul>{:else}<p class="small muted">{atHead ? "Nothing links here." : "Shown for the latest version."}</p>{/if}</section
 >{#if showCheck}<section class="panel-section check" aria-label="Check"
     >{#if s.verified}<p class="check-state">{changesSince(s, props.name)}</p
-      ><!-- In review mode the bar over the text has Mark as checked and Done. -->{#if !props.reviewing}<div class="actions"><a class="button" href={props.urls.review(props.concept.path)}>Show changes</a></div>{/if}{:else}<div class="actions"><button type="button" disabled={check.busy} onclick={() => check.check()}>Mark as checked</button></div>{/if}{#if check.error}<p class="small warn">{check.error}</p>{/if}</section
+      ><!-- In review mode the bar over the text has Mark as checked and Done. -->{#if !props.reviewing}<div class="actions"><a class="button" href={props.urls.review(props.page.path)}>Show changes</a></div>{/if}{:else}<div class="actions"><button type="button" disabled={check.busy} onclick={() => check.check()}>Mark as checked</button></div>{/if}{#if check.error}<p class="small warn">{check.error}</p>{/if}</section
   >{/if}

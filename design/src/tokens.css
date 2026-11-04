@@ -126,7 +126,7 @@
      schemes, at least 4.5:1 on the colour (design/contrast.test.ts). */
   --tempra-color-on-agent: light-dark(var(--tempra-grey-201), var(--tempra-grey-201));
 
-  /* Color: commented text in a concept's body (TEMPRA-223), greys only: an open thread's quote on
+  /* Color: commented text in a page's body (TEMPRA-223), greys only: an open thread's quote on
      a soft fill over a solid mid-grey underline, the thread in focus on a deeper fill with an ink
      underline. Text keeps at least 4.5:1 on both fills, and the underline 3:1 on the soft fill
      and the page (design/contrast.test.ts). */
@@ -208,15 +208,15 @@
   --tempra-text-ui: 13px; /* controls, panels, the tree, comments */
   --tempra-text-base: 14px; /* the app's base text */
   --tempra-text-name: 15px; /* a library's name, dialog heads, the wordmark */
-  --tempra-text-reader: 17px; /* a concept's body and description, the landing page's lede */
+  --tempra-text-reader: 17px; /* a page's body and description, the landing page's lede */
   --tempra-text-h2: 22px; /* an attachment's name, a compose dialog's name */
-  --tempra-text-page: 28px; /* a view's title (h1); a concept's title on a phone */
-  --tempra-text-title: 36px; /* a concept's title */
+  --tempra-text-page: 28px; /* a view's title (h1); a page's title on a phone */
+  --tempra-text-title: 36px; /* a page's title */
   --tempra-text-code: 0.92em; /* code, a step under the text around it */
 
   /* Weights: three */
   --tempra-weight-regular: 400; /* text */
-  --tempra-weight-medium: 500; /* names in rows, a concept's title, the body's h1 and h2 */
+  --tempra-weight-medium: 500; /* names in rows, a page's title, the body's h1 and h2 */
   --tempra-weight-strong: 600; /* the sans's headings, section labels, the wordmark */
 
   /* Leading: three */
@@ -227,14 +227,14 @@
   /* Tracking */
   --tempra-tracking-label: 0.04em; /* uppercase labels */
   --tempra-tracking-title: -0.02em; /* h1 and a view's title */
-  --tempra-tracking-doc: -0.01em; /* a concept's title */
+  --tempra-tracking-doc: -0.01em; /* a page's title */
 
   /* Lines: a link's underline sits this far under the text (inside .prose, in em) */
   --tempra-line-offset: 2px;
 
   /* Measure */
   --tempra-measure: 680px; /* the reader's column, with its padding: diagrams, captions */
-  --tempra-measure-reader: 34em; /* concept text: about 66 characters at the reading size */
+  --tempra-measure-reader: 34em; /* page text: about 66 characters at the reading size */
 
   /* Space: one scale in rem, so spacing grows with the reader's chosen text size, named by its
      size in px at the default 16px root (take 2 to take 4 used every step below; the palette
@@ -267,12 +267,12 @@
   --tempra-space-chip: 1px 7px;
 
   /* Size: the frame (take 4): a top bar across the window, the sidebar, one panel beside a
-     concept. The breakpoints are 1100px (the panel overlays the page) and 900px (the phone
+     page. The breakpoints are 1100px (the panel overlays the page) and 900px (the phone
      layout); a media query cannot read a token, so they are written where they are used. */
   --tempra-size-topbar: 60px; /* the top bar */
   --tempra-size-topbar-phone: 52px; /* the phone's top bar */
   --tempra-size-sidebar: 264px; /* the sidebar's width */
-  --tempra-size-panel: 360px; /* a concept's panel (Comments, History, Properties) */
+  --tempra-size-panel: 360px; /* a page's panel (Comments, History, Properties) */
   --tempra-size-panel-head: 56px; /* a panel's head; the phone sheet's is taller */
   --tempra-size-panel-head-phone: 64px;
   --tempra-size-drawer: min(82vw, 360px); /* the phone's drawer: about four fifths of the screen */
@@ -280,7 +280,7 @@
   --tempra-size-row: 30px; /* a sidebar row */
   --tempra-size-touch: 44px; /* the least touch target on a phone */
 
-  /* Size: a concept's columns (take 4): the text, centred; on the right its contents, or a panel */
+  /* Size: a page's columns (take 4): the text, centred; on the right its contents, or a panel */
   --tempra-size-column-text: 620px;
   --tempra-size-contents: 200px;
   --tempra-size-figure-wide: 960px; /* a wide figure (`layout=wide`), past the text's measure */

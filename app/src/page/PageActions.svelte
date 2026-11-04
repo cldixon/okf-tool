@@ -7,14 +7,14 @@
    * A page's actions (TEMPRA-172; tempra-dev: decisions/a-pages-actions-float): one round + button
    * at the page's bottom right, the one raised thing on a flat page, opening a small menu upward.
    * What it holds depends on the page (TEMPRA-222): Comment (with the open count) everywhere, then
-   * what the page adds (`more`: on a concept, Check by its state, CheckActions.svelte; on the home,
+   * what the page adds (`more`: on a page, Check by its state, CheckActions.svelte; on the home,
    * nothing). It steps aside while a panel is open (the panel has its own ×), and comes back,
    * focusable, when the panel closes.
    */
   let props: {
     /** Open threads here. */
     openCount: number;
-    /** Something else waits here (on a concept, changes since it was checked). */
+    /** Something else waits here (on a page, changes since it was checked). */
     waiting?: boolean;
     /** A panel is open: the button steps aside. */
     hidden: boolean;

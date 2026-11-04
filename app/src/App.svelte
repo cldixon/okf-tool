@@ -13,7 +13,7 @@
     return designChunk;
   };
 
-  /** The pages that lay out their column themselves (a concept's columns, the person's views). */
+  /** The pages that lay out their column themselves (a page's columns, the person's views). */
   const OWN_COLUMN = new Set(["file", "directory", "activity"]);
 </script>
 
@@ -139,7 +139,7 @@
     {:else if route.page === "file"}
       <File {urls} path={route.path} done={url.searchParams.get("done")} {actor} compare={route.compare ?? null} />
     {:else if route.page === "diff"}
-      <!-- The take 3 Diff page is retired (TEMPRA-124): its address opens the concept's own
+      <!-- The take 3 Diff page is retired (TEMPRA-124): its address opens the page's own
            version view. -->
       <Redirect to={urls.diff(route.path, route.from, route.to)} />
     {:else if route.page === "settings"}

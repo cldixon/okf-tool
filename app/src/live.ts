@@ -11,7 +11,7 @@ export interface FeedEvent {
   request_id: string;
   op: string;
   path: string;
-  concept_id: string;
+  page_id: string;
   hash: string | null;
   note: string | null;
   from_path: string | null;
