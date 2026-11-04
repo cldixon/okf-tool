@@ -787,13 +787,13 @@ async function browserRenders(
       // sample bundles leave none since the pages-not-okf checks, so an agent leaves a page
       // with a link to nowhere for the length of this step.
       const auth = { Authorization: `Bearer ${token}` };
-      const chore = `${base}/api/v1/libraries/${owner}/${slug}/files/gate-housekeeping.md`;
+      const chore = `${base}/api/v1/libraries/${owner}/${slug}/files/gate-chore.md`;
       const put = await fetch(chore, {
         method: "PUT",
-        headers: { ...auth, "Content-Type": "text/markdown", "X-Note": "gate: housekeeping" },
-        body: "---\ntitle: Gate housekeeping\ndescription: Links nowhere.\n---\nSee [gone](/gate-gone.md).\n",
+        headers: { ...auth, "Content-Type": "text/markdown", "X-Note": "gate: a chore for agents" },
+        body: "---\ntitle: Gate chore\ndescription: Links nowhere.\n---\nSee [gone](/gate-gone.md).\n",
       });
-      if (!put.ok) throw new Error(`write gate-housekeeping.md: ${put.status}`);
+      if (!put.ok) throw new Error(`write gate-chore.md: ${put.status}`);
       await page.reload();
       await main.locator(".home-section").first().waitFor({ timeout: 15_000 });
       const work = (await (
@@ -815,7 +815,7 @@ async function browserRenders(
         method: "DELETE",
         headers: { ...auth, "If-Match": now.headers.get("ETag") ?? "", "X-Note": "gate: tidy" },
       });
-      if (!gone.ok) throw new Error(`delete gate-housekeeping.md: ${gone.status}`);
+      if (!gone.ok) throw new Error(`delete gate-chore.md: ${gone.status}`);
       await home();
       if (shots) await page.screenshot({ path: `${shots}/home.png` });
     });
@@ -5102,9 +5102,10 @@ async function nightlyExport(owner: string, slug: string, originals: number): Pr
   const tar = await ui(`${lib}/-/exports/${date}/bundle.tar`);
   if (!tar.ok) return [`nightly bundle.tar: ${tar.status}`];
   const files = readTar(new Uint8Array(await tar.arrayBuffer()));
-  // A nightly folder is the plain format: the pages and attachments, no index.md or log.md.
-  if (files.length !== originals) {
-    return [`nightly bundle has ${files.length} files, not ${originals}`];
+  // A nightly folder is the plain format: the pages and attachments (with what the gate wrote,
+  // so at least the originals), no index.md or log.md.
+  if (files.length < originals) {
+    return [`nightly bundle has ${files.length} files, fewer than ${originals}`];
   }
   if (files.some((f) => /(^|\/)(index|log)\.md$/.test(f.path))) {
     return ["nightly bundle holds a synthesized index.md or log.md"];
