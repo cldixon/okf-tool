@@ -3549,12 +3549,38 @@ async function browserRenders(
         page.evaluate(
           `document.getAnimations().filter((a) => a.animationName === "tempra-shimmer").forEach((a) => { if (${hold}) { a.pause(); a.currentTime = 1000; } else a.play(); })`,
         );
-      // What the feed brings: its presence messages, said if a mark does not come.
-      const frames: string[] = [];
+      // What the feed brings to the page opened below (only sockets opened from here on): its
+      // hello, which says the socket is open, and its presence messages and live events, each
+      // with when it came (ms since `t0`), said if a mark does not come or does not go.
+      const t0 = Date.now();
+      let feedOpen = false;
+      const frames: { at: number; paths: string[]; text: string }[] = [];
+      const writes: string[] = [];
       const listen = (ws: { on(e: "framereceived", f: (d: { payload: unknown }) => void): void }) =>
         ws.on("framereceived", (d) => {
-          const s = String(d.payload);
-          if (s.includes('"presence"')) frames.push(s);
+          const text = String(d.payload);
+          if (text === "pong") return;
+          try {
+            const m = JSON.parse(text) as {
+              type?: string;
+              paths?: string[];
+              events?: { op: string; path: string; actor: string }[];
+            };
+            const at = Date.now() - t0;
+            if (m.type === "hello") feedOpen = true;
+            if (m.type === "presence") frames.push({ at, paths: m.paths ?? [], text });
+            for (const e of m.events ?? [])
+              writes.push(`+${at} ms ${e.op} ${e.path} by ${e.actor}`);
+          } catch {
+            // Not the feed's JSON: nothing to note.
+          }
+        });
+      const said = () =>
+        `presence on the feed: ${frames.map((f) => `+${f.at} ms ${f.text}`).join(" ") || "none"}; writes on it: ${writes.join(", ") || "none"}`;
+      /** A wait that says which one it was when it times out. */
+      const named = <T>(what: string, wait: Promise<T>) =>
+        wait.catch((e: unknown) => {
+          throw new Error(`${what}: ${String(e).split("\n")[0]}`);
         });
       page.on("websocket", listen);
       const client = new Client({ name: "gate-presence", version: "1.0.0" });
@@ -3575,11 +3601,33 @@ async function browserRenders(
       try {
         // Every folder open, so every row the agent touches is drawn.
         await page.evaluate(`localStorage.removeItem("tempra:tree-closed:${owner}/${slug}")`);
+        feedOpen = false;
         await page.goto(`${lib}/${enc(other.path)}`);
-        await main.locator(".body .prose").waitFor({ timeout: 15_000 });
-        await sidebar.locator(`a[data-path="${concept}"]`).waitFor({ timeout: 10_000 });
+        await named(
+          `${other.path} drawn`,
+          main.locator(".body .prose").waitFor({ timeout: 15_000 }),
+        );
+        await named(
+          "the tree drawn",
+          sidebar.locator(`a[data-path="${concept}"]`).waitFor({ timeout: 10_000 }),
+        );
+        // The page's feed open (its hello) before the agent does anything: presence goes only to
+        // open sockets and is never caught up, so a read before it would be missed.
+        await named(
+          "the page's feed opening",
+          (async () => {
+            const until = Date.now() + 10_000;
+            while (!feedOpen) {
+              if (Date.now() > until) throw new Error("no hello on the feed in 10 s");
+              await page.waitForTimeout(50);
+            }
+          })(),
+        );
         // Earlier steps' agent writes and reads fade first.
-        await marked.first().waitFor({ state: "detached", timeout: 20_000 });
+        await named(
+          "earlier marks fading",
+          marked.first().waitFor({ state: "detached", timeout: 20_000 }),
+        );
         // What a search will find, asked as the person (whose search is no presence either).
         const q =
           (other.title ?? "")
@@ -3598,14 +3646,14 @@ async function browserRenders(
         // A presence message would land in milliseconds; the search sends none.
         await page.waitForTimeout(1500);
         if ((await marked.count()) > 0 || frames.length > 0) {
-          throw new Error(`a search marked pages: ${frames.join(" ")}`);
+          throw new Error(`a search marked pages: ${said()}`);
         }
         for (const path of read) await call("read", { path });
         // The pages it read shimmer, as reading; what it only found does not.
         for (const path of read) {
           const row = sidebar.locator(`a.presence[data-path="${path}"][data-presence="reading"]`);
           await row.waitFor({ timeout: 5000 }).catch(() => {
-            throw new Error(`${path} is not marked; presence on the feed: ${frames.join(" ")}`);
+            throw new Error(`${path} is not marked; ${said()}`);
           });
         }
         for (const path of unread) {
@@ -3667,8 +3715,35 @@ async function browserRenders(
         if ((await sidebar.locator(".tree-row.dir.open.presence").count()) > 0) {
           throw new Error("an open folder shimmers");
         }
-        // Gone a few seconds after the agent stopped (8 s after its last read).
-        await marked.first().waitFor({ state: "detached", timeout: 15_000 });
+        // Gone a few seconds after the agent stopped: PRESENCE_TTL_MS (app/src/presence.ts, 8 s)
+        // after the last presence message for these pages, not after the gate starts looking,
+        // and only these marks (an agent elsewhere in the library is not this check's business).
+        const lastFor = Math.max(
+          ...frames.filter((f) => f.paths.some((p) => read.includes(p))).map((f) => f.at),
+        );
+        const deadline = t0 + lastFor + 8000 + 4000;
+        const ours = sidebar.locator(
+          [
+            ...read.map((p) => `a.presence[data-path="${p}"]`),
+            `.tree-row.dir.presence button.tree-name[title^="${folderName(top)}: "]`,
+          ].join(", "),
+        );
+        await ours
+          .first()
+          .waitFor({ state: "detached", timeout: Math.max(1, deadline - Date.now()) })
+          .catch(async () => {
+            const still = await sidebar
+              .locator(".tree-row.presence a, .tree-row.dir.presence button.tree-name")
+              .evaluateAll((els) =>
+                els.map((el) => {
+                  const e = el as unknown as { getAttribute(n: string): string | null };
+                  return e.getAttribute("data-path") ?? e.getAttribute("title");
+                }),
+              );
+            throw new Error(
+              `still marked ${Date.now() - t0 - lastFor} ms after the last presence for the pages read (+${lastFor} ms): ${still.join(", ")}; ${said()}`,
+            );
+          });
 
         // A recording for review, with GATE_RECORD=1 (it needs Playwright's ffmpeg, which CI's
         // runners lack): the tree while the agent reads a page outside a closed folder and one
