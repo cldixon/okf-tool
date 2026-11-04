@@ -69,14 +69,14 @@ describe("search (TEMPRA-17)", () => {
   test("a library from before gets its search stemmed once, rows and rowids intact", () => {
     const lib = pages();
     // Back to the unstemmed index a library from before has.
-    lib.db.run("CREATE VIRTUAL TABLE fts_old USING fts5(concept_id UNINDEXED, title, body, tags)");
+    lib.db.run("CREATE VIRTUAL TABLE fts_old USING fts5(page_id UNINDEXED, title, body, tags)");
     lib.db.run(
-      "INSERT INTO fts_old (concept_id, title, body, tags) SELECT concept_id, title, body, tags FROM fts",
+      "INSERT INTO fts_old (page_id, title, body, tags) SELECT page_id, title, body, tags FROM fts",
     );
     lib.db.run("DROP TABLE fts");
     lib.db.run("ALTER TABLE fts_old RENAME TO fts");
     lib.db.run("DELETE FROM fts_rows");
-    lib.db.run("INSERT INTO fts_rows (concept_id, fts_rowid) SELECT concept_id, rowid FROM fts");
+    lib.db.run("INSERT INTO fts_rows (page_id, fts_rowid) SELECT page_id, rowid FROM fts");
     // Unstemmed, "commenting" matches nothing (opening a store would upgrade it, so ask SQL).
     const before = lib.db
       .query("SELECT COUNT(*) AS n FROM fts WHERE fts MATCH 'commenting'")
@@ -102,7 +102,7 @@ describe("search (TEMPRA-17)", () => {
         op: "write",
         path: "misc.md",
         content: md("Misc", "Now about stemming.\n"),
-        if_match: v.kind === "concept" ? v.hash : null,
+        if_match: v.kind === "page" ? v.hash : null,
       },
     ]);
     const n = lib.db.query("SELECT COUNT(*) AS n FROM fts").get() as { n: number };
@@ -114,14 +114,14 @@ describe("search (TEMPRA-17)", () => {
 
   test("an upgrade that fails leaves the library open, its search unstemmed but working", () => {
     const lib = pages();
-    lib.db.run("CREATE VIRTUAL TABLE fts_old USING fts5(concept_id UNINDEXED, title, body, tags)");
+    lib.db.run("CREATE VIRTUAL TABLE fts_old USING fts5(page_id UNINDEXED, title, body, tags)");
     lib.db.run(
-      "INSERT INTO fts_old (concept_id, title, body, tags) SELECT concept_id, title, body, tags FROM fts",
+      "INSERT INTO fts_old (page_id, title, body, tags) SELECT page_id, title, body, tags FROM fts",
     );
     lib.db.run("DROP TABLE fts");
     lib.db.run("ALTER TABLE fts_old RENAME TO fts");
     lib.db.run("DELETE FROM fts_rows");
-    lib.db.run("INSERT INTO fts_rows (concept_id, fts_rowid) SELECT concept_id, rowid FROM fts");
+    lib.db.run("INSERT INTO fts_rows (page_id, fts_rowid) SELECT page_id, rowid FROM fts");
     // A handle on which the rename fails, as a platform might refuse it.
     const sql = bunSqlHandle(lib.db);
     const failing = {

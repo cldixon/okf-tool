@@ -1,6 +1,6 @@
 /**
  * Where a link in a concept body points, and heading anchors. The same rules as the server's
- * (worker/src/okf/paths.ts), so the reader and the server agree;
+ * (worker/src/format/paths.ts), so the reader and the server agree;
  * kept here, DOM-free, because the reader needs them in the browser.
  */
 import type { PhrasingContent } from "mdast";

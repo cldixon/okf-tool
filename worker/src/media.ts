@@ -1,4 +1,4 @@
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /**
  * What attachment bytes are (TEMPRA-152): the image formats the app draws, checked from their
@@ -139,7 +139,7 @@ export function checkAttachment(
   if (!info) return { media: declared };
   const what = path ? `${path} is not a valid ${FORMAT_NAME[info.format]}` : "Not a valid image";
   if (!info.ok) {
-    throw new OkfError(400, "bad_image", `${what}: ${info.problem}.`, {
+    throw new StoreError(400, "bad_image", `${what}: ${info.problem}.`, {
       format: info.format,
       problem: info.problem,
     });

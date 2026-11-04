@@ -4,7 +4,7 @@
  * the Library DO holds the sockets (hibernation API) and calls these.
  */
 import type { ActedBy } from "./agents";
-import { normalizeDir, underPrefix } from "./okf/paths";
+import { normalizeDir, underPrefix } from "./format/paths";
 import { type ReaderKind, type Reading, type ReadSurface, readerKey } from "./store/reads";
 import type { EventRow } from "./store/store";
 
@@ -16,7 +16,7 @@ export interface FeedEvent {
   request_id: string;
   op: string;
   path: string;
-  concept_id: string;
+  page_id: string;
   hash: string | null;
   note: string | null;
   /** For a move: where the file was. */
@@ -87,7 +87,7 @@ export function feedEvent(e: EventRow): FeedEvent {
     request_id: e.request_id,
     op: e.op,
     path: e.path,
-    concept_id: e.concept_id,
+    page_id: e.page_id,
     hash: e.hash,
     note: typeof meta.note === "string" ? meta.note : null,
     from_path: typeof meta.from_path === "string" ? meta.from_path : null,
@@ -246,7 +246,7 @@ export function readingOf(c: Caller): Reading {
 export const PRESENCE_THROTTLE_MS = 3000;
 
 /**
- * The file a read method's result names: a read file (a concept or an attachment; not the
+ * The file a read method's result names: a read file (a page or an attachment; not the
  * library's generated index or log, which are no row in the tree) or a page's file. Any other
  * method, `search` included, names none.
  */
@@ -254,7 +254,7 @@ export function presencePaths(method: string, value: unknown): string[] {
   if (!value || typeof value !== "object") return [];
   const fileOf = (v: unknown) => {
     const f = v as { kind?: unknown; path?: unknown } | null;
-    return f && (f.kind === "concept" || f.kind === "attachment") && typeof f.path === "string"
+    return f && (f.kind === "page" || f.kind === "attachment") && typeof f.path === "string"
       ? [f.path]
       : [];
   };

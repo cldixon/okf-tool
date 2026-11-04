@@ -33,16 +33,16 @@ import {
 } from "./paths";
 import { normalizeVerified } from "./trust";
 import type {
-  ConceptRecord,
   Json,
   JsonObject,
   LintWarning,
+  PageRecord,
   StoredLink,
   StoredSource,
   Verification,
 } from "./types";
 
-/** Keys the server owns: taken from the writer only on import (spec: OKF conformance). */
+/** Keys the server owns: taken from the writer only on import (spec: the page format). */
 export const SERVER_OWNED = new Set(["generated", "verified"]);
 /** Keys the server computes at read time; never stored, ignored on write. */
 export const COMPUTED = new Set([
@@ -52,8 +52,8 @@ export const COMPUTED = new Set([
   "inbound_links",
   "usage_count",
 ]);
-/** OKF fields render first, in this order; other keys follow in arrival order. */
-const OKF_ORDER = [
+/** Known fields render first, in this order; other keys follow in arrival order. */
+const FIELD_ORDER = [
   "type",
   "title",
   "description",
@@ -65,7 +65,7 @@ const OKF_ORDER = [
   "usage_window",
 ];
 
-export interface ParsedConcept {
+export interface ParsedPage {
   /** Frontmatter entries in arrival order, server-owned and computed keys removed. */
   entries: [string, Json][];
   /** Frontmatter text kept verbatim when it is not a parseable YAML mapping. */
@@ -95,11 +95,11 @@ export function splitFrontmatter(md: string): { fm: string | null; body: string 
   return { fm: rest.slice(0, close.index), body: rest.slice(close.index + close[0].length) };
 }
 
-/** Parses OKF markdown into frontmatter entries and body, with parse-level lint. */
-export function parseConcept(md: string): ParsedConcept {
+/** Parses page markdown into frontmatter entries and body, with parse-level lint. */
+export function parsePage(md: string): ParsedPage {
   const { fm, body } = splitFrontmatter(md);
   const lint: LintWarning[] = [];
-  const out: ParsedConcept = {
+  const out: ParsedPage = {
     entries: [],
     rawFm: null,
     body,
@@ -111,10 +111,11 @@ export function parseConcept(md: string): ParsedConcept {
   };
   if (fm === null) {
     out.fmError =
-      "There is no YAML frontmatter block. Start the file with `---`, then `type: …` and the other fields, then `---`.";
+      "There is no YAML frontmatter block. Start the file with `---`, then `title: …`, `description: …` and any other fields, then `---`.";
     lint.push({
       code: "missing_frontmatter",
-      message: "No YAML frontmatter block; `type` is required.",
+      message:
+        "No YAML frontmatter block; a page starts with one, holding its `title` and `description`.",
     });
     return out;
   }
@@ -189,11 +190,11 @@ export interface BuildOptions {
   hints?: Doc | null;
 }
 
-export interface BuiltConcept {
-  record: ConceptRecord;
+export interface BuiltPage {
+  record: PageRecord;
   lint: LintWarning[];
   /**
-   * What the writer should know about this write but has nothing to fix in the stored concept
+   * What the writer should know about this write but has nothing to fix in the stored page
    * (fields the server ignored): returned with the write, never stored as lint.
    */
   notices: LintWarning[];
@@ -206,11 +207,11 @@ export interface BuiltConcept {
 
 /**
  * Builds a content version from parsed markdown: parses the body into the stored tree (block IDs
- * carried over from `prev`), applies v0.1 migrations (OKF §13), stamps `generated` on ordinary
+ * carried over from `prev`), applies the v0.1 upgrades OKF bundles may carry, stamps `generated` on ordinary
  * writes, scans links and footnotes, and lints. Link targets are left unresolved (null); the store
  * resolves them against the library.
  */
-export function buildRecord(parsed: ParsedConcept, opts: BuildOptions): BuiltConcept {
+export function buildRecord(parsed: ParsedPage, opts: BuildOptions): BuiltPage {
   const lint = [...parsed.lint];
   const notices: LintWarning[] = [];
   let entries = parsed.entries.map(([k, v]) => [k, v] as [string, Json]);
@@ -225,7 +226,7 @@ export function buildRecord(parsed: ParsedConcept, opts: BuildOptions): BuiltCon
     entries = entries.filter(([k]) => k !== "timestamp");
     lint.push({
       code: "v01_timestamp",
-      message: "v0.1 `timestamp` migrated: superseded by `generated.at` (OKF §13).",
+      message: "v0.1 `timestamp` migrated: superseded by `generated.at`.",
     });
   }
   // v0.1: a `# Citations` body list is superseded by `sources`.
@@ -234,7 +235,7 @@ export function buildRecord(parsed: ParsedConcept, opts: BuildOptions): BuiltCon
     entries = migrated;
     lint.push({
       code: "v01_citations",
-      message: "v0.1 `# Citations` list migrated into `sources` (OKF §13).",
+      message: "v0.1 `# Citations` list migrated into `sources`.",
     });
   }
 
@@ -268,7 +269,7 @@ export function buildRecord(parsed: ParsedConcept, opts: BuildOptions): BuiltCon
       notices.push({
         code: "verified_ignored",
         message:
-          "`verified` is set when a person verifies the concept in the app; the value you sent was ignored.",
+          "`verified` is set when a person verifies the page in the app; the value you sent was ignored.",
       });
     }
   } else if (opts.mode === "import" && parsed.verifiedBare) {
@@ -287,7 +288,7 @@ export function buildRecord(parsed: ParsedConcept, opts: BuildOptions): BuiltCon
   }
   lint.push(...diagramLint(doc), ...figureLint(doc));
   lint.push(...imageLint(doc));
-  const record: ConceptRecord = {
+  const record: PageRecord = {
     fm: entries,
     raw_fm: parsed.rawFm,
     generated,
@@ -369,7 +370,7 @@ function migrateCitations(doc: Doc, entries: [string, Json][]): [string, Json][]
 }
 
 /** Canonical serialization of a record; its SHA-256 is the content-version hash. */
-export function serializeRecord(r: ConceptRecord): string {
+export function serializeRecord(r: PageRecord): string {
   return JSON.stringify({
     fm: r.fm,
     raw_fm: r.raw_fm,
@@ -411,10 +412,10 @@ export interface SourceCandidate {
 }
 
 /**
- * The internal-looking `sources[].resource` values of a concept at `conceptPath` (spec: Concept
- * model, Links). A bare path is tried relative to the concept, then to the bundle root.
+ * The internal-looking `sources[].resource` values of a page at `pagePath` (spec: Page
+ * model, Links). A bare path is tried relative to the page, then to the bundle root.
  */
-export function sourceCandidates(conceptPath: string, fm: [string, Json][]): SourceCandidate[] {
+export function sourceCandidates(pagePath: string, fm: [string, Json][]): SourceCandidate[] {
   const list = fm.find(([k]) => k === "sources")?.[1];
   if (!Array.isArray(list)) return [];
   const out: SourceCandidate[] = [];
@@ -433,7 +434,7 @@ export function sourceCandidates(conceptPath: string, fm: [string, Json][]): Sou
     };
     if (written.startsWith("/")) add("absolute", normalizePath(written));
     else {
-      add("relative", resolveLinkPath(conceptPath, written));
+      add("relative", resolveLinkPath(pagePath, written));
       if (!written.startsWith("./") && !written.startsWith("../"))
         add("root", normalizePath(written));
     }
@@ -451,12 +452,12 @@ export function sourceCandidates(conceptPath: string, fm: [string, Json][]): Sou
   return out;
 }
 
-export function deserializeRecord(s: string): ConceptRecord {
-  return JSON.parse(s) as ConceptRecord;
+export function deserializeRecord(s: string): PageRecord {
+  return JSON.parse(s) as PageRecord;
 }
 
 /** A frontmatter field of a record, or undefined. */
-export function field(r: ConceptRecord, key: string): Json | undefined {
+export function field(r: PageRecord, key: string): Json | undefined {
   return r.fm.find(([k]) => k === key)?.[1];
 }
 
@@ -470,17 +471,17 @@ export interface RenderOptions {
   computed?: [string, Json][];
 }
 
-/** Renders a record as OKF markdown with canonical frontmatter (spec: Reads and export). */
-export function renderConcept(r: ConceptRecord, opts: RenderOptions): string {
+/** Renders a record as page markdown with canonical frontmatter (spec: Reads and export). */
+export function renderPage(r: PageRecord, opts: RenderOptions): string {
   const body = renderBody(r, opts.href);
   if (r.raw_fm !== null) return `---\n${r.raw_fm}\n---\n${body}`;
   const fm = renderSources(r, opts.sourceHref);
   const ordered: [string, Json][] = [];
-  for (const key of OKF_ORDER) {
+  for (const key of FIELD_ORDER) {
     const e = fm.find(([k]) => k === key);
     if (e) ordered.push(e);
   }
-  for (const e of fm) if (!OKF_ORDER.includes(e[0])) ordered.push(e);
+  for (const e of fm) if (!FIELD_ORDER.includes(e[0])) ordered.push(e);
   if (r.generated) ordered.push(["generated", r.generated]);
   if (opts.verified.length > 0) {
     ordered.push(["verified", opts.verified.map((v) => ({ by: v.by, at: v.at }))]);
@@ -491,7 +492,7 @@ export function renderConcept(r: ConceptRecord, opts: RenderOptions): string {
 }
 
 /** The frontmatter entries with each internal source's `resource` as `sourceHref` renders it. */
-function renderSources(r: ConceptRecord, sourceHref?: (s: StoredSource) => string) {
+function renderSources(r: PageRecord, sourceHref?: (s: StoredSource) => string) {
   if (!sourceHref || !r.sources?.length) return r.fm;
   const stored = r.sources;
   return r.fm.map(([k, v]): [string, Json] => {
@@ -512,14 +513,14 @@ function renderSources(r: ConceptRecord, sourceHref?: (s: StoredSource) => strin
  * The body with each link at the target `href` gives it (its target's current path): the stored
  * markdown when no link moved, else the tree written anew.
  */
-export function renderBody(r: ConceptRecord, href?: (link: StoredLink) => string): string {
+export function renderBody(r: PageRecord, href?: (link: StoredLink) => string): string {
   if (!href) return r.body;
   const doc = renderDoc(r, href);
   return doc === r.doc ? r.body : toMarkdown(doc);
 }
 
 /** The tree with each link at the target `href` gives it; the stored tree itself when none moved. */
-export function renderDoc(r: ConceptRecord, href?: (link: StoredLink) => string): Doc {
+export function renderDoc(r: PageRecord, href?: (link: StoredLink) => string): Doc {
   if (!href) return r.doc;
   const moved = r.links.flatMap((l) => {
     const url = href(l);
@@ -544,13 +545,13 @@ function stringifyFrontmatter(entries: [string, Json][]): string {
     map.add(doc.createPair(k, node));
   }
   doc.contents = map;
-  // OKF's examples write `{ by, at }` but `[a, b]`; the yaml library pads both, so unpad lists.
+  // The format's examples write `{ by, at }` but `[a, b]`; the yaml library pads both, so unpad lists.
   return doc
     .toString({ lineWidth: 0, minContentWidth: 0 })
     .replace(/^(\s*(?:- )?[^\s:][^:]*: )\[ (.*) \]$/gm, "$1[$2]");
 }
 
-/** Flow style for lists of scalars and for `generated`, as in OKF's own examples (`tags: [a, b]`, `{ by, at }`). */
+/** Flow style for lists of scalars and for `generated`, as in the format's examples (`tags: [a, b]`, `{ by, at }`). */
 function styleNode(node: unknown, key: string | null) {
   if (isSeq(node)) {
     const seq = node as YAMLSeq;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { AuthCache, TtlCache } from "../src/authcache";
-import { sha256Hex } from "../src/okf/hash";
+import { sha256Hex } from "../src/format/hash";
 import { d1Sessions } from "../src/session";
 import { bunD1 } from "./d1";
 import { API, LIB, ORIGIN, OWNER, setup } from "./harness";

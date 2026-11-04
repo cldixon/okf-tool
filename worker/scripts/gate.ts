@@ -5,7 +5,7 @@
  * Starts the Worker with fresh local D1, R2 and DO state, seeds one library and write token per
  * sample bundle, imports each bundle as a tarball, exports it, and compares: same parsed
  * frontmatter (generated and verified included) and bodies, byte-identical attachments,
- * synthesized index.md and log.md ignored. Then checks every concept and directory of each bundle
+ * synthesized index.md and log.md ignored. Then checks every page and directory of each bundle
  * is the app's page and renders through the API (signed in by a dev magic link), drives the app in
  * Chromium (playwright-core; CHROME_PATH picks the binary), runs the nightly export through the Durable
  * Object into local R2, signs up a second user who must not see the first one's libraries
@@ -202,7 +202,7 @@ async function uiPages(owner: string, slug: string, paths: string[]): Promise<st
   const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
   const lib = `${base}/${owner}/${slug}`;
   const api = `${base}/api/v1/libraries/${owner}/${slug}`;
-  const concepts = paths.filter((p) => p.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(p));
+  const pagePaths = paths.filter((p) => p.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(p));
   const dirs = new Set<string>();
   for (const p of paths) {
     const parts = p.split("/").slice(0, -1);
@@ -213,7 +213,7 @@ async function uiPages(owner: string, slug: string, paths: string[]): Promise<st
     `${lib}/-/ledger`,
     ...["activity", "transfer", "recovery", "connect", "delete"].map((p) => `${lib}/-/${p}`),
     ...[...dirs].map((d) => `${lib}/${enc(d)}/`),
-    ...concepts.map((p) => `${lib}/${enc(p)}`),
+    ...pagePaths.map((p) => `${lib}/${enc(p)}`),
   ];
   const problems: string[] = [];
   // Needs you is retired, and the Inbox page with it (TEMPRA-116, TEMPRA-189): its URL lands on
@@ -238,7 +238,7 @@ async function uiPages(owner: string, slug: string, paths: string[]): Promise<st
       problems.push(`${url.slice(base.length)}: ${r.status} ${html.slice(0, 200)}`);
     }
   }
-  for (const p of [...concepts, "index.md", "log.md"]) {
+  for (const p of [...pagePaths, "index.md", "log.md"]) {
     const r = await ui(`${api}/files/${enc(p)}`, { headers: { Accept: "application/json" } });
     const body = (await r.json().catch(() => null)) as { kind?: string } | null;
     if (r.status !== 200 || !body?.kind) {
@@ -649,11 +649,11 @@ function greyscalePng(
  * Settings page's sections in the library's frame, the quick switcher, the hidden sidebar; at
  * phone width the bar's mark and library, the drawer with the bar's parts at its head, the tree,
  * Activity and Settings, the home stacked, the Settings page's drawer, the library's own), a folder's address revealing it, Not found for a moved
- * path, an attachment's page, every concept in the reader (drawn from the stored
- * tree, with no Edit, a footnote card on hover), the concept's panels (Comments, History,
+ * path, an attachment's page, every page in the reader (drawn from the stored
+ * tree, with no Edit, a footnote card on hover), the page's panels (Comments, History,
  * Properties: opened from the top bar, closed by ×, Escape and the control, the contents back,
  * `?panel=`), Copy page, the byline while an agent edits, History's versions, checking a page
- * (Mark as checked, the Checked line, review mode), comments in the panel, a concept on a
+ * (Mark as checked, the Checked line, review mode), comments in the panel, a page on a
  * phone (its top bar with Copy page under ⋯,
  * On this page, every panel as a bottom sheet), the Markdown view,
  * figures in the full-screen view, notifications (a reply waiting in the bell's panel, opened into
@@ -665,7 +665,7 @@ function greyscalePng(
 async function browserRenders(
   owner: string,
   slug: string,
-  concepts: string[],
+  pagePaths: string[],
   token: string,
 ): Promise<string[]> {
   const b = await openBrowser();
@@ -701,13 +701,13 @@ async function browserRenders(
       await page.keyboard.press("ArrowDown");
       await page.keyboard.press("Enter");
     };
-    /** The concept's panels (take 4): one at a time, in place of the contents. */
-    const comments = page.locator("aside#panel-comments.concept-panel");
-    const historyPanel = page.locator("aside#panel-history.concept-panel");
-    const properties = () => page.locator("aside#panel-properties.concept-panel");
+    /** The page's panels (take 4): one at a time, in place of the contents. */
+    const comments = page.locator("aside#panel-comments.page-aside");
+    const historyPanel = page.locator("aside#panel-history.page-aside");
+    const properties = () => page.locator("aside#panel-properties.page-aside");
     /** The contents on the right, while no panel is open and there is room. */
-    const contentsNav = main.locator("nav.concept-contents");
-    /** An item of the concept's ⋯ menu. */
+    const contentsNav = main.locator("nav.page-contents");
+    /** An item of the page's ⋯ menu. */
     const more = async (item: string) => {
       await sheetBar.getByRole("button", { name: "More", exact: true }).click();
       await page.locator(".menu-list").getByRole("button", { name: item, exact: true }).click();
@@ -732,7 +732,7 @@ async function browserRenders(
         .waitFor({ timeout: 15_000 });
     };
     // The workspace (TEMPRA-19): the tree stays while files open in the main pane.
-    const nested = concepts.find((c) => c.includes("/")) ?? concepts[0] ?? "";
+    const nested = pagePaths.find((c) => c.includes("/")) ?? pagePaths[0] ?? "";
     const folder = nested.split("/").slice(0, -1).join("/");
     const sidebar = page.locator("section.ws-sidebar");
     const lib = `${base}/${owner}/${slug}`;
@@ -914,10 +914,10 @@ async function browserRenders(
     await step(
       "workspace: hover prefetches, new pages start at the top, back restores",
       async () => {
-        const other = concepts.find(
+        const other = pagePaths.find(
           (c) => c !== nested && c.split("/").slice(0, -1).join("/") === folder,
         );
-        if (!other) throw new Error(`no second concept in ${folder}/ to move to`);
+        if (!other) throw new Error(`no second page in ${folder}/ to move to`);
         await page.locator(".body .prose").waitFor({ timeout: 15_000 });
         await main.evaluate((el) => {
           el.scrollTop = 300;
@@ -963,11 +963,11 @@ async function browserRenders(
         // the click. The next page's file is held here so the hold is seen to end by the delay.
         // Not the page the step before moved to (the first of the folder's others): one this
         // browser has not opened, so it is not in the cache.
-        const siblings = concepts.filter(
+        const siblings = pagePaths.filter(
           (c) => c !== nested && c.split("/").slice(0, -1).join("/") === folder,
         );
-        const next = siblings[1] ?? concepts.find((c) => c !== nested && c !== siblings[0]);
-        if (!next) throw new Error(`no third concept in ${folder}/ to move to`);
+        const next = siblings[1] ?? pagePaths.find((c) => c !== nested && c !== siblings[0]);
+        if (!next) throw new Error(`no third page in ${folder}/ to move to`);
         await page.locator(".body .prose").waitFor({ timeout: 15_000 });
         await main.evaluate((el) => {
           el.scrollTop = 200;
@@ -1034,7 +1034,7 @@ async function browserRenders(
     await step(
       "the page's path over it; a folder is not a page, its address reveals it",
       async () => {
-        if (!folder) throw new Error("no concept in a folder");
+        if (!folder) throw new Error("no page in a folder");
         await page.locator(".body .prose").waitFor({ timeout: 15_000 });
         // The top bar names the page's path (TEMPRA-145): its folders as words (folders are not
         // pages, so no links), then its title; the page's own line of folders stays hidden.
@@ -1224,8 +1224,8 @@ async function browserRenders(
         .locator(`a[data-path="${path}"]`)
         .waitFor({ state: "detached", timeout: 10_000 });
     });
-    await step("workspace: the quick switcher opens a concept", async () => {
-      const first = concepts[0] ?? "";
+    await step("workspace: the quick switcher opens a page", async () => {
+      const first = pagePaths[0] ?? "";
       const meta = (await (
         await fetch(`${libApi}/files/${enc(first)}`, {
           headers: { ...bearer, Accept: "application/json" },
@@ -1272,7 +1272,7 @@ async function browserRenders(
       await option.waitFor({ timeout: 5000 });
       await box.press("ArrowDown");
       await box.press("ArrowUp");
-      // The hit for the first concept, wherever it ranks.
+      // The hit for the first page, wherever it ranks.
       await option.click();
       await page.waitForURL(`${lib}/${enc(first)}`);
     });
@@ -1691,15 +1691,15 @@ async function browserRenders(
       },
     );
 
-    // A few concepts with tables, code, footnotes and lists, as screenshots for review.
+    // A few pages with tables, code, footnotes and lists, as screenshots for review.
     const shotsOf = [
-      concepts[0] ?? "",
-      ...concepts.filter((c) => /orders|transactions|events|metrics\//.test(c)).slice(0, 3),
+      pagePaths[0] ?? "",
+      ...pagePaths.filter((c) => /orders|transactions|events|metrics\//.test(c)).slice(0, 3),
     ];
     let tooltipShown = false;
-    for (const concept of concepts) {
-      await step(`reader on ${concept}`, async () => {
-        // The first page's data comes in the shell (TEMPRA-175): a full load of a concept draws
+    for (const pagePath of pagePaths) {
+      await step(`reader on ${pagePath}`, async () => {
+        // The first page's data comes in the shell (TEMPRA-175): a full load of a page draws
         // its body without asking the API for the file, its context or the frame's first calls.
         const asked: string[] = [];
         // The frame's libraries by name alone (TEMPRA-190): never the list with every library's
@@ -1714,12 +1714,12 @@ async function browserRenders(
           }
         };
         page.on("request", onRequest);
-        await page.goto(`${base}/${owner}/${slug}/${enc(concept)}`);
+        await page.goto(`${base}/${owner}/${slug}/${enc(pagePath)}`);
         const body = page.locator(".body .prose");
         await body.waitFor({ timeout: 15_000 });
         page.off("request", onRequest);
         const lib = `/api/v1/libraries/${owner}/${slug}`;
-        const booted = [`${lib}/page/${enc(concept)}`, `${lib}/outline`, "/api/v1/inbox/count"];
+        const booted = [`${lib}/page/${enc(pagePath)}`, `${lib}/outline`, "/api/v1/inbox/count"];
         const refetched = asked.filter((a) => booted.includes(a));
         if (refetched.length > 0) {
           throw new Error(`asked the API for what the shell carries: ${refetched.join(", ")}`);
@@ -1732,10 +1732,10 @@ async function browserRenders(
           (a) =>
             a === `${lib}/stats` ||
             ["files", "sources", "links", "history"].some(
-              (r) => a === `${lib}/${r}/${enc(concept)}`,
+              (r) => a === `${lib}/${r}/${enc(pagePath)}`,
             ),
         );
-        if (split.length > 0) throw new Error(`a concept's page asked ${split.join(", ")}`);
+        if (split.length > 0) throw new Error(`a page's view asked ${split.join(", ")}`);
         await sheetBar.getByRole("button", { name: "More", exact: true }).waitFor();
         await actionsFab().waitFor();
         // Read and comment only (TEMPRA-99): nothing in the page edits.
@@ -1746,8 +1746,8 @@ async function browserRenders(
         if ((await body.innerText()).trim() === "") throw new Error("empty body");
         // Every block carries its ID, every textblock its place in the text.
         if ((await body.locator("[data-block]").count()) === 0) throw new Error("no block IDs");
-        if (shots && shotsOf.includes(concept)) {
-          const name = concept.replace(/\.md$/, "").replaceAll("/", "-");
+        if (shots && shotsOf.includes(pagePath)) {
+          const name = pagePath.replace(/\.md$/, "").replaceAll("/", "-");
           // On a desktop the page opens on its contents; a panel only when asked.
           await wide();
           await main.evaluate((el) => {
@@ -1935,7 +1935,7 @@ async function browserRenders(
     });
 
     // Figures (tempra-dev: app/reader, Figures): an image alone in its paragraph is a numbered
-    // figure that opens the full-screen view, which steps through the concept's figures.
+    // figure that opens the full-screen view, which steps through the page's figures.
     await step("figures: an image opens the full-screen view, and Escape closes it", async () => {
       for (const [path, shade] of [
         ["gate-figure-1.png", 0x88],
@@ -2010,7 +2010,7 @@ async function browserRenders(
       await page.keyboard.press("Escape");
       await view.waitFor({ state: "hidden", timeout: 5000 });
       // The attachment's page (take 4, board 28): the image on its frame, Download, Copy link,
-      // Type, Size, Added and Used in (the concept that shows it).
+      // Type, Size, Added and Used in (the page that shows it).
       await page.goto(`${lib}/gate-figure-2.png`);
       const side = main.locator(".attachment-side");
       await side
@@ -2534,10 +2534,10 @@ async function browserRenders(
       },
     );
 
-    // Verify a concept as a person, let an agent change it, and see the change over the text.
-    const concept = concepts[0] ?? "";
-    const url = `${base}/${owner}/${slug}/${enc(concept)}`;
-    const api = `${base}/api/v1/libraries/${owner}/${slug}/files/${enc(concept)}`;
+    // Verify a page as a person, let an agent change it, and see the change over the text.
+    const pagePath = pagePaths[0] ?? "";
+    const url = `${base}/${owner}/${slug}/${enc(pagePath)}`;
+    const api = `${base}/api/v1/libraries/${owner}/${slug}/files/${enc(pagePath)}`;
     const auth = { Authorization: `Bearer ${token}` };
     /** An agent appends a sentence (which also lapses any human verification). */
     const agentAppends = async (sentence: string, note = "gate: an agent edits") => {
@@ -2579,7 +2579,7 @@ async function browserRenders(
       if (ms > 3000) throw new Error(`the new-version glyph took ${ms} ms`);
       if (shots) await page.screenshot({ path: `${shots}/live.png` });
       // The open file prefetched again (a hover on its own row) must not hide the new version.
-      await page.locator(`.ws-sidebar a[data-path="${concept}"]`).hover();
+      await page.locator(`.ws-sidebar a[data-path="${pagePath}"]`).hover();
       await page.waitForTimeout(500);
       await newVersion().click();
       await page
@@ -2711,7 +2711,7 @@ async function browserRenders(
     await step(
       "Notifications: an edit to a page the person checked tells them nothing",
       async () => {
-        const reviewHref = `/${owner}/${slug}/${enc(concept)}?review=1`;
+        const reviewHref = `/${owner}/${slug}/${enc(pagePath)}?review=1`;
         await page.goto(`${base}/`);
         await main.locator("h1").first().waitFor({ timeout: 15_000 });
         // An account page's bar over the sidebar, as the drawer's head has it: the mark and
@@ -2980,7 +2980,7 @@ async function browserRenders(
         await card.getByText("Gate: please check this sentence.").waitFor();
         if (shots) await page.screenshot({ path: `${shots}/comment.png` });
         const listed = (await (
-          await fetch(`${libApi}/comments?path=${encodeURIComponent(concept)}&status=open`, {
+          await fetch(`${libApi}/comments?path=${encodeURIComponent(pagePath)}&status=open`, {
             headers: bearer,
           })
         ).json()) as { threads: { id: string; comments: { body: string }[] }[] };
@@ -3163,7 +3163,7 @@ async function browserRenders(
     // in the bell's panel, on the page the person is on; opening it lands in the thread and is
     // seeing it.
     await step("Notifications: an agent's reply waits in the bell's panel", async () => {
-      const target = concepts.find((c) => c !== concept) ?? concept;
+      const target = pagePaths.find((c) => c !== pagePath) ?? pagePath;
       const posted = await apiAs(devCookie, `/api/v1/libraries/${owner}/${slug}/comments`, "POST", {
         path: target,
         body: "Gate: is this still current?",
@@ -3230,12 +3230,12 @@ async function browserRenders(
       });
       if (!resolved.ok) throw new Error(`agent resolve: ${resolved.status}`);
     });
-    // A concept at phone width (take 4, TEMPRA-118, boards 33 and 35): the top bar with Tempra,
+    // A page at phone width (take 4, TEMPRA-118, boards 33 and 35): the top bar with Tempra,
     // Comments n and ⋯ (Copy page under ⋯), the folders above the title, "On this page" closed
     // until opened; Comments, History and Properties are one bottom sheet, opened only when
     // asked, closed by × or Escape.
     await step(
-      "a concept at phone width: its top bar, On this page, the panels as a bottom sheet",
+      "a page at phone width: its top bar, On this page, the panels as a bottom sheet",
       async () => {
         await page.setViewportSize({ width: 390, height: 844 });
         try {
@@ -3259,16 +3259,16 @@ async function browserRenders(
           const moreButton = sheetBar.getByRole("button", { name: "More", exact: true });
           if (!(await moreButton.isVisible())) throw new Error("no ⋯ in the phone's top bar");
           if (!(await sheetBar.getByRole("button", { name: /^Notifications/ }).isVisible())) {
-            throw new Error("no bell in the concept's phone bar");
+            throw new Error("no bell in the page's phone bar");
           }
           for (const gone of [
             sheetBar.getByRole("button", { name: "Search", exact: true }),
             sheetBar.getByRole("button", { name: /^Comments/ }),
             sheetBar.getByRole("button", { name: /^Copy page$/ }),
           ]) {
-            if (await gone.isVisible()) throw new Error(`the concept's phone bar shows ${gone}`);
+            if (await gone.isVisible()) throw new Error(`the page's phone bar shows ${gone}`);
           }
-          if (concept.includes("/")) {
+          if (pagePath.includes("/")) {
             const crumbs = main.getByRole("navigation", { name: "Folders" });
             if (!(await crumbs.isVisible())) throw new Error("no crumbs under the phone's top bar");
           }
@@ -3295,11 +3295,11 @@ async function browserRenders(
             );
             if (await isOpen()) throw new Error("On this page stayed open after a heading");
           }
-          if (shots) await page.screenshot({ path: `${shots}/concept-phone.png` });
+          if (shots) await page.screenshot({ path: `${shots}/page-phone.png` });
           const sideways = await page
             .locator("html")
             .evaluate((el) => el.scrollWidth > el.clientWidth);
-          if (sideways) throw new Error("the concept scrolls sideways at phone width");
+          if (sideways) throw new Error("the page scrolls sideways at phone width");
           // Copy page heads ⋯, on a phone as everywhere (TEMPRA-145).
           await b.context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
           await moreButton.click();
@@ -3524,14 +3524,14 @@ async function browserRenders(
       )) as { files: { path: string; kind: string; title?: string | null; seq?: number }[] };
       const pages = outline.files.filter(
         (f) =>
-          f.kind === "concept" &&
-          f.path !== concept &&
+          f.kind === "page" &&
+          f.path !== pagePath &&
           !f.path.startsWith("gate") &&
           /[A-Za-z]{4,}/.test(f.title ?? ""),
       );
       const other = [...pages].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))[0];
       if (!other) throw new Error("no other page to read");
-      const nested = [concept, other.path].find((p) => p.includes("/"));
+      const nested = [pagePath, other.path].find((p) => p.includes("/"));
       if (!nested) throw new Error("no page in a folder to read");
       const top = nested.split("/")[0] ?? "";
       /** A folder's row in the tree, by its first-level name. */
@@ -3609,7 +3609,7 @@ async function browserRenders(
         );
         await named(
           "the tree drawn",
-          sidebar.locator(`a[data-path="${concept}"]`).waitFor({ timeout: 10_000 }),
+          sidebar.locator(`a[data-path="${pagePath}"]`).waitFor({ timeout: 10_000 }),
         );
         // The page's feed open (its hello) before the agent does anything: presence goes only to
         // open sockets and is never caught up, so a read before it would be missed.
@@ -3637,7 +3637,7 @@ async function browserRenders(
         const found = (await page.evaluate(
           `fetch("/api/v1/libraries/${owner}/${slug}/search?q=${encodeURIComponent(q)}").then((r) => r.json())`,
         )) as { results: { path: string }[] };
-        const read = [concept, other.path];
+        const read = [pagePath, other.path];
         // What the search finds that the agent will not read: these must never shimmer.
         const unread = [...new Set(found.results.map((r) => r.path))].filter(
           (p) => !read.includes(p),
@@ -3763,7 +3763,7 @@ async function browserRenders(
             const p = await rec.newPage();
             await p.goto(`${lib}/${enc(other.path)}`);
             const side = p.locator("section.ws-sidebar");
-            await side.locator(`a[data-path="${concept}"]`).waitFor({ timeout: 15_000 });
+            await side.locator(`a[data-path="${pagePath}"]`).waitFor({ timeout: 15_000 });
             const f = side
               .locator(".tree-row.dir")
               // Its title names the agent while it shimmers ("Computations: … in here").
@@ -3840,7 +3840,7 @@ async function browserRenders(
           await sidebar
             .locator("a[data-path]")
             .evaluateAll((els) => els.map((e) => e.getAttribute("data-path") ?? ""))
-        ).filter((p) => p.endsWith(".md") && p !== concept && !p.startsWith("gate"));
+        ).filter((p) => p.endsWith(".md") && p !== pagePath && !p.startsWith("gate"));
         const target = rows[0];
         if (!target || rows.length < 3)
           throw new Error(`too few pages in the tree: ${rows.length}`);
@@ -3994,7 +3994,7 @@ async function browserRenders(
       if (numbers !== text.replace(/\n$/, "").split("\n").length) {
         throw new Error(`${numbers} line numbers for ${text.split("\n").length} lines`);
       }
-      await page.locator(".raw-markdown").getByText(concept, { exact: true }).waitFor();
+      await page.locator(".raw-markdown").getByText(pagePath, { exact: true }).waitFor();
       if ((await contentsNav.count()) > 0) throw new Error("the contents show beside the markdown");
       // Download's glyph sits beside its word, not over it.
       const download = await page
@@ -4051,7 +4051,7 @@ async function browserRenders(
       if (entries.join("|") !== "First|Inside|Second") throw new Error(`contents: ${entries}`);
       const back = async (what: string) => {
         await contentsNav.waitFor({ timeout: 5000 });
-        if ((await page.locator("aside.concept-panel").count()) > 0) {
+        if ((await page.locator("aside.page-aside").count()) > 0) {
           throw new Error(`a panel is still open after ${what}`);
         }
       };
@@ -4109,7 +4109,7 @@ async function browserRenders(
       await historyPanel.waitFor({ timeout: 5000 });
       await more("Properties");
       await properties().waitFor({ timeout: 5000 });
-      if ((await page.locator("aside.concept-panel").count()) !== 1) {
+      if ((await page.locator("aside.page-aside").count()) !== 1) {
         throw new Error("two panels at once");
       }
       // Properties in people's words (TEMPRA-134, C-12, C-13): Status "not set", no lint codes,
@@ -4154,7 +4154,7 @@ async function browserRenders(
         await contentsNav.waitFor({ timeout: 5000 });
         if (await inline.isVisible()) throw new Error(`On this page shows ${where}`);
         const toc = await contentsNav.boundingBox();
-        const text = await main.locator(".concept .doc").boundingBox();
+        const text = await main.locator(".page-view .doc").boundingBox();
         if (!toc || !text || toc.x < text.x + text.width - 1) {
           throw new Error(`the contents are not beside the text ${where}`);
         }
@@ -4278,7 +4278,7 @@ async function browserRenders(
         if (Number(firstSeq) !== head.seq) {
           throw new Error(`Every event starts at seq ${firstSeq}, the ledger is at ${head.seq}`);
         }
-        if (!(await rows.first().innerText()).includes(concept)) {
+        if (!(await rows.first().innerText()).includes(pagePath)) {
           throw new Error(
             `the newest row is not the agent's write: ${await rows.first().innerText()}`,
           );
@@ -4437,7 +4437,7 @@ async function browserRenders(
     await step("reader images: the page of figures goes", async () => {
       for (const path of [imagesPage, ...imagePaths]) await agentDeletes(path);
     });
-    // axe (TEMPRA-133): the gate's pages, light and dark, a concept with its Comments panel, and
+    // axe (TEMPRA-133): the gate's pages, light and dark, a page with its Comments panel, and
     // the phone's drawer and sheet, with no serious or critical issue. After the busy minute, so
     // its loads are not counted there.
     await step("axe: no serious or critical issues on the app's pages", async () => {
@@ -4674,8 +4674,8 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
   const outline = (await (await fetch(`${lib}/outline`, { headers })).json()) as {
     files: { path: string; kind: string }[];
   };
-  const concept = outline.files.find((f) => f.kind === "concept")?.path;
-  if (!concept) return ["no concept to comment on"];
+  const pagePath = outline.files.find((f) => f.kind === "page")?.path;
+  if (!pagePath) return ["no page to comment on"];
   const b = await openBrowser();
   if (typeof b === "string") return [b];
   const { page, step, problems } = b;
@@ -4698,7 +4698,7 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
   };
   try {
     await step("a mention on a page: Tempra is replying…, then its reply", async () => {
-      await b.signInAs("dev@localhost", `/${owner}/${slug}/${concept}`);
+      await b.signInAs("dev@localhost", `/${owner}/${slug}/${pagePath}`);
       await page.locator(".doc-title").waitFor({ timeout: 15_000 });
       await comment("Comment on the page…", "@tempra what does this page say?", "click");
       await comments
@@ -4761,7 +4761,7 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
       }
       await card.getByRole("button", { name: "Resolve" }).waitFor({ timeout: 5000 });
       const open = (await (
-        await fetch(`${lib}/comments?path=${encodeURIComponent(concept)}&status=open`, { headers })
+        await fetch(`${lib}/comments?path=${encodeURIComponent(pagePath)}&status=open`, { headers })
       ).json()) as { threads: { comments: { body: string }[] }[] };
       if (
         !open.threads.some((t) => t.comments.some((c) => c.body.startsWith("A stand-in answer")))
@@ -5244,7 +5244,7 @@ async function oauthConnect(
     response_type: "code",
     client_id,
     redirect_uri: redirect,
-    scope: "okf:read okf:write",
+    scope: "tempra:read tempra:write",
     state: "gate",
     code_challenge: challenge,
     code_challenge_method: "S256",
@@ -5348,7 +5348,7 @@ async function freshAccountConnects(): Promise<string[]> {
         throw new Error(`the ${id} reads "${hint}"`);
       }
     }
-    // No start-here note: the library starts empty, so its home shows how to connect an agent.
+    // No guide: the library starts empty, so its home shows how to connect an agent.
     await page.locator('input[name="starter"]').uncheck();
     await page.getByRole("button", { name: "Create" }).click();
     const lib = `${base}/newcomer/notes`;
@@ -5579,13 +5579,13 @@ async function freshAccountConnects(): Promise<string[]> {
       );
       if (put.status !== 200) throw new Error(`PUT shared.md: ${put.status}`);
     });
-    /** Opens the open concept's Properties (TEMPRA-122: a page nobody checked shows only Mark
+    /** Opens the open page's Properties (TEMPRA-122: a page nobody checked shows only Mark
      * as checked there, to a write member). */
     const properties = async () => {
       await page.locator(".byline").waitFor({ timeout: 15_000 });
       await page.getByRole("button", { name: "More", exact: true }).click();
       await page.locator(".menu-list").getByRole("button", { name: "Properties" }).click();
-      const panel = page.locator("aside#panel-properties.concept-panel");
+      const panel = page.locator("aside#panel-properties.page-aside");
       await panel.waitFor({ timeout: 15_000 });
       return panel;
     };
@@ -5731,13 +5731,13 @@ try {
       readTar(new Uint8Array(await exp.arrayBuffer())).map((f) => [f.path, f.bytes]),
     );
     const problems = compareBundle(original, exported);
-    const concepts = original.filter(
+    const pagePaths = original.filter(
       (f) => f.path.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(f.path),
     ).length;
     const attachments = original.filter((f) => !f.path.endsWith(".md")).length;
     const status = problems.length === 0 ? "PASS" : "FAIL";
     console.log(
-      `${status} ${t.bundle}: ${concepts} concepts, ${attachments} attachments, ${res.seq} events, ${res.warnings.length} files with lint`,
+      `${status} ${t.bundle}: ${pagePaths} pages, ${attachments} attachments, ${res.seq} events, ${res.warnings.length} files with lint`,
     );
     for (const p of problems) console.log(`  - ${p}`);
     if (problems.length > 0) failed = true;
@@ -5752,10 +5752,10 @@ try {
     if (uiProblems.length > 0) failed = true;
 
     if (t === tokens[0]) {
-      const concepts = original
+      const pagePaths = original
         .map((f) => f.path)
         .filter((p) => p.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(p));
-      const browser = await browserRenders(t.owner, t.slug, concepts, t.token).catch((e) => [
+      const browser = await browserRenders(t.owner, t.slug, pagePaths, t.token).catch((e) => [
         String(e),
       ]);
       console.log(`${browser.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: the app in a browser`);
@@ -5831,7 +5831,7 @@ try {
   for (const p of shown) console.log(`  - ${p}`);
   if (shown.length > 0) failed = true;
   if (!mcpOk) failed = true;
-  // Several agents at once over MCP: a stale edit refused, turns on one concept, parallel
+  // Several agents at once over MCP: a stale edit refused, turns on one page, parallel
   // writes; every write must reach the change feed. Patient, since the gate's earlier steps
   // spend much of the account's write limit.
   const a = agentTokens[0];

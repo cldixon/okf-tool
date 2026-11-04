@@ -42,7 +42,7 @@ export interface RunOptions {
   scenarios?: string[];
   /** Milliseconds between steps (0: full speed). */
   pace?: number;
-  /** Rounds per agent (live) or concepts per agent (load). */
+  /** Rounds per agent (live) or pages per agent (load). */
   rounds?: number;
   /** Leave the scenario's files in place. */
   keep?: boolean;

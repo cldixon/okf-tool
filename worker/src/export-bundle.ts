@@ -1,6 +1,7 @@
 import type { BlobStore } from "./client";
 import { type DiagramExport, drawnDiagrams } from "./diagram-export";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
+import { EXPORT_FORMATS, type ExportFormat } from "./store/store";
 import { readTar, tarEnd, tarHeader, tarPadding } from "./util/tar";
 
 /**
@@ -93,17 +94,17 @@ export function tarStream(
 
 /**
  * A library's bundle at `at` as a tar stream, with attachments' bytes from blob storage. With
- * `diagrams`, each concept's Mermaid, SVG and Vega-Lite fences are drawn beside it as SVG
+ * `diagrams`, each page's Mermaid, SVG and Vega-Lite fences are drawn beside it as SVG
  * (TEMPRA-168, TEMPRA-206, TEMPRA-207): on for the person's export. A chart's data file is read
  * from blob storage when a chart names it.
  */
 export async function bundleStream(
-  lib: { exportBundle(at?: number): unknown },
+  lib: { exportBundle(at?: number, format?: ExportFormat): unknown },
   blobs: BlobStore,
   at?: number,
-  opts: { diagrams?: DiagramExport } = {},
+  opts: { diagrams?: DiagramExport; format?: ExportFormat } = {},
 ): Promise<{ seq: number; files: number; body: ReadableStream<Uint8Array> }> {
-  const bundle = (await lib.exportBundle(at)) as {
+  const bundle = (await lib.exportBundle(at, opts.format ?? "plain")) as {
     seq: number;
     files: {
       path: string;
@@ -125,7 +126,7 @@ export async function bundleStream(
     const batch = attachments.slice(i, i + 8);
     const found = await Promise.all(batch.map((a) => blobs.head(a.hash)));
     const gone = batch.find((_, j) => !found[j]);
-    if (gone) throw new OkfError(500, "blob_missing", `Bytes for ${gone.path} are missing.`);
+    if (gone) throw new StoreError(500, "blob_missing", `Bytes for ${gone.path} are missing.`);
   }
   if (opts.diagrams) {
     const byPath = new Map(entries.map((e) => [e.path, e]));
@@ -173,4 +174,13 @@ export async function nightlyBundle(
   ) as ExportAttachment[];
   const have = new Set(text.map((f) => f.path));
   return tarStream([...text, ...attachments.filter((a) => !have.has(a.path))], blobs);
+}
+
+/** An export's `format` as asked: `plain` when not given; anything else is refused. */
+export function exportFormat(raw: string | undefined): ExportFormat {
+  const format = raw ?? "plain";
+  if (!(EXPORT_FORMATS as readonly string[]).includes(format)) {
+    throw new StoreError(400, "bad_format", "`format` is plain (the default) or okf.");
+  }
+  return format as ExportFormat;
 }

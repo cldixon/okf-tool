@@ -2,52 +2,41 @@ import { dirname } from "./paths";
 
 /**
  * Directory and index health (TEMPRA-64). A directory's index.md is synthesized on read from its
- * concepts' titles and descriptions, so what makes an index poor is the concepts behind it. These
+ * pages' titles and descriptions, so what makes an index poor is the pages behind it. These
  * checks find that, deterministically and without a model; the structure process stores what they
- * find as `structure` flags, one per concept and one per directory, and never rewrites anything.
+ * find as `structure` flags, one per page and one per directory, and never rewrites anything.
  * Free of Worker APIs and of the store, so the thresholds can be tuned on the sample bundles.
  */
 
 /** A description longer than this does not fit an index line. */
 export const DESCRIPTION_MAX = 200;
-/** A directory holding more concepts than this (directly) is a candidate to split. */
+/** A directory holding more pages than this (directly) may be worth splitting. */
 export const LARGE_DIRECTORY = 50;
-/**
- * A directory holding one concept and nothing else is a candidate to fold up, from this depth on.
- * Top-level folders (`datasets/`, `tables/`) often start with one concept and grow, so they are
- * left alone; on Google's sample bundles this keeps the check to the one nested case.
- */
-export const SINGLE_CONCEPT_DEPTH = 2;
 
 export type StructureCode =
   | "long_description"
   | "description_repeats_title"
   | "missing_descriptions"
-  | "orphans"
   | "duplicate_titles"
-  | "no_concepts"
-  | "single_concept"
   | "large_directory";
 
 export interface StructureIssue {
   code: StructureCode;
   message: string;
-  /** The concepts it names, for a directory's issues. */
+  /** The pages it names, for a directory's issues. */
   paths?: string[];
 }
 
-/** What the checks read about one file: its place, and for a concept its index line and links in. */
+/** What the checks read about one file: its place, and for a page its index line. */
 export interface StructureEntry {
   path: string;
   kind: string;
-  concept_id: string;
+  page_id: string;
   title: string | null;
   description: string | null;
-  /** Concepts other than itself that link to it or cite it. */
-  inbound: number;
 }
 
-/** The key a directory's flag is stored under: flags are keyed by concept ID, so `dir:<path>`. */
+/** The key a directory's flag is stored under: flags are keyed by page ID, so `dir:<path>`. */
 export const dirKey = (dir: string) => `dir:${dir}`;
 export const isDirKey = (key: string) => key.startsWith("dir:");
 /** The index.md a directory's issues are reported on ("index.md" at the root). */
@@ -57,18 +46,13 @@ const ACTIONS: Record<StructureCode, string> = {
   long_description:
     "Shorten the description to one line the index can show (under 200 characters); move detail into the body.",
   description_repeats_title:
-    "Rewrite the description to say what the concept is or covers, not its title again.",
+    "Rewrite the description to say what the page is or covers, not its title again.",
   missing_descriptions:
-    "Give each concept listed a one-line description; the index shows it beside the title.",
-  orphans:
-    "Link to each from the concepts it relates to, or cite it as a source; if nothing should, ask whether it belongs here.",
+    "Give each page listed a one-line description; the index shows it beside the title.",
   duplicate_titles:
-    "Make the titles say how the concepts differ, or merge them into one if they describe the same thing.",
-  no_concepts:
-    "Add a concept that describes the attachments here, or move them beside the concept that uses them.",
-  single_concept:
-    "Move the concept up into the parent directory, unless more concepts are coming here.",
-  large_directory: "Split the directory into subdirectories by topic.",
+    "Make the titles say how the pages differ, or merge them into one if they describe the same thing.",
+  large_directory:
+    "Consider splitting the directory into subdirectories by topic, if readers would find their way better.",
 };
 
 /** What to do about a set of issues, one sentence per kind, in a stable order. */
@@ -95,7 +79,7 @@ const STOP = new Set(["a", "an", "the", "of"]);
 /** Two titles that read the same once case, punctuation, plurals and articles are set aside. */
 export const titleKey = (title: string) => words(title).join(" ");
 
-/** The checks on one concept's own index line. */
+/** The checks on one page's own index line. */
 export function descriptionIssues(
   title: string | null,
   description: string | null,
@@ -122,7 +106,6 @@ export function descriptionIssues(
   return out;
 }
 
-const depth = (dir: string) => (dir === "" ? 0 : dir.split("/").length);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** Paths for a message: the first few, and how many more. */
 const LISTED = 5;
@@ -134,13 +117,15 @@ const list = (paths: string[]) =>
 
 /**
  * Runs the checks. `entries` must hold every file under each directory checked; `dirs` limits
- * which directories (and which directories' concepts) are checked, or null for all of them.
- * Returns the issues by flag key: a concept's ID, or `dirKey(dir)`. Keys with no issues are absent.
+ * which directories (and which directories' pages) are checked, or null for all of them.
+ * Returns the issues by flag key: a page's ID, or `dirKey(dir)`. Keys with no issues are absent.
+ * Only what makes an index read poorly is checked: how a library is laid out, how many pages a
+ * folder holds and what links where are the library's own choice (tempra-dev:
+ * decisions/pages-not-okf).
  */
 export function checkStructure(
   entries: StructureEntry[],
   dirs: Set<string> | null,
-  libraryConcepts: number,
 ): Map<string, StructureIssue[]> {
   const out = new Map<string, StructureIssue[]>();
   const add = (key: string, issue: StructureIssue) => {
@@ -150,69 +135,35 @@ export function checkStructure(
   };
   const inScope = (dir: string) => dirs === null || dirs.has(dir);
 
-  // Every directory: its own concepts, whether it has subdirectories, concepts anywhere beneath.
-  interface Dir {
-    concepts: StructureEntry[];
-    subdirs: boolean;
-    beneath: number;
-  }
-  const tree = new Map<string, Dir>();
-  const at = (dir: string) => {
-    let d = tree.get(dir);
-    if (!d) {
-      d = { concepts: [], subdirs: false, beneath: 0 };
-      tree.set(dir, d);
-    }
-    return d;
-  };
+  // Each directory's own pages.
+  const tree = new Map<string, StructureEntry[]>();
   for (const e of entries) {
-    const parent = dirname(e.path);
-    if (e.kind === "concept") at(parent).concepts.push(e);
-    else at(parent);
-    // Walk up: each ancestor has a subdirectory, and one more concept beneath it.
-    let dir = parent;
-    for (;;) {
-      if (e.kind === "concept") at(dir).beneath++;
-      if (dir === "") break;
-      const up = dirname(dir);
-      at(up).subdirs = true;
-      dir = up;
-    }
+    if (e.kind !== "page") continue;
+    const dir = dirname(e.path);
+    tree.set(dir, [...(tree.get(dir) ?? []), e]);
   }
 
-  for (const [dir, d] of tree) {
+  for (const [dir, pages] of tree) {
     if (!inScope(dir)) continue;
     const key = dirKey(dir);
-    const n = d.concepts.length;
+    const n = pages.length;
 
-    // Concepts: their own index line.
-    for (const c of d.concepts) {
-      for (const issue of descriptionIssues(c.title, c.description)) add(c.concept_id, issue);
+    // Pages: their own index line.
+    for (const c of pages) {
+      for (const issue of descriptionIssues(c.title, c.description)) add(c.page_id, issue);
     }
 
-    const missing = d.concepts.filter((c) => !c.description?.trim()).map((c) => c.path);
+    const missing = pages.filter((c) => !c.description?.trim()).map((c) => c.path);
     if (missing.length > 0) {
       add(key, {
         code: "missing_descriptions",
-        message: `${plural(missing.length, "concept")} of ${n} ${missing.length === 1 ? "has" : "have"} no description, so the index shows a bare title: ${list(missing)}.`,
+        message: `${plural(missing.length, "page")} of ${n} ${missing.length === 1 ? "has" : "have"} no description, so the index shows a bare title: ${list(missing)}.`,
         paths: missing,
       });
     }
 
-    // Orphans, rolled up like descriptions: one item per directory, however many there are, so
-    // a library that links little gets a few items to work through, not one per concept.
-    const orphans =
-      libraryConcepts > 1 ? d.concepts.filter((c) => c.inbound === 0).map((c) => c.path) : [];
-    if (orphans.length > 0) {
-      add(key, {
-        code: "orphans",
-        message: `${plural(orphans.length, "concept")} of ${n} ${orphans.length === 1 ? "has" : "have"} no links in from other concepts, only the index: ${list(orphans)}.`,
-        paths: orphans,
-      });
-    }
-
     const byTitle = new Map<string, string[]>();
-    for (const c of d.concepts) {
+    for (const c of pages) {
       const k = c.title ? titleKey(c.title) : "";
       if (k === "") continue;
       byTitle.set(k, [...(byTitle.get(k) ?? []), c.path]);
@@ -226,22 +177,10 @@ export function checkStructure(
       });
     }
 
-    if (dir !== "" && d.beneath === 0) {
-      add(key, {
-        code: "no_concepts",
-        message: "No concept here or below, only attachments: the index has nothing to describe.",
-      });
-    } else if (n === 1 && !d.subdirs && depth(dir) >= SINGLE_CONCEPT_DEPTH) {
-      add(key, {
-        code: "single_concept",
-        message: "The directory holds a single concept.",
-        paths: [d.concepts[0]?.path ?? ""],
-      });
-    }
     if (n > LARGE_DIRECTORY) {
       add(key, {
         code: "large_directory",
-        message: `${n} concepts directly here; an index reads well up to about ${LARGE_DIRECTORY}.`,
+        message: `${n} pages directly here; an index reads well up to about ${LARGE_DIRECTORY}.`,
       });
     }
   }

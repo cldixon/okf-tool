@@ -94,7 +94,7 @@
     </p>
     <p>
       <label>
-        <input type="checkbox" name="starter" value="1" defaultChecked /> Add a start-here note
+        <input type="checkbox" name="starter" value="1" defaultChecked /> Add a guide page
       </label>
     </p>
     <p>

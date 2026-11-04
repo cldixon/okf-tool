@@ -163,7 +163,7 @@
           who={home.latest ? actors.view(home.latest.actor, home.latest.by) : null}
         />
       {:else}
-        <!-- A first library with only its start-here note: how to connect an agent. -->
+        <!-- A first library with only its guide: how to connect an agent. -->
         {#if home.noAgentYet && canWrite}
           <EmptyLibrary
             {urls}

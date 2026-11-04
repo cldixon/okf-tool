@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { sha256Hex } from "../src/okf/hash";
+import { sha256Hex } from "../src/format/hash";
 import { LINK_MINUTES, SESSION_COOKIE } from "../src/session";
 import { ORIGIN, setup, UI } from "./harness";
 
@@ -80,9 +80,9 @@ describe("first run (v2 spec: Onboarding)", () => {
     expect(await done.json()).toMatchObject({ owner: "newbie", slug: "notes" });
     expect((await s.accounts.user("new@example.com")).actor).toBe("human:newbie");
 
-    const starter = await text(app.request("/api/v1/libraries/newbie/notes/files/start-here.md"));
-    expect(starter).toContain("Start here");
-    const history = await text(app.request("/api/v1/libraries/newbie/notes/history/start-here.md"));
+    const starter = await text(app.request("/api/v1/libraries/newbie/notes/files/guide.md"));
+    expect(starter).toContain("title: Guide");
+    const history = await text(app.request("/api/v1/libraries/newbie/notes/history/guide.md"));
     expect(history).toContain("human:newbie");
 
     // Connect: the app's page; no agent has written yet.
@@ -102,7 +102,7 @@ describe("first run (v2 spec: Onboarding)", () => {
       body: JSON.stringify({ slug: "plain", starter: true }),
     });
     expect(r.status).toBe(201);
-    const files = await s.app.request("/api/v1/libraries/owner/plain/files/start-here.md", {
+    const files = await s.app.request("/api/v1/libraries/owner/plain/files/guide.md", {
       headers: { Accept: "application/json" },
     });
     expect(files.status).toBe(404);

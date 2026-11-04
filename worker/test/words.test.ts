@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { wordChange } from "../src/okf/words";
+import { wordChange } from "../src/format/words";
 import { LibraryStore, type RequestContext } from "../src/store/store";
 import { API, setup } from "./harness";
 import { bunSqlHandle } from "./sqlite";
@@ -32,7 +32,7 @@ describe("word counts for edits", () => {
     expect(wordChange("cost\uFFFCnote", "cost note")).toEqual({ added: 0, removed: 0, before: 2 });
   });
 
-  test("recorded on a new version of a concept, never on a create, move or delete", () => {
+  test("recorded on a new version of a page, never on a create, move or delete", () => {
     const s = new LibraryStore(bunSqlHandle());
     const created = s.apply(ctx(), [
       { op: "write", path: "m.md", content: doc("Margin is revenue minus cost.") },
@@ -59,12 +59,12 @@ describe("word counts for edits", () => {
       ["revert", { added: 1, removed: 1, before: 8 }],
       ["move", null],
     ]);
-    const current = s.concepts().items[0]?.hash ?? null;
+    const current = s.pages().items[0]?.hash ?? null;
     s.apply(ctx(), [{ op: "delete", path: "n.md", if_match: current }]);
     expect(s.history("n.md").events.at(-1)?.meta?.words).toBeUndefined();
   });
 
-  test("an import counts only over an existing concept", () => {
+  test("an import counts only over an existing page", () => {
     const s = new LibraryStore(bunSqlHandle());
     s.import(ctx(), [{ path: "m.md", markdown: doc("Margin is revenue.") }]);
     s.import(ctx(), [
@@ -78,7 +78,7 @@ describe("word counts for edits", () => {
     expect(s.history("o.md").events[0]?.meta?.words).toBeUndefined();
   });
 
-  test("in the ledger's requests and a concept's history over REST", async () => {
+  test("in the ledger's requests and a page's history over REST", async () => {
     const s = setup();
     const put = (body: string, ifMatch?: string) =>
       s.req("/files/m.md", {

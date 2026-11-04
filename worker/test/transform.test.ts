@@ -125,7 +125,7 @@ describe("transform (TEMPRA-208)", () => {
     expect((await fileJson(s, "figs/shot.thumb.png")).width).toBe(200);
   });
 
-  test("refusals: not an image, no binding, a concept", async () => {
+  test("refusals: not an image, no binding, a page", async () => {
     const s = setup();
     const call = await connect(s.app);
     await attachFile(s.app, call, "data/rows.csv", new TextEncoder().encode("a,b\n1,2\n"));

@@ -1,4 +1,4 @@
-/** Line-based unified diff (Myers), for comparing rendered concepts between sequences. */
+/** Line-based unified diff (Myers), for comparing rendered pages between sequences. */
 
 type Op = { kind: " " | "-" | "+"; line: string };
 

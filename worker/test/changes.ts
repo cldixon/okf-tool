@@ -26,7 +26,7 @@ export function library() {
   });
   const hash = (path: string) => {
     const v = fresh().read(path);
-    return v.kind === "concept" || v.kind === "attachment" ? v.hash : undefined;
+    return v.kind === "page" || v.kind === "attachment" ? v.hash : undefined;
   };
   return { db, clock, store, fresh, ctx, hash };
 }

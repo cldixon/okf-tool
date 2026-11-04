@@ -13,7 +13,7 @@ import { attachFile } from "./upload";
 type S = ReturnType<typeof setup>;
 type Page = {
   library: { owner: string; slug: string };
-  concept: {
+  page: {
     path: string;
     title: string;
     description: string | null;
@@ -80,7 +80,7 @@ describe("the page panel", () => {
     expect(r.text).toContain("http://localhost/owner/demo/metrics/margin.md");
     const page = r.page as Page;
     expect(page.library).toEqual({ owner: "owner", slug: "demo" });
-    expect(page.concept).toMatchObject({
+    expect(page.page).toMatchObject({
       title: "Margin",
       description: "Gross margin.",
       status: "draft",
@@ -89,7 +89,7 @@ describe("the page panel", () => {
       { id: "book", title: "The book", resource: "https://example.com/book" },
     ]);
     expect(page.byline).toMatchObject({ name: "claude-code", agent: true });
-    const src = page.concept.images["metrics/chart.png"]?.src ?? "";
+    const src = page.page.images["metrics/chart.png"]?.src ?? "";
     expect(src).toStartWith("http://localhost/dl/lib-1/");
     // The signed link loads the image with no session.
     const img = await s.anon.request(src);
@@ -114,6 +114,6 @@ describe("the page panel", () => {
     await attachFile(s.app, call, "metrics/chart.png", makePng(4, 3));
     const r = await call("show", { path: "metrics/chart.png" });
     expect(r.isError).toBe(true);
-    expect(r.text).toContain("not_concept");
+    expect(r.text).toContain("not_page");
   });
 });

@@ -46,7 +46,7 @@ export const MODEL_BYTES = 400 * 1024;
 const MODEL_LADDER = [MODEL_EDGE, 1092, 768] as const;
 /**
  * At most this many image blocks in one call, and this many bytes of image in them all (`read` of
- * a concept with `images` or `figures`, TEMPRA-154); first guesses for the media trial
+ * a page with `images` or `figures`, TEMPRA-154); first guesses for the media trial
  * (tempra-dev: app/media, Limits).
  */
 export const IMAGES_PER_CALL = 6;

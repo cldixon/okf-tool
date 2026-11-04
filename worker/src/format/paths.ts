@@ -1,5 +1,5 @@
 /**
- * Bundle paths: slash-separated, no leading slash in storage (spec: Concepts and terminology).
+ * Bundle paths: slash-separated, no leading slash in storage (spec: Pages and terminology).
  * Directories are prefixes, not objects.
  */
 
@@ -21,7 +21,7 @@ export function isReserved(path: string): boolean {
   return RESERVED_NAMES.has(basename(path));
 }
 
-export function isConceptPath(path: string): boolean {
+export function isPagePath(path: string): boolean {
   return path.endsWith(".md") && !isReserved(path);
 }
 
@@ -56,8 +56,8 @@ export function underPrefix(path: string, prefix: string): boolean {
 }
 
 /**
- * Resolves a link target written in the concept at `fromPath`. Absolute targets (leading `/`) are
- * bundle-relative; everything else is relative to the concept's directory.
+ * Resolves a link target written in the page at `fromPath`. Absolute targets (leading `/`) are
+ * bundle-relative; everything else is relative to the page's directory.
  */
 export function resolveLinkPath(fromPath: string, target: string): string | null {
   if (target.startsWith("/")) return normalizePath(target);

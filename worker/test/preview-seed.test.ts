@@ -86,7 +86,7 @@ describe("copyLibrary: export from one deployment, import into another (TEMPRA-1
     return { from, to, fetch, calls, source, target };
   };
 
-  test("carries concepts, attachments, generated and verified; not history or comments", async () => {
+  test("carries pages, attachments, generated and verified; not history or comments", async () => {
     const w = world();
     const bundle = BUNDLES[0] as string;
     let r = await w.from.req(`/import?source=fixtures/${bundle}`, {
@@ -95,7 +95,7 @@ describe("copyLibrary: export from one deployment, import into another (TEMPRA-1
       headers: { "Content-Type": "application/x-tar" },
     });
     expect(r.status).toBe(200);
-    // A concept with a later version, a verification, an attachment and a comment thread.
+    // A page with a later version, a verification, an attachment and a comment thread.
     const md = "---\ntype: Note\ntitle: Seeded\ndescription: One note.\n---\nFirst text.\n";
     r = await w.from.req("/files/notes/seeded.md", { method: "PUT", body: md });
     expect(r.status).toBe(200);

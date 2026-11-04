@@ -4,33 +4,10 @@ import type { Json, JsonObject, LintWarning, Verification } from "./types";
 
 const STATUSES = new Set(["draft", "stable", "deprecated"]);
 
-/** Types that say nothing about what a concept is (the server instructions forbid them). */
-const GENERIC_TYPES = new Set([
-  "concept",
-  "content",
-  "doc",
-  "document",
-  "entry",
-  "file",
-  "general",
-  "info",
-  "item",
-  "misc",
-  "note",
-  "notes",
-  "other",
-  "page",
-  "text",
-  "thing",
-  "topic",
-  "untitled",
-]);
-
 export interface LintOptions {
   /**
-   * Also check what the server instructions ask of a writer (a specific `type`, a `description`
-   * and `status`, absolute links, cited footnotes). On for writes, off for imports, so bundles from
-   * elsewhere that OKF accepts load without a flood of warnings.
+   * Also check what the server instructions ask of a writer (a one-line `description`). On for
+   * writes, off for imports, so files from elsewhere load without a flood of warnings.
    */
   strict?: boolean;
 }
@@ -44,7 +21,7 @@ export function isObject(v: Json | undefined): v is JsonObject {
 }
 
 /**
- * Field-level lint on write (spec: OKF conformance; warn, never reject, per OKF §11). Broken links
+ * Field-level lint on write (warn, never reject). Broken links
  * and the size cap are checked by the store, which knows the library.
  */
 export function lintFields(
@@ -56,18 +33,6 @@ export function lintFields(
 ): LintWarning[] {
   const out: LintWarning[] = [];
   const strict = opts.strict ?? false;
-  const type = get(entries, "type");
-  if (typeof type !== "string" || type.trim() === "") {
-    out.push({
-      code: "missing_type",
-      message: "`type` is required and must be a non-empty string.",
-    });
-  } else if (strict && GENERIC_TYPES.has(type.trim().toLowerCase())) {
-    out.push({
-      code: "generic_type",
-      message: `\`type: ${type}\` says nothing about what this is; name the kind of thing (Metric, Decision, Runbook), reusing a type the library already has where one fits (\`start\` lists them).`,
-    });
-  }
   if (strict) {
     const description = get(entries, "description");
     if (typeof description !== "string" || description.trim() === "") {
@@ -82,12 +47,6 @@ export function lintFields(
     out.push({
       code: "invalid_status",
       message: `\`status\` must be one of draft, stable, deprecated; got ${JSON.stringify(status)}.`,
-    });
-  } else if (status === undefined && strict) {
-    out.push({
-      code: "missing_status",
-      message:
-        "Set `status`: draft until what it describes is built or settled, then stable (an absent status reads as stable).",
     });
   }
 
@@ -157,24 +116,6 @@ export function lintFields(
       out.push({
         code: "footnote_undefined",
         message: `Footnote [^${label}] has no \`[^${label}]: …\` definition line, so markdown renderers show it as literal text. Add one at the end of the body.`,
-      });
-    }
-  }
-  if (strict) {
-    const cited = new Set(scan.footnoteRefs.map((r) => r.toLowerCase()));
-    for (const label of scan.footnoteDefs) {
-      if (!cited.has(label.toLowerCase())) {
-        out.push({
-          code: "footnote_uncited",
-          message: `Footnote definition [^${label}] is never cited in the body; cite it with [^${label}] or remove it.`,
-        });
-      }
-    }
-    for (const link of scan.links ?? []) {
-      if (link.form !== "relative") continue;
-      out.push({
-        code: "relative_link",
-        message: `Link ${link.raw} is relative; write it as /${link.path}${link.anchor ?? ""} so it reads the same from anywhere.`,
       });
     }
   }

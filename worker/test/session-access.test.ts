@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { sha256Hex } from "../src/okf/hash";
+import { sha256Hex } from "../src/format/hash";
 import { API, LIB, OWNER, setup, UI } from "./harness";
 import { makePng } from "./images";
 

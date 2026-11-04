@@ -1,11 +1,11 @@
 import { normalize } from "@tempra/editor/doc";
-import { jsonEqual, parseConcept } from "../src/okf/concept";
+import { jsonEqual, parsePage } from "../src/format/page";
 
 const dec = new TextDecoder();
 const SYNTHESIZED = /(^|\/)(index|log)\.md$/;
 
 /**
- * The Phase 1 gate comparison: every concept has the same parsed frontmatter fields (`generated`
+ * The Phase 1 gate comparison: every page has the same parsed frontmatter fields (`generated`
  * and `verified` included) and the same body, normalized (tempra-dev:
  * decisions/structured-documents: markdown is normalized once on its way in); every attachment is byte-identical; `index.md` and
  * `log.md` are ignored because the service synthesizes them. Returns a list of mismatches.
@@ -28,8 +28,8 @@ export function compareBundle(
       }
       continue;
     }
-    const a = parseConcept(dec.decode(f.bytes));
-    const b = parseConcept(dec.decode(got));
+    const a = parsePage(dec.decode(f.bytes));
+    const b = parsePage(dec.decode(got));
     if (!jsonEqual(Object.fromEntries(a.entries), Object.fromEntries(b.entries))) {
       problems.push(`${f.path}: frontmatter fields differ`);
     }

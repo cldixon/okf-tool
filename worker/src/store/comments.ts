@@ -4,7 +4,7 @@
  * the `threads` and `comments` tables in step with it.
  */
 import { MAX_QUOTE, type QuoteSelector } from "@tempra/editor/doc";
-import { OkfError } from "./errors";
+import { StoreError } from "./errors";
 
 /** Longest comment body, in characters. */
 export const MAX_COMMENT = 10_000;
@@ -31,14 +31,14 @@ export type ThreadKind = "comment" | "request";
 export function threadKind(raw: unknown): ThreadKind | undefined {
   if (raw === undefined || raw === null || raw === "") return undefined;
   if (raw === "comment" || raw === "request") return raw;
-  throw new OkfError(400, "bad_kind", "A thread's kind is comment or request.");
+  throw new StoreError(400, "bad_kind", "A thread's kind is comment or request.");
 }
 
 export type CommentAction = (
   | {
       kind: "open";
       /**
-       * The concept to comment on; empty (or absent) for a library thread, on the library itself
+       * The page to comment on; empty (or absent) for a library thread, on the library itself
        * rather than a page (TEMPRA-222), which takes no anchor.
        */
       path?: string | null;
@@ -88,7 +88,7 @@ export interface CommentView {
 
 export interface ThreadView {
   id: string;
-  /** The concept's path; "" for a library thread (TEMPRA-222). */
+  /** The page's path; "" for a library thread (TEMPRA-222). */
   path: string;
   /** A comment, or a request left for people's agents (TEMPRA-222). */
   kind: ThreadKind;
@@ -131,7 +131,7 @@ export interface CommentResult {
   thread: ThreadView;
   /**
    * Who the action may concern, as users ids from the ledger's `by` (notify.ts decides who is
-   * told): the people who opened or wrote in the thread, and who wrote or verified the concept.
+   * told): the people who opened or wrote in the thread, and who wrote or verified the page.
    */
   people: { participants: string[]; writers: string[] };
 }
@@ -140,11 +140,11 @@ export interface CommentResult {
 export function commentBody(raw: unknown, required: boolean): string | null {
   const body = typeof raw === "string" ? raw.trim() : "";
   if (!body) {
-    if (required) throw new OkfError(400, "empty_comment", "A comment needs a body.");
+    if (required) throw new StoreError(400, "empty_comment", "A comment needs a body.");
     return null;
   }
   if (body.length > MAX_COMMENT) {
-    throw new OkfError(
+    throw new StoreError(
       400,
       "comment_too_long",
       `A comment is at most ${MAX_COMMENT} characters; this one is ${body.length}.`,
@@ -156,13 +156,13 @@ export function commentBody(raw: unknown, required: boolean): string | null {
 /** A quote to anchor on: not empty, not too long. */
 export function checkQuote(quote: unknown): string {
   if (typeof quote !== "string" || quote.length === 0) {
-    throw new OkfError(400, "bad_anchor", "An anchor needs the quoted text.");
+    throw new StoreError(400, "bad_anchor", "An anchor needs the quoted text.");
   }
   if (quote.length > MAX_QUOTE) {
-    throw new OkfError(
+    throw new StoreError(
       400,
       "bad_anchor",
-      `Quote at most ${MAX_QUOTE} characters; comment on the concept instead.`,
+      `Quote at most ${MAX_QUOTE} characters; comment on the page instead.`,
     );
   }
   return quote;

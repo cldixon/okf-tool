@@ -6,7 +6,7 @@ export type JsonObject = { [key: string]: Json };
 export interface LintWarning {
   code: string;
   message: string;
-  /** The path the warning is about, when it is not the concept itself (e.g. a broken link). */
+  /** The path the warning is about, when it is not the page itself (e.g. a broken link). */
   target?: string;
   /** The body block the warning is about (e.g. a diagram that does not parse). */
   block?: string;
@@ -18,7 +18,7 @@ export interface LintWarning {
 }
 
 /**
- * A body link as stored in a concept record: the written target plus what it resolved to. One per
+ * A body link as stored in a page record: the written target plus what it resolved to. One per
  * internal link, image or definition of the document, in document order.
  */
 export interface StoredLink {
@@ -29,13 +29,13 @@ export interface StoredLink {
   path: string;
   anchor: string | null;
   form: "absolute" | "relative";
-  /** concept_id of the target, or null when it did not exist at write time. */
+  /** page_id of the target, or null when it did not exist at write time. */
   target: string | null;
 }
 
 /**
- * An internal `sources[].resource` as stored in a concept record, resolved like a body link
- * (spec: Concept model, Links). `root` is a bundle-root path without a leading slash, as OKF's
+ * An internal `sources[].resource` as stored in a page record, resolved like a body link
+ * (spec: Page model, Links). `root` is a bundle-root path without a leading slash, as a bundle's
  * sample bundles write them.
  */
 export interface StoredSource {
@@ -47,16 +47,16 @@ export interface StoredSource {
   path: string;
   anchor: string | null;
   form: "absolute" | "relative" | "root";
-  /** concept_id of the target, or null when it did not exist at write time. */
+  /** page_id of the target, or null when it did not exist at write time. */
   target: string | null;
 }
 
 /**
- * A concept's content version (spec: Concept model; tempra-dev: decisions/structured-documents).
+ * A page's content version (spec: Page model; tempra-dev: decisions/structured-documents).
  * Hashing its canonical serialization gives the content-version hash used by ETags, If-Match and
  * the ledger. `verified` is not part of it.
  */
-export interface ConceptRecord {
+export interface PageRecord {
   /** Writer frontmatter in arrival order, minus server-owned and computed keys. */
   fm: [string, Json][];
   /** Frontmatter text kept verbatim when it could not be parsed as a YAML mapping. */

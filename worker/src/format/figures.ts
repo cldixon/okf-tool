@@ -1,5 +1,5 @@
 /**
- * What MCP `read` says about a concept's figures (TEMPRA-154; tempra-dev: app/media, How agents
+ * What MCP `read` says about a page's figures (TEMPRA-154; tempra-dev: app/media, How agents
  * see): each figure, numbered as the reader numbers it (`findFigures`), with what the library
  * knows of it from the stored blob rows alone, so listing figures fetches no bytes.
  */
@@ -58,10 +58,10 @@ export type FigureFact =
       source: string;
     };
 
-/** The figures of a concept at `conceptPath`; `blobAt` reads an attachment's blob row by path. */
+/** The figures of a page at `pagePath`; `blobAt` reads an attachment's blob row by path. */
 export function figureFacts(
   doc: Doc,
-  conceptPath: string,
+  pagePath: string,
   blobAt: (path: string) => FigureBlob | null,
 ): FigureFact[] {
   return findFigures(doc).map((f): FigureFact => {
@@ -94,7 +94,7 @@ export function figureFacts(
       alt: image.alt ?? "",
       title: image.title?.trim() || null,
     };
-    const target = linkTarget(conceptPath, image.url);
+    const target = linkTarget(pagePath, image.url);
     if (target?.kind === "external") {
       return { ...base, status: "external", path: null, blob: null };
     }

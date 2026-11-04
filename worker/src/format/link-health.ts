@@ -5,21 +5,20 @@ import type { Json, JsonObject, LintWarning } from "./types";
 
 /**
  * The link-health process's checks (TEMPRA-65; tempra-dev: v2/maintainers), free of the store:
- * what a concept's stored tree says about its footnotes, worked out the way a write works it out,
+ * what a page's stored tree says about its footnotes, worked out the way a write works it out,
  * so the daily pass and the write path can never disagree on what is dangling.
  */
 
 /**
  * The footnote lint the pass owns: a marker with no `sources[].id` (`footnote_unmatched`) or with
- * no definition line (`footnote_undefined`). Both are checked on writes and imports alike;
- * `footnote_uncited` is a writer's courtesy (strict lint, writes only) and stays the write path's.
+ * no definition line (`footnote_undefined`). Both are checked on writes and imports alike.
  */
 export const FOOTNOTE_CODES: ReadonlySet<string> = new Set([
   "footnote_unmatched",
   "footnote_undefined",
 ]);
 
-/** A concept's dangling footnotes from its stored frontmatter and tree, as lint. */
+/** A page's dangling footnotes from its stored frontmatter and tree, as lint. */
 export function danglingFootnotes(
   fm: [string, Json][],
   generated: JsonObject | null,

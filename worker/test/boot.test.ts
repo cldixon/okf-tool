@@ -8,7 +8,7 @@ describe("the shell's boot data (TEMPRA-175)", () => {
     expect(bootKey("http://localhost/api/v1/x?path=a%2Fb.md")).toBe("/api/v1/x?path=a%2Fb.md");
   });
 
-  test("a file's page asks for its page first (one call, TEMPRA-191), a concept's threads, then the frame", () => {
+  test("a file's page asks for its page first (one call, TEMPRA-191), a page's threads, then the frame", () => {
     const urls = bootUrls({ kind: "file", owner: "ann", slug: "notes", path: "a b/c.md" });
     expect(urls[0]).toBe("/api/v1/libraries/ann/notes/page/a%20b/c.md");
     expect(urls[1]).toStartWith("/api/v1/libraries/ann/notes/comments?");
@@ -19,7 +19,7 @@ describe("the shell's boot data (TEMPRA-175)", () => {
     expect(bootUrls({ kind: "file", owner: "a", slug: "b", path: "c.md", at: 3 })[0]).toBe(
       "/api/v1/libraries/a/b/page/c.md?at=3",
     );
-    // Not a concept: no comments.
+    // Not a page: no comments.
     const png = bootUrls({ kind: "file", owner: "ann", slug: "notes", path: "img/x.png" });
     expect(png[0]).toBe("/api/v1/libraries/ann/notes/page/img/x.png");
     expect(png.some((u) => u.includes("/comments"))).toBe(false);

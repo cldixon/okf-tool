@@ -11,9 +11,9 @@ import { checkSlug } from "../accounts";
 import { type ClientSignals, connectionAgent } from "../agents";
 import type { Deps } from "../app";
 import type { TokenInfo } from "../auth";
-import { normalizeDir } from "../okf/paths";
+import { normalizeDir } from "../format/paths";
 import { signedIn } from "../signin";
-import { OkfError } from "../store/errors";
+import { StoreError } from "../store/errors";
 import type { AccountGrant } from "../tenancy";
 import {
   type ConsentField,
@@ -26,7 +26,7 @@ import {
 } from "./pages";
 
 /** OAuth scopes (spec: Apps under Auth). A grant never carries more than the person approved. */
-export const SCOPES = ["okf:read", "okf:write"];
+export const SCOPES = ["tempra:read", "tempra:write"];
 
 /**
  * What an approved grant carries. Connections approved here belong to the account and name
@@ -55,7 +55,7 @@ function defaultForm(
   details: ConsentDescription,
   libs: ReachableLibrary[],
 ): ConsentForm {
-  const wantsWrite = request.scope.length === 0 || request.scope.includes("okf:write");
+  const wantsWrite = request.scope.length === 0 || request.scope.includes("tempra:write");
   return {
     libraries: "all",
     selected: [],
@@ -94,7 +94,7 @@ function validate(form: ConsentForm, libs: ReachableLibrary[]): Problem | null {
     try {
       checkSlug(form.newLibrary);
     } catch (e) {
-      return { message: (e as OkfError).message, field: "new_library" };
+      return { message: (e as StoreError).message, field: "new_library" };
     }
     if (libs.some((l) => l.role === "owner" && l.slug === form.newLibrary.toLowerCase())) {
       return {
@@ -243,7 +243,7 @@ export function registerAppRoutes<E extends AppEnv>(
           400,
         );
       }
-      const scope = form.access === "write" ? ["okf:read", "okf:write"] : ["okf:read"];
+      const scope = form.access === "write" ? ["tempra:read", "tempra:write"] : ["tempra:read"];
       const approved = await oauth.approveConsent(c.req.raw, handle, { scope });
       const created = form.newLibrary ? await accounts.createLibrary(form.newLibrary, user) : null;
       const libraries: AccountGrant["libraries"] =
@@ -304,7 +304,8 @@ export function registerAppRoutes<E extends AppEnv>(
       approved.headers.set("Location", redirectTo);
       return new Response(null, { status: 302, headers: approved.headers });
     } catch (e) {
-      if (e instanceof OkfError) return messagePage("Cannot connect this app", e.message, e.status);
+      if (e instanceof StoreError)
+        return messagePage("Cannot connect this app", e.message, e.status);
       return authError(e);
     }
   });

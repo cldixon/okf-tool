@@ -2,7 +2,7 @@ import { type Doc, type DocNode, walk } from "@tempra/editor/doc";
 import type { Heading, RootContent } from "mdast";
 import { isExternal, resolveLinkPath, safeDecode, splitAnchor } from "./paths";
 
-/** A bundle-internal link in a concept body: a link, image or definition, in document order. */
+/** A bundle-internal link in a page body: a link, image or definition, in document order. */
 export interface BodyLink {
   /** Which of the document's {@link targets} it is. */
   at: number;
@@ -37,8 +37,8 @@ export function targets(doc: Doc): TargetNode[] {
   return out;
 }
 
-/** Finds internal links and footnote references in a body written at `conceptPath`. */
-export function scanDoc(doc: Doc, conceptPath: string): BodyScan {
+/** Finds internal links and footnote references in a body written at `pagePath`. */
+export function scanDoc(doc: Doc, pagePath: string): BodyScan {
   const refs: string[] = [];
   const counts = new Map<string, number>();
   const defs: string[] = [];
@@ -52,18 +52,18 @@ export function scanDoc(doc: Doc, conceptPath: string): BodyScan {
     return undefined;
   });
   const links = targets(doc).flatMap((n, at) => {
-    const link = toLink(n.url, conceptPath);
+    const link = toLink(n.url, pagePath);
     return link ? [{ at, ...link }] : [];
   });
   return { links, footnoteRefs: refs, footnoteCounts: counts, footnoteDefs: defs };
 }
 
 /** A link target as an internal link, or null for an external one, an anchor or nothing. */
-export function toLink(raw: string, conceptPath: string): Omit<BodyLink, "at"> | null {
+export function toLink(raw: string, pagePath: string): Omit<BodyLink, "at"> | null {
   if (raw === "" || raw.startsWith("#") || isExternal(raw)) return null;
   const { path, anchor } = splitAnchor(raw);
   if (path === "") return null;
-  const resolved = resolveLinkPath(conceptPath, safeDecode(path));
+  const resolved = resolveLinkPath(pagePath, safeDecode(path));
   if (!resolved) return null;
   return { raw, path: resolved, anchor, form: path.startsWith("/") ? "absolute" : "relative" };
 }

@@ -3,7 +3,7 @@
  * poor for people or useless to a screen reader. Lint only, never a refusal. Two kinds:
  *
  * - from the body alone ({@link imageLint}): an image with no alt text (`image_no_alt`) and one
- *   hotlinked from another site (`image_external`), checked with the concept's other field lint;
+ *   hotlinked from another site (`image_external`), checked with the page's other field lint;
  * - from what an image points to ({@link imageTargetLint}): an attachment too large to be a figure
  *   (`image_large`) or one that is not an image, video, audio or PDF (`image_not_image`). The store
  *   recomputes these when the target changes, as it does broken links.
@@ -78,7 +78,7 @@ export function imageLint(doc: Doc): LintWarning[] {
     if (host) {
       out.push({
         code: "image_external",
-        message: `Image ${img.url} is hotlinked from ${host}; bring it into the library with \`attach\` and \`source_url: "${img.url}"\` (the server fetches it and records where from; put it beside this concept), point the image at the attached path, and cite the original in \`sources\`.`,
+        message: `Image ${img.url} is hotlinked from ${host}; bring it into the library with \`attach\` and \`source_url: "${img.url}"\` (the server fetches it and records where from; put it beside this page), point the image at the attached path, and cite the original in \`sources\`.`,
         target: img.url,
       });
     }
@@ -114,7 +114,7 @@ function megabytes(n: number): string {
 
 /**
  * Lint from what each image points to: `attachment` returns the attachment at a link's target, or
- * null where the target is a concept or missing (broken links are linted elsewhere).
+ * null where the target is a page or missing (broken links are linted elsewhere).
  */
 export function imageTargetLint(
   links: StoredLink[],

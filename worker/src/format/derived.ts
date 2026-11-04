@@ -1,34 +1,41 @@
-/** Synthesized `index.md` (OKF §8) and `log.md` (OKF §9). Never authored, never stored. */
+/**
+ * Synthesized `index.md` and `log.md`. Never authored, never stored. An OKF export
+ * (`format: "okf"`) writes the index as OKF's spec has it: `okf_version` on the root's and its
+ * pages under "Concepts" (tempra-dev: decisions/pages-not-okf).
+ */
 
 import { basename } from "./paths";
 
+/** The OKF version an OKF export says it conforms to. */
 export const OKF_VERSION = "0.2";
 
 export interface IndexInput {
   /** The directory, "" for the bundle root. */
   dir: string;
-  subdirs: { name: string; concepts: number }[];
-  concepts: { path: string; title: string | null; description: string | null }[];
+  subdirs: { name: string; pages: number }[];
+  pages: { path: string; title: string | null; description: string | null }[];
   attachments: { path: string }[];
 }
 
-/** One directory level: a section for subdirectories, one for concepts, one for other files. */
-export function renderIndex(input: IndexInput): string {
+/** One directory level: a section for subdirectories, one for pages, one for other files. */
+export function renderIndex(input: IndexInput, opts: { okf?: boolean } = {}): string {
   const parts: string[] = [];
-  if (input.dir === "") parts.push(`---\nokf_version: "${OKF_VERSION}"\n---\n`);
+  const okf = opts.okf === true;
+  if (okf && input.dir === "") parts.push(`---\nokf_version: "${OKF_VERSION}"\n---\n`);
+  const noun = okf ? "concept" : "page";
   const line = (label: string, href: string, desc: string | null) =>
     `* [${escapeLabel(label)}](${encodeHref(href)})${desc ? ` - ${oneLine(desc)}` : ""}`;
   if (input.subdirs.length > 0) {
     parts.push("# Subdirectories\n");
     for (const d of input.subdirs) {
-      const n = d.concepts === 1 ? "1 concept" : `${d.concepts} concepts`;
+      const n = d.pages === 1 ? `1 ${noun}` : `${d.pages} ${noun}s`;
       parts.push(line(d.name, `${d.name}/index.md`, n));
     }
     parts.push("");
   }
-  if (input.concepts.length > 0) {
-    parts.push("# Concepts\n");
-    for (const c of input.concepts) {
+  if (input.pages.length > 0) {
+    parts.push(okf ? "# Concepts\n" : "# Pages\n");
+    for (const c of input.pages) {
       const name = basename(c.path);
       parts.push(line(c.title || name.replace(/\.md$/, ""), name, c.description));
     }
@@ -39,7 +46,9 @@ export function renderIndex(input: IndexInput): string {
     for (const a of input.attachments) parts.push(line(basename(a.path), basename(a.path), null));
     parts.push("");
   }
-  if (parts.length === (input.dir === "" ? 1 : 0)) parts.push("*This directory is empty.*\n");
+  if (parts.length === (okf && input.dir === "" ? 1 : 0)) {
+    parts.push("*This directory is empty.*\n");
+  }
   return parts.join("\n");
 }
 

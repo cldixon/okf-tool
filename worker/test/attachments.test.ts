@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { sha256Hex } from "../src/okf/hash";
+import { sha256Hex } from "../src/format/hash";
 import { LibraryStore } from "../src/store/store";
 import { readTar, writeTar } from "../src/util/tar";
 import { API, setup } from "./harness";
@@ -223,7 +223,7 @@ describe("attachments: checked images, type from the bytes, dimensions (TEMPRA-1
   });
 });
 
-/** A concept showing the given files as figures. */
+/** A page showing the given files as figures. */
 const showing = (s: S, path: string, files: string[]) =>
   s.req(`/files/${path}`, {
     method: "PUT",
@@ -379,7 +379,8 @@ describe("exports name attachments by hash (TEMPRA-83)", () => {
     expect(dl.status).toBe(200);
     const whole = readTar(new Uint8Array(await dl.arrayBuffer()));
     expect(whole.find((f) => f.path === "files/data.bin")?.bytes).toEqual(bytes);
-    expect(whole.map((f) => f.path)).toContain("log.md");
+    // A nightly folder is the plain format: the files, with no index.md or log.md.
+    expect(whole.map((f) => f.path)).not.toContain("log.md");
 
     const exp = await s.req("/export");
     expect(exp.status).toBe(200);

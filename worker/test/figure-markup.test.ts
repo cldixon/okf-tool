@@ -1,7 +1,7 @@
 /** Figure lint (TEMPRA-161; tempra-dev: app/media, Figure markup): on write and import, never a refusal. */
 import { describe, expect, test } from "bun:test";
 import { parseMarkdown, reconcile } from "@tempra/editor/doc";
-import { figureLint } from "../src/okf/figure-lint";
+import { figureLint } from "../src/format/figure-lint";
 import { LibraryStore, type RequestContext } from "../src/store/store";
 import { bunSqlHandle } from "./sqlite";
 
@@ -11,7 +11,7 @@ const ctx = (): RequestContext => ({ actor: "claude-code/test", request_id: `req
 const codes = (lint: { code: string }[]) =>
   lint.map((l) => l.code).filter((c) => c.startsWith("figure_"));
 const md = (body: string) =>
-  `---\ntype: Memo\ndescription: A test concept.\nstatus: stable\n---\n${body}\n`;
+  `---\ntype: Memo\ndescription: A test page.\nstatus: stable\n---\n${body}\n`;
 
 const GOOD = [
   ":::figure{width=480 frame}\n![a](/a.png)\n:::",
@@ -55,15 +55,15 @@ describe("figure lint (TEMPRA-161)", () => {
     const res = s.apply(ctx(), [{ op: "write", path: "f.md", content: md(broken) }]);
     expect(codes(res.results[0]?.lint ?? [])).toEqual(["figure_invalid"]);
     const v = s.read("f");
-    expect(v.kind === "concept" && codes(v.lint)).toEqual(["figure_invalid"]);
-    expect(v.kind === "concept" && v.markdown).toContain(`${broken}\n`);
+    expect(v.kind === "page" && codes(v.lint)).toEqual(["figure_invalid"]);
+    expect(v.kind === "page" && v.markdown).toContain(`${broken}\n`);
     expect(s.work({ kind: "lint" }).items.map((i) => i.path)).toEqual(["f.md"]);
     const fixed = s.apply(ctx(), [
       {
         op: "write",
         path: "f.md",
         content: md(":::figure{layout=wide}\n![a](https://example.com/a.png)\n:::"),
-        if_match: v.kind === "concept" ? v.hash : "",
+        if_match: v.kind === "page" ? v.hash : "",
       },
     ]);
     expect(codes(fixed.results[0]?.lint ?? [])).toEqual([]);

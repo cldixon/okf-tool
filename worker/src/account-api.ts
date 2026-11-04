@@ -11,7 +11,7 @@ import {
   sessionId,
 } from "./session";
 import { sendLink } from "./signin";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /**
  * The account as the app's pages manage it (TEMPRA-14): the account page, sessions, email and
@@ -31,7 +31,11 @@ export function registerAccountApi(
   const person = async (c: C) => {
     const d = deps(c.env);
     if (c.req.header("Authorization") !== undefined) {
-      throw new OkfError(403, "session_only", "The account is managed only from the app's pages.");
+      throw new StoreError(
+        403,
+        "session_only",
+        "The account is managed only from the app's pages.",
+      );
     }
     return { d, user: await signedIn(c, d) };
   };
@@ -73,7 +77,7 @@ export function registerAccountApi(
     const { d, user } = await person(c);
     const b = await body<{ theme?: unknown; name?: unknown }>(c);
     if (!("theme" in b) && !("name" in b)) {
-      throw new OkfError(400, "nothing_to_change", "Nothing to change.");
+      throw new StoreError(400, "nothing_to_change", "Nothing to change.");
     }
     const theme = "theme" in b ? checkTheme(b.theme) : undefined;
     const name = "name" in b ? checkName(b.name) : undefined;
@@ -102,13 +106,14 @@ export function registerAccountApi(
       .trim()
       .toLowerCase();
     if (!/^[^\s@]+@[^\s@]+$/.test(email) || email.length > 254) {
-      throw new OkfError(400, "bad_email", "That does not look like an email address.");
+      throw new StoreError(400, "bad_email", "That does not look like an email address.");
     }
-    if (email === user.email) throw new OkfError(400, "same_email", "That is your email already.");
+    if (email === user.email)
+      throw new StoreError(400, "same_email", "That is your email already.");
     const ip = c.req.header("CF-Connecting-IP") ?? null;
     const secret = await d.sessions.createLink(email, ip, { user: user.id });
     if (!secret)
-      throw new OkfError(429, "rate_limited", "Too many links asked for. Try again later.");
+      throw new StoreError(429, "rate_limited", "Too many links asked for. Try again later.");
     const link = `${new URL(c.req.url).origin}/account/email/confirm?t=${secret}`;
     const sent = await sendLink(c.req.raw, c.env, d, {
       to: email,
@@ -119,7 +124,7 @@ export function registerAccountApi(
       text: `Open this link to make this your Tempra sign-in email:\n\n${link}\n\nSign in with ${user.email} first: the link works only in that account. It works once, within ${LINK_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
     });
     if (sent === null)
-      throw new OkfError(502, "mail_failed", "Could not send email. Try again later.");
+      throw new StoreError(502, "mail_failed", "Could not send email. Try again later.");
     // Local dev shows the link instead of mailing it.
     return c.json({ sent_to: email, ...(sent && { dev_link: sent }) });
   });
@@ -133,7 +138,7 @@ export function registerAccountApi(
   app.post("/api/v1/account/delete", async (c) => {
     const { d, user } = await person(c);
     if (String((await body<{ confirm: string }>(c)).confirm ?? "").trim() !== user.handle) {
-      throw new OkfError(400, "not_confirmed", `Type ${user.handle} to confirm.`);
+      throw new StoreError(400, "not_confirmed", `Type ${user.handle} to confirm.`);
     }
     await deleteAccount(d, c.env.OAUTH_PROVIDER, user);
     return c.body(null, 204, { "Set-Cookie": clearedSessionCookie });

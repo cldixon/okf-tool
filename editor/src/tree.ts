@@ -93,7 +93,7 @@ const OPTIONS = {
 
 /**
  * Parses markdown (a body, without frontmatter) into a document without IDs: positions dropped,
- * and a `[^label]` the parser left as text (no definition in the body; OKF cites `sources[].id`)
+ * and a `[^label]` the parser left as text (no definition in the body; pages cite `sources[].id`)
  * made a footnote reference, so it is written back as written.
  */
 export function parseMarkdown(markdown: string): Doc {

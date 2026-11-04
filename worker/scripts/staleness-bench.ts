@@ -1,6 +1,6 @@
 /**
  * Times the staleness process on a synthetic library (TEMPRA-63): `bun scripts/staleness-bench.ts
- * [concepts]` writes that many concepts (default 5000) under bun:sqlite, a third of them with a
+ * [pages]` writes that many pages (default 5000) under bun:sqlite, a third of them with a
  * stale_after spread over the next and last 60 days, then times a first run (every flag new), a
  * steady run a day later, and the reads that use the flags.
  */
@@ -12,7 +12,7 @@ const day = 86_400_000;
 const clock = { t: Date.parse("2026-10-01T00:00:00Z") };
 const store = new LibraryStore(bunSqlHandle(), {
   now: () => new Date(clock.t),
-  conceptCap: n + 10,
+  pageCap: n + 10,
 });
 
 const ms = <T>(f: () => T) => {
@@ -30,7 +30,7 @@ const [write] = ms(() => {
       ops.push({
         op: "write" as const,
         path: `d${j % 50}/c${j}.md`,
-        content: `---\ntype: Metric\ntitle: C${j}\ndescription: Concept ${j}.\nstatus: stable\n${dated ? `stale_after: ${at}\n` : ""}---\nBody of ${j}, see [next](/d${(j + 1) % 50}/c${j + 1}.md).\n`,
+        content: `---\ntype: Metric\ntitle: C${j}\ndescription: Page ${j}.\nstatus: stable\n${dated ? `stale_after: ${at}\n` : ""}---\nBody of ${j}, see [next](/d${(j + 1) % 50}/c${j + 1}.md).\n`,
       });
     }
     store.apply({ actor: "bench/1", request_id: crypto.randomUUID() }, ops);
@@ -46,7 +46,7 @@ const [outline] = ms(() => store.outline());
 console.log(
   JSON.stringify(
     {
-      concepts: n,
+      pages: n,
       write_ms: write,
       first_run_ms: first,
       first_run: {

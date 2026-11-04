@@ -119,14 +119,14 @@ describe("MCP server", () => {
   });
 
   test("INSTRUCTIONS and SKILL.md tell agents the same media story (TEMPRA-160, TEMPRA-211)", () => {
-    const skill = readFileSync(`${import.meta.dir}/../../skills/okf/SKILL.md`, "utf8");
+    const skill = readFileSync(`${import.meta.dir}/../../skills/tempra/SKILL.md`, "utf8");
     for (const term of [
       "Mermaid",
       "`render`",
       "`source_url`",
       "never hotlink",
       "`prepare_upload`",
-      "beside the concept that uses it",
+      "beside the page that uses it",
       "`dir/x.md` uses `dir/x-architecture.png`",
       "the title is the caption",
       ":::figure",
@@ -202,7 +202,7 @@ describe("MCP server", () => {
     let r = await call("write", {
       path: "metrics/revenue.md",
       content: doc("Revenue", "Money in. See [orders](/tables/orders.md).\n"),
-      note: "first concept",
+      note: "first page",
     });
     expect(r.isError).toBe(false);
     expect(r.text).toContain("broken_link");
@@ -236,7 +236,7 @@ describe("MCP server", () => {
       "metrics/revenue.md:8: Money received. See [orders](/tables/orders.md).",
     );
     expect((await call("browse", { dir: "metrics" })).text).toBe(
-      "In the app: http://localhost/owner/demo/metrics/ (each page at its path under http://localhost/owner/demo/)\n\n# Concepts\n\n* [Revenue](revenue.md) - About Revenue.\n",
+      "In the app: http://localhost/owner/demo/metrics/ (each page at its path under http://localhost/owner/demo/)\n\n# Pages\n\n* [Revenue](revenue.md) - About Revenue.\n",
     );
 
     r = await call("move", { from: "tables", to: "data/tables", note: "reorganize" });
@@ -257,8 +257,7 @@ describe("MCP server", () => {
     expect((await call("delete", { path: "b.md", if_match: hb })).isError).toBe(false);
 
     const start = (await call("start")).text;
-    expect(start).toContain("Concepts: 3 · attachments: 0");
-    expect(start).toContain("Types: Memo 3");
+    expect(start).toContain("Pages: 3 · attachments: 0");
     expect(start).toContain("Health (checked ");
   });
 
@@ -303,7 +302,7 @@ describe("MCP server", () => {
     });
 
     expect((await call("search", { q: "alpha" })).text).toContain("x.md — X");
-    expect((await call("query", { type: "Memo" })).text).toContain("2 matching concepts");
+    expect((await call("query", { type: "Memo" })).text).toContain("2 matching pages");
     expect(JSON.parse((await call("links", { path: "y.md" })).text).inbound[0].path).toBe("x.md");
     const log = (await call("log")).text;
     expect(log.split("\n")[0]).toContain("claude-code/test · delta");
@@ -343,7 +342,23 @@ describe("MCP server", () => {
     const paths = readTar(new Uint8Array(await tar.arrayBuffer()))
       .map((f) => f.path)
       .sort();
-    expect(paths).toEqual(["a.md", "index.md", "log.md", "refs/data.bin", "refs/index.md"]);
+    expect(paths).toEqual(["a.md", "refs/data.bin"]);
+    // An OKF bundle adds each directory's index.md and the log.
+    const okf = (await call("export", { format: "okf" })).text;
+    expect(okf).toContain("OKF bundle at seq");
+    const okfTar = await app.request(/(http\S+)/.exec(okf)?.[1] ?? "");
+    expect(okfTar.headers.get("Content-Disposition")).toContain("-okf.tar");
+    const okfFiles = readTar(new Uint8Array(await okfTar.arrayBuffer()));
+    expect(okfFiles.map((f) => f.path).sort()).toEqual([
+      "a.md",
+      "index.md",
+      "log.md",
+      "refs/data.bin",
+      "refs/index.md",
+    ]);
+    const root = new TextDecoder().decode(okfFiles.find((f) => f.path === "index.md")?.bytes);
+    expect(root).toContain('okf_version: "0.2"');
+    expect(root).toContain("# Concepts");
 
     // Tampered or foreign links are refused.
     expect((await app.request(`${url.slice(0, -2)}xx`)).status).toBe(403);
@@ -528,7 +543,7 @@ describe("MCP server", () => {
     expect(after).toContain("by: process:nightly-verify");
   });
 
-  test("resources list and read concepts", async () => {
+  test("resources list and read pages", async () => {
     const { app } = setup();
     const { client, call } = await connect(app);
     await call("write", { path: "t/a.md", content: doc("A", "a\n") });
@@ -537,9 +552,9 @@ describe("MCP server", () => {
     expect(list.resources.map((r) => [r.uri, r.title])).toEqual([
       ["ui://tempra/upload", "Upload a file"],
       ["ui://tempra/page", "Show a page"],
-      ["okf://owner/demo/t/a.md", "A"],
+      ["tempra://owner/demo/t/a.md", "A"],
     ]);
-    const res = await client.readResource({ uri: "okf://owner/demo/t/a.md" });
+    const res = await client.readResource({ uri: "tempra://owner/demo/t/a.md" });
     expect((res.contents[0] as { text: string }).text).toContain("title: A");
   });
 
@@ -687,7 +702,7 @@ describe("MCP server", () => {
       expect(c[1]).toEqual({
         type: "resource",
         resource: {
-          uri: "okf://owner/demo/docs/paper.pdf",
+          uri: "tempra://owner/demo/docs/paper.pdf",
           mimeType: "application/pdf",
           blob: b64(pdf),
         },
@@ -714,7 +729,7 @@ describe("MCP server", () => {
       expect(video.map((x) => x.type)).toEqual(["text"]);
       expect((video[0] as Text).text).toContain("media: video/webm");
       expect((video[0] as Text).text).toContain("dimensions: 64×36 px");
-      // A concept's figure lines name what a media figure is.
+      // A page's figure lines name what a media figure is.
       await call("write", {
         path: "notes/m.md",
         content:
@@ -749,22 +764,22 @@ describe("MCP server", () => {
         Object.fromEntries(list.resources.map((r) => [r.name, r.mimeType ?? null])),
       ).toMatchObject({ "img/big.jpg": "image/jpeg", "refs/data.csv": "text/csv" });
 
-      const img = (await client.readResource({ uri: "okf://owner/demo/img/big.jpg" }))
+      const img = (await client.readResource({ uri: "tempra://owner/demo/img/big.jpg" }))
         .contents[0] as { mimeType: string; blob: string };
       expect(img.mimeType).toBe("image/webp");
       expect(Uint8Array.from(atob(img.blob), (ch) => ch.charCodeAt(0))).toEqual(SCALED);
 
-      const csv = (await client.readResource({ uri: "okf://owner/demo/refs/data.csv" }))
+      const csv = (await client.readResource({ uri: "tempra://owner/demo/refs/data.csv" }))
         .contents[0] as { mimeType: string; blob: string };
       expect(csv).toMatchObject({ mimeType: "text/csv", blob: btoa("a,b\n1,2\n") });
 
-      const huge = (await client.readResource({ uri: "okf://owner/demo/refs/huge.bin" }))
+      const huge = (await client.readResource({ uri: "tempra://owner/demo/refs/huge.bin" }))
         .contents[0] as { mimeType: string; text: string };
       expect(huge.mimeType).toBe("text/plain");
       expect(huge.text).toContain("Attachment; download: http");
     });
 
-    describe("a concept's figures (TEMPRA-154)", () => {
+    describe("a page's figures (TEMPRA-154)", () => {
       const FIGS = [
         "# Figures",
         "",
@@ -808,7 +823,7 @@ describe("MCP server", () => {
         );
         // No bytes were read for the list, and none metered.
         expect(s.usage.filter((e) => e.kind === "read_image")).toEqual([]);
-        // A concept without figures has no block.
+        // A page without figures has no block.
         await call("write", { path: "t/plain.md", content: doc("Plain", "Just text.\n") });
         expect((await call("read", { path: "t/plain.md" })).text).not.toContain("Figures:");
       });
@@ -1235,7 +1250,11 @@ describe("MCP server", () => {
 
     test("refused for a read connection, without the choice, and for a bearer token", async () => {
       const s = setup();
-      const read = await connectApp(s.app, { ...creator, access: "read" }, { scope: "okf:read" });
+      const read = await connectApp(
+        s.app,
+        { ...creator, access: "read" },
+        { scope: "tempra:read" },
+      );
       expect(read.flow.html).not.toContain("create_libraries");
       const r1 = await read.call("create_library", { slug: "x" });
       expect(r1.isError).toBe(true);

@@ -3,12 +3,12 @@ import type { Json, JsonObject, TrustTier, Verification } from "./types";
 const ACTOR = /^(?:human:\S+|process:\S+|[^\s/:]+\/\S+)$/;
 const OFFSET = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
-/** OKF §7 actor convention: `human:<id>`, `process:<id>` or `<producer>/<version>`. */
+/** The actor convention: `human:<id>`, `process:<id>` or `<producer>/<version>`. */
 export function isActor(s: string): boolean {
   return ACTOR.test(s);
 }
 
-/** An ISO 8601 datetime with an explicit offset, as OKF §5 requires. */
+/** An ISO 8601 datetime with an explicit offset, as timestamps require. */
 export function hasOffset(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}T/.test(s) && OFFSET.test(s);
 }
@@ -27,7 +27,7 @@ function atOrAfter(a: string, b: string): boolean {
 }
 
 /**
- * Trust tier (OKF §5.3, with the spec's lapse rule): human-reviewed only while the latest `human:`
+ * Trust tier (with the lapse rule): human-reviewed only while the latest `human:`
  * verification is at or after `generated.at`; machine-confirmed when any other verification exists.
  */
 export function trustTier(generated: JsonObject | null, verified: Verification[]): TrustTier {
@@ -41,13 +41,13 @@ export function trustTier(generated: JsonObject | null, verified: Verification[]
   return verified.some((v) => !v.by.startsWith("human:")) ? "machine-confirmed" : "unverified";
 }
 
-/** A concept is stale when `now >= stale_after` (OKF §5.5). */
+/** A page is stale when `now >= stale_after`. */
 export function isStale(staleAfter: Json | undefined, now = Date.now()): boolean {
   const t = staleTime(staleAfter);
   return t !== null && now >= t;
 }
 
-/** How far ahead of `stale_after` a concept is stale soon (TEMPRA-63). */
+/** How far ahead of `stale_after` a page is stale soon (TEMPRA-63). */
 export const STALE_SOON_DAYS = 14;
 export const STALE_SOON_MS = STALE_SOON_DAYS * 86_400_000;
 
@@ -61,7 +61,7 @@ export function staleTime(staleAfter: Json | undefined): number | null {
 export type Staleness = "stale" | "stale_soon";
 
 /**
- * Where a concept stands against its clock: stale once `stale_after` has passed, stale soon within
+ * Where a page stands against its clock: stale once `stale_after` has passed, stale soon within
  * STALE_SOON_DAYS of it. Only `stale_after` and the time decide it; no other write moves it.
  */
 export function staleness(staleAfter: Json | undefined, now = Date.now()): Staleness | null {
@@ -71,12 +71,12 @@ export function staleness(staleAfter: Json | undefined, now = Date.now()): Stale
   return now + STALE_SOON_MS >= t ? "stale_soon" : null;
 }
 
-/** Absent status is `stable` (OKF §5.4). */
+/** Absent status is `stable`. */
 export function effectiveStatus(status: Json | undefined): string {
   return typeof status === "string" && status !== "" ? status : "stable";
 }
 
-/** Normalizes a `verified` value: a bare mapping is a one-element list (OKF §5.2). */
+/** Normalizes a `verified` value: a bare mapping is a one-element list. */
 export function normalizeVerified(value: Json | undefined): Verification[] {
   if (value === undefined || value === null) return [];
   const list = Array.isArray(value) ? value : [value];

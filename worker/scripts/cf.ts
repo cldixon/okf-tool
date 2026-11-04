@@ -213,7 +213,7 @@ export async function cf(args: string[], opts: CfOptions = {}): Promise<string> 
   const timeout = opts.timeoutMs ?? (opts.local ? 20_000 : 120_000);
   const attempts = 3;
   for (let attempt = 1; ; attempt++) {
-    const dir = mkdtempSync(join(tmpdir(), "okf-cf-"));
+    const dir = mkdtempSync(join(tmpdir(), "tempra-cf-"));
     const outFile = join(dir, "out");
     const errFile = join(dir, "err");
     try {
