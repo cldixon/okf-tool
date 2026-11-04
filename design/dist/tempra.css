@@ -3896,6 +3896,34 @@ ul.events {
   border-bottom: 1px solid var(--tempra-color-border);
 }
 
+/* Beside the text (960px of page and up), a panel floats in its column as a card (TEMPRA-283;
+   tempra-dev: app/workspace, A panel floats): as tall as what it holds, up to the window, where
+   it scrolls inside; kept near the top, a hairline and the soft shadow round it, no rule down the
+   page and none under its head. The column keeps its width, so the text never moves. Narrower,
+   it overlays the page and on a phone it is the sheet, as before (the rules further down). */
+@container page (width >= 960px) {
+  .concept-side > .concept-panel {
+    top: var(--tempra-space-16);
+    height: auto;
+    max-height: calc(100dvh - var(--tempra-size-topbar) - 2 * var(--tempra-space-16));
+    margin: var(--tempra-space-16) var(--tempra-space-16) 0 0;
+    overflow: hidden;
+    border: 1px solid var(--tempra-color-border);
+    border-radius: var(--tempra-radius-card);
+    box-shadow: var(--tempra-shadow);
+  }
+
+  .concept-side > .concept-panel .panel-head {
+    padding: 0 var(--tempra-space-08) 0 var(--tempra-space-16);
+    border-bottom: 0;
+  }
+
+  /* A little room at its top, so a focus ring there is not cut by the scroller. */
+  .concept-side > .concept-panel .panel-body {
+    padding: var(--tempra-space-04) var(--tempra-space-16) var(--tempra-space-16);
+  }
+}
+
 .panel-head h2 {
   margin: 0;
   font-size: var(--tempra-text-ui);
@@ -4407,15 +4435,13 @@ ul.events {
     justify-self: end;
   }
 
+  /* Back in the column: the floating card above (TEMPRA-283) takes its top, height and shadow. */
   .concept.panel-open .concept-panel {
     position: sticky;
-    top: 0;
     right: auto;
     bottom: auto;
     z-index: auto;
     width: auto;
-    height: calc(100dvh - var(--tempra-size-topbar));
-    box-shadow: none;
   }
 }
 
@@ -4858,6 +4884,31 @@ ul.events {
 /* The active thread's card is drawn in ink, as its quote's highlight is filled. */
 section.thread.open {
   border-color: var(--tempra-color-text);
+}
+
+/* In the floating card beside the text (TEMPRA-283) the threads are not boxes in a box: the
+   active one (and a draft) is open in place, and a compact one is a row across the card under a
+   hairline. The overlay and the phone's sheet keep the cards above. */
+@container page (width >= 960px) {
+  .concept-side .comments-list .thread.open {
+    padding: var(--tempra-space-08) 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .concept-side .comments-list .thread.collapsed {
+    width: auto;
+    margin: 0 calc(-1 * var(--tempra-space-16));
+    padding: var(--tempra-space-12) var(--tempra-space-16);
+    border: 0;
+    border-top: 1px solid var(--tempra-color-border);
+    border-radius: 0;
+  }
+
+  /* Edge to edge in a scroller, so its ring sits just inside it. */
+  .concept-side .comments-list .thread.collapsed:focus-visible {
+    outline-offset: calc(-1 * var(--tempra-focus-offset));
+  }
 }
 
 /* On a phone, a compact thread is a touch target. */
