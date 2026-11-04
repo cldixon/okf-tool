@@ -27,21 +27,29 @@
      a stylesheet never does (design.test.ts), so a theme changes which primitive a role points at,
      here, and nothing else. The palette (TEMPRA-1, "Graphite"): one neutral grey ramp, barely
      cool (OKLCH chroma 0.004, hue 286), serves both schemes; orange is the agent's and nothing
-     else's; the focus ring is the chart's blue, seen only on keyboard focus. */
+     else's; the focus ring is the chart's blue, seen only on keyboard focus. Five greys come from
+     Linear's docs (TEMPRA-277, drawn in Paper first): the light ground (980), the text (285) and
+     the dark hairline (264), a touch bluer than the ramp; and the two muted greys (515, 691),
+     Linear's own nudged in OKLCH to clear 4.5:1 on the hover and selected fills. */
   --tempra-white: #ffffff;
 
   /* Palette: greys, one ramp for light and dark */
+  --tempra-grey-980: #f9f8f9;
   --tempra-grey-974: #f6f6f9;
   --tempra-grey-956: #f0f0f3;
   --tempra-grey-929: #e7e7ea;
   --tempra-grey-901: #dedee0;
   --tempra-grey-871: #d4d4d7;
   --tempra-grey-720: #a4a4a7;
+  --tempra-grey-691: #989ca4;
   --tempra-grey-601: #808082;
+  --tempra-grey-515: #67666e;
   --tempra-grey-500: #636365;
   --tempra-grey-380: #424244;
   --tempra-grey-321: #323335;
+  --tempra-grey-285: #282a2f;
   --tempra-grey-269: #262628;
+  --tempra-grey-264: #23252a;
   --tempra-grey-232: #1d1d1f;
   --tempra-grey-201: #161618;
   --tempra-grey-169: #0f0f11;
@@ -76,11 +84,11 @@
   /* Color: surfaces */
   --tempra-color-bg: light-dark(
     var(--tempra-white),
-    var(--tempra-grey-232)
+    var(--tempra-grey-141)
   ); /* the page, panels, pills */
   --tempra-color-ground: light-dark(
-    var(--tempra-grey-974),
-    var(--tempra-grey-201)
+    var(--tempra-grey-980),
+    var(--tempra-grey-232)
   ); /* the page under them, inset fills */
   --tempra-color-hover: light-dark(var(--tempra-grey-956), var(--tempra-grey-269));
   --tempra-color-selected: light-dark(var(--tempra-grey-929), var(--tempra-grey-321));
@@ -89,12 +97,12 @@
   /* Color: text, in three steps. Text people read is text or muted, at least 4.5:1 on every
      surface in light and dark (TEMPRA-132; design/contrast.test.ts). Faint is under that: icons,
      rules and disabled controls only, never words. */
-  --tempra-color-text: light-dark(var(--tempra-grey-201), var(--tempra-grey-956));
-  --tempra-color-muted: light-dark(var(--tempra-grey-500), var(--tempra-grey-720));
+  --tempra-color-text: light-dark(var(--tempra-grey-285), var(--tempra-grey-974));
+  --tempra-color-muted: light-dark(var(--tempra-grey-515), var(--tempra-grey-691));
   --tempra-color-faint: light-dark(var(--tempra-grey-720), var(--tempra-grey-500));
 
   /* Color: lines */
-  --tempra-color-border: light-dark(var(--tempra-grey-929), var(--tempra-grey-321));
+  --tempra-color-border: light-dark(var(--tempra-grey-929), var(--tempra-grey-264));
   --tempra-color-border-strong: light-dark(var(--tempra-grey-871), var(--tempra-grey-380));
 
   /* Focus: a 2px ring in the focus colour on every control focused by keyboard (:focus-visible),
@@ -157,7 +165,7 @@
   --tempra-color-scrim: light-dark(rgb(20 20 22 / 0.2), rgb(0 0 0 / 0.5));
 
   /* Color: the dark frame an attachment is shown on (take 4, board 28), and a mark on it */
-  --tempra-color-frame: light-dark(var(--tempra-grey-169), var(--tempra-grey-141));
+  --tempra-color-frame: light-dark(var(--tempra-grey-169), var(--tempra-grey-232));
   --tempra-color-frame-ink: light-dark(var(--tempra-grey-601), var(--tempra-grey-601));
 
   /* Color: links are text, underlined in running text (no colour until the palette) */
