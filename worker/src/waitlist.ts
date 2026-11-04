@@ -1,14 +1,15 @@
 import type { Hono } from "hono";
 import type { Deps } from "./app";
-import { mailKey } from "./mail-queue";
 import { esc, messagePage } from "./oauth/pages";
+import { sendInvitation } from "./operator";
 import { fromThisSite } from "./origin";
 import { html, operatorEmail, signedIn } from "./signin";
 
 /**
  * The operator's review of the waitlist (v2 spec: Accounts and sign-in, The waitlist): who asked
  * to join, with Approve and Dismiss. Only the session whose email is OPERATOR_EMAIL sees it;
- * everyone else gets 404. A server page, like sign-in: it works with no script.
+ * everyone else gets 404. A server page, like sign-in: it works with no script. Where the
+ * deployment has the operator's portal (ADMIN_ORIGIN, TEMPRA-278), it sends the operator there.
  */
 
 type AppEnv = { Bindings: Cloudflare.Env };
@@ -62,6 +63,8 @@ export function registerWaitlistRoutes<E extends AppEnv>(
     const user = await signedIn(c.req.raw, d);
     if (user instanceof Response) return user;
     if (user.email !== operatorEmail(c.env)) return notFound();
+    const portal = (c.env as { ADMIN_ORIGIN?: string }).ADMIN_ORIGIN;
+    if (portal) return c.redirect(`${portal}/`, 302);
     const outcome = OUTCOMES[c.req.query("done") ?? ""];
     const email = c.req.query("email") ?? "";
     return reviewPage(await d.accounts.waitlist(), outcome && email ? outcome(email) : undefined);
@@ -82,26 +85,9 @@ export function registerWaitlistRoutes<E extends AppEnv>(
     const decided = await d.accounts.decideWaitlist(email, decision);
     let done: keyof typeof OUTCOMES = decided ? "dismissed" : "missing";
     if (decided && decision === "invited") {
-      done = "approved";
-      if (d.outbox) {
-        const origin = new URL(c.req.url).origin;
-        try {
-          // Queued (TEMPRA-89): the operator is not waiting on it, and a retry should reach them.
-          await d.outbox.send({
-            key: mailKey("waitlist-in", email, new Date().toISOString().slice(0, 10)),
-            kind: "waitlist",
-            account: email,
-            to: email,
-            subject: "You're in: Tempra",
-            text: `You asked to join Tempra, and you're in.\n\nSign in with this email at ${origin}/sign-in\n`,
-          });
-        } catch (e) {
-          console.error(JSON.stringify({ mail_not_queued: "waitlist approval", error: String(e) }));
-          done = "mail_failed";
-        }
-      } else {
-        done = "no_mail";
-      }
+      // Queued (TEMPRA-89): the operator is not waiting on it, and a retry should reach them.
+      const mailed = await sendInvitation(d, email, new URL(c.req.url).origin, { asked: true });
+      done = mailed === "sent" ? "approved" : mailed;
     }
     const q = new URLSearchParams({ done, email });
     return c.redirect(`/waitlist?${q}`, 303);

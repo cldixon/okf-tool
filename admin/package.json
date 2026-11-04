@@ -1,0 +1,23 @@
+{
+  "name": "@tempra/admin",
+  "private": true,
+  "type": "module",
+  "description": "The operator's portal, tempra-admin on admin.tempra.dev (TEMPRA-278): who has access, invite by email, activity. Behind Cloudflare Access; calls the app's Worker through its Operator entrypoint.",
+  "scripts": {
+    "build": "bun build.ts",
+    "dev": "bun build.ts && cf dev",
+    "deploy": "bun build.ts && bun scripts/deploy.ts",
+    "typecheck": "bun build.ts && cf workers types -q && tsc --noEmit && tsc --noEmit -p test",
+    "test": "bun build.ts && bun test"
+  },
+  "dependencies": {
+    "@tempra/design": "workspace:*",
+    "hono": "^4.13.9"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "cf": "1.0.0-beta.9",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.142.0"
+  }
+}
