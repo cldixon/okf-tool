@@ -25,12 +25,13 @@ import { cloudflareApi, ensureAccess } from "./access";
  * The sign-in page, made Tempra's (TEMPRA-282): the design package's light colours (the page's
  * background and text) and the Tempra mark, served by the app at tempra.dev, a host Access does
  * not cover. Access keeps these on the account's organization, so staging's portal and
- * production's share them; the team subdomain is renamed to `tempra` (tempra.cloudflareaccess.com)
- * when it is free.
+ * production's share them; the team subdomain is renamed to `tempra-admin`
+ * (tempra-admin.cloudflareaccess.com) when it is free.
  */
 const BRAND = {
   name: "Tempra",
-  team: "tempra",
+  // `tempra` is another account's (409 auth_domain_not_available, 2026-11-04).
+  team: "tempra-admin",
   background: brand.light.bg,
   text: brand.light.text,
   logo: `https://tempra.dev${markPath}`,
