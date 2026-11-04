@@ -208,6 +208,25 @@ describe("the sign-in page made Tempra's (TEMPRA-282)", () => {
     expect(f.writes.length).toBe(before);
   });
 
+  test("a design Access returns in another order is not sent again", async () => {
+    const f = fakeAccess({
+      org: {
+        name: "Tempra",
+        auth_domain: "tempra.cloudflareaccess.com",
+        // Access's own order, not ours (seen 2026-11-04).
+        login_design: {
+          background_color: "#ffffff",
+          logo_path: "https://tempra.dev/mark.svg",
+          text_color: "#282a2f",
+          footer_text: "For Tempra's operator only.",
+        },
+      },
+    });
+    const got = await ensureAccess(f.api, BRANDED);
+    expect(f.writes.some(([, p]) => p === "/access/organizations")).toBe(false);
+    expect(got.changes.some((c) => c.includes("brand"))).toBe(false);
+  });
+
   test("a taken team name keeps the current one, says so, and still brands the page", async () => {
     const f = fakeAccess({ taken: ["tempra.cloudflareaccess.com"] });
     const got = await ensureAccess(f.api, BRANDED);

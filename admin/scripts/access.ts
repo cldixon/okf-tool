@@ -89,6 +89,13 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 const ACCESS_DOMAIN = ".cloudflareaccess.com";
 
+/** Two flat records with the same fields and values, whatever order Access returns them in. */
+function sameFields(a: object, b: object): boolean {
+  const sorted = (o: object) =>
+    JSON.stringify(Object.entries(o).sort(([x], [y]) => (x < y ? -1 : 1)));
+  return sorted(a) === sorted(b);
+}
+
 /** The login design's fields, with the empty ones left out (Access stores them unset). */
 function designOf(brand: Brand): Record<string, string> {
   const all = {
@@ -123,7 +130,7 @@ async function ensureBrand(
   const current = String(org.auth_domain ?? "");
   const wantDomain = `${brand.team}${ACCESS_DOMAIN}`;
   const design = designOf(brand);
-  const restyle = org.name !== brand.name || !same(org.login_design ?? {}, design);
+  const restyle = org.name !== brand.name || !sameFields(org.login_design ?? {}, design);
   const rename = current !== wantDomain;
   if (restyle) {
     changes.push(`brand the sign-in page as "${brand.name}"`);
