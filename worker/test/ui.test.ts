@@ -138,6 +138,11 @@ describe("the app's pages (TEMPRA-9)", () => {
       expect(block).toContain("X-Content-Type-Options: nosniff");
     }
     expect(readFileSync(join(PUBLIC, "favicon.svg"), "utf8")).toStartWith("<svg");
+    // The Tempra mark, for Access's sign-in page (TEMPRA-282), the design package's own.
+    expect(readFileSync(join(PUBLIC, "mark.svg"), "utf8")).toBe(
+      readFileSync(Bun.resolveSync("@tempra/design/mark.svg", import.meta.dir), "utf8"),
+    );
+    expect(headers).toContain("/mark.svg\n  Cache-Control: public, max-age=86400");
   });
 
   test("the Worker's config serves the app's dist/public/ as its assets", async () => {

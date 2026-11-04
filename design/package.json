@@ -10,6 +10,8 @@
     "./tempra.css": "./dist/tempra.css",
     "./pele": "./dist/pele.ts",
     "./panel": "./dist/panel.ts",
+    "./brand": "./dist/brand.ts",
+    "./mark.svg": "./dist/mark.svg",
     "./components": "./src/components/index.ts",
     "./mark": "./src/components/mark.ts",
     "./fonts/*": "./fonts/*",
