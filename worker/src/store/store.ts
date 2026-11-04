@@ -3065,9 +3065,15 @@ export class LibraryStore {
     return lint;
   }
 
-  private renderEntry(snap: View, e: Entry, computed: boolean, unstamped = false): string {
+  private renderEntry(
+    snap: View,
+    e: Entry,
+    computed: boolean,
+    unstamped = false,
+    okf = false,
+  ): string {
     const stored = this.record(e.hash);
-    const r = unstamped ? { ...stored, generated: null } : stored;
+    const r = okfTyped(unstamped ? { ...stored, generated: null } : stored, okf);
     const verified = this.verifiedAt(e.page_id, snap.seq);
     return renderPage(r, {
       verified,
@@ -4113,9 +4119,7 @@ export class LibraryStore {
     for (const e of snap.sorted()) {
       for (let d = dirname(e.path); d !== ""; d = dirname(d)) dirs.add(d);
       if (e.kind === "page") {
-        const text = this.renderEntry(snap, e, false);
-        const typed = !okf || typeof field(this.record(e.hash), "type") === "string";
-        files.push({ path: e.path, text: typed ? text : withOkfType(text) });
+        files.push({ path: e.path, text: this.renderEntry(snap, e, false, false, okf) });
       } else {
         const info = this.blobInfo(e.hash);
         const { location: _, dims: __, ...blob } = info;
@@ -5804,17 +5808,25 @@ export type DownloadPayload =
   | { k: "export"; at: number; name?: string; format?: ExportFormat };
 
 /** An export's shape: the files as they are, or a bundle that conforms to Google's OKF. */
-export type ExportFormat = "plain" | "okf";
-export const EXPORT_FORMATS: readonly ExportFormat[] = ["plain", "okf"];
+export const EXPORT_FORMATS = ["plain", "okf"] as const;
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
-/** The type OKF requires, on a page that has none (rendered markdown, frontmatter first). */
+/** The type OKF requires, on a page that has none. */
 export const OKF_DEFAULT_TYPE = "Page";
 
-/** A page's rendered markdown with `type: Page` first in its frontmatter, for an OKF export. */
-export function withOkfType(markdown: string): string {
-  return markdown.startsWith("---\n")
-    ? `---\ntype: ${OKF_DEFAULT_TYPE}\n${markdown.slice(4)}`
-    : `---\ntype: ${OKF_DEFAULT_TYPE}\n---\n${markdown}`;
+/**
+ * A record as an OKF export writes it: a page whose `type` is missing, empty or not a string
+ * (writes no longer check it) gets `type: Page` in its place, so the bundle has exactly one,
+ * non-empty `type` on every page. Unchanged when `okf` is false or the type is usable.
+ */
+export function okfTyped(r: PageRecord, okf: boolean): PageRecord {
+  if (!okf) return r;
+  const t = field(r, "type");
+  if (typeof t === "string" && t.trim() !== "") return r;
+  return {
+    ...r,
+    fm: [["type", OKF_DEFAULT_TYPE], ...r.fm.filter(([k]) => k !== "type")],
+  };
 }
 
 /** What one run of the structure process found: flags now set, and what was newly flagged. */

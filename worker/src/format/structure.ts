@@ -140,7 +140,9 @@ export function checkStructure(
   for (const e of entries) {
     if (e.kind !== "page") continue;
     const dir = dirname(e.path);
-    tree.set(dir, [...(tree.get(dir) ?? []), e]);
+    const pages = tree.get(dir);
+    if (pages) pages.push(e);
+    else tree.set(dir, [e]);
   }
 
   for (const [dir, pages] of tree) {

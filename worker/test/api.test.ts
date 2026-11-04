@@ -313,6 +313,7 @@ describe("import and export round-trip the sample bundles (through the API)", ()
           .sort(),
       );
       expect((await req("/export?format=tar")).status).toBe(400);
+      expect((await req("/pages?type=Metric")).status).toBe(400);
     });
   }
 });

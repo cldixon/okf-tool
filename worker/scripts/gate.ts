@@ -783,13 +783,23 @@ async function browserRenders(
       if ((await main.getByRole("heading", { level: 2, name: "Sections" }).count()) > 0) {
         throw new Error("the home still lists sections");
       }
-      // No agents' housekeeping, though the work queue has some (TEMPRA-144): it is theirs.
+      // No agents' housekeeping, though the work queue has some (TEMPRA-144): it is theirs. The
+      // sample bundles leave none since the pages-not-okf checks, so an agent leaves a page
+      // with a link to nowhere for the length of this step.
+      const auth = { Authorization: `Bearer ${token}` };
+      const chore = `${base}/api/v1/libraries/${owner}/${slug}/files/gate-housekeeping.md`;
+      const put = await fetch(chore, {
+        method: "PUT",
+        headers: { ...auth, "Content-Type": "text/markdown", "X-Note": "gate: housekeeping" },
+        body: "---\ntitle: Gate housekeeping\ndescription: Links nowhere.\n---\nSee [gone](/gate-gone.md).\n",
+      });
+      if (!put.ok) throw new Error(`write gate-housekeeping.md: ${put.status}`);
+      await page.reload();
+      await main.locator(".home-section").first().waitFor({ timeout: 15_000 });
       const work = (await (
-        await fetch(`${base}/api/v1/libraries/${owner}/${slug}/work`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        await fetch(`${base}/api/v1/libraries/${owner}/${slug}/work`, { headers: auth })
       ).json()) as { total: number };
-      if (work.total === 0) throw new Error("the bundle left the agents nothing to do");
+      if (work.total === 0) throw new Error("the agents have nothing to do");
       if ((await main.getByText(/housekeeping|for agents/i).count()) > 0) {
         throw new Error("the home shows the agents' housekeeping");
       }
@@ -799,6 +809,13 @@ async function browserRenders(
       // Its old address lands here.
       await page.goto(`${base}/${owner}/${slug}/-/work?kind=lint`);
       await page.waitForURL(`${base}/${owner}/${slug}/`);
+      const now = await fetch(chore, { headers: auth });
+      await now.arrayBuffer();
+      const gone = await fetch(chore, {
+        method: "DELETE",
+        headers: { ...auth, "If-Match": now.headers.get("ETag") ?? "", "X-Note": "gate: tidy" },
+      });
+      if (!gone.ok) throw new Error(`delete gate-housekeeping.md: ${gone.status}`);
       await home();
       if (shots) await page.screenshot({ path: `${shots}/home.png` });
     });
@@ -5085,8 +5102,13 @@ async function nightlyExport(owner: string, slug: string, originals: number): Pr
   const tar = await ui(`${lib}/-/exports/${date}/bundle.tar`);
   if (!tar.ok) return [`nightly bundle.tar: ${tar.status}`];
   const files = readTar(new Uint8Array(await tar.arrayBuffer()));
-  // The originals' own index.md and log.md are replaced by synthesized ones, so at least as many.
-  if (files.length < originals) return [`nightly bundle has ${files.length} files`];
+  // A nightly folder is the plain format: the pages and attachments, no index.md or log.md.
+  if (files.length !== originals) {
+    return [`nightly bundle has ${files.length} files, not ${originals}`];
+  }
+  if (files.some((f) => /(^|\/)(index|log)\.md$/.test(f.path))) {
+    return ["nightly bundle holds a synthesized index.md or log.md"];
+  }
   const ledger = await ui(`${lib}/-/exports/${date}/ledger.jsonl`);
   if (!ledger.ok || !(await ledger.text()).includes('"t":"event"')) {
     return [`nightly ledger.jsonl: ${ledger.status}`];
@@ -5725,12 +5747,18 @@ try {
     if (!imp.ok) throw new Error(`import ${t.bundle}: ${imp.status} ${await imp.text()}`);
     const res = (await imp.json()) as { files: number; seq: number; warnings: unknown[] };
 
-    const exp = await fetch(`${lib}/export`, { headers });
+    // An OKF bundle in, an OKF bundle out: every file back, and the synthesized index.md files.
+    const exp = await fetch(`${lib}/export?format=okf`, { headers });
     if (!exp.ok) throw new Error(`export ${t.bundle}: ${exp.status} ${await exp.text()}`);
     const exported = new Map(
       readTar(new Uint8Array(await exp.arrayBuffer())).map((f) => [f.path, f.bytes]),
     );
     const problems = compareBundle(original, exported);
+    for (const f of original) {
+      if (/(^|\/)index\.md$/.test(f.path) && !exported.has(f.path)) {
+        problems.push(`${f.path}: missing from the OKF export`);
+      }
+    }
     const pagePaths = original.filter(
       (f) => f.path.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(f.path),
     ).length;
@@ -5762,7 +5790,11 @@ try {
       for (const p of browser) console.log(`  - ${p}`);
       if (browser.length > 0) failed = true;
     }
-    const exportProblems = await nightlyExport(t.owner, t.slug, original.length);
+    const exportProblems = await nightlyExport(
+      t.owner,
+      t.slug,
+      original.filter((f) => !/(^|\/)(index|log)\.md$/.test(f.path)).length,
+    );
     console.log(
       `${exportProblems.length === 0 ? "PASS" : "FAIL"} ${t.bundle}: nightly export to R2 via the Durable Object`,
     );

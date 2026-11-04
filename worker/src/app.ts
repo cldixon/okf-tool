@@ -716,8 +716,15 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // file's path, kind, title and sequence, no bodies or other frontmatter.
   app.get(`${BASE}/outline`, async (c) => c.json(await c.var.lib.outline({ at: num(c, "at") })));
 
-  app.get(`${BASE}/pages`, async (c) =>
-    c.json(
+  app.get(`${BASE}/pages`, async (c) => {
+    if (c.req.query("type") !== undefined) {
+      throw new StoreError(
+        400,
+        "bad_param",
+        "`type` is not a filter: pages have no special type. Filter by `tag` or `prefix`.",
+      );
+    }
+    return c.json(
       await c.var.lib.pages({
         tag: c.req.query("tag"),
         status: c.req.query("status"),
@@ -732,8 +739,8 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
         min_reads: num(c, "min_reads"),
         max_reads: num(c, "max_reads"),
       }),
-    ),
-  );
+    );
+  });
 
   app.get(`${BASE}/search`, async (c) =>
     c.json(

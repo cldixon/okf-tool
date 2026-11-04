@@ -354,6 +354,30 @@ describe("queries", () => {
       '---\nokf_version: "0.2"\n---\n\n# Subdirectories\n\n* [m](m/index.md) - 2 concepts\n* [t](t/index.md) - 1 concept\n',
     );
     expect(s.index("t")).toBe("# Pages\n\n* [orders](orders.md) - One row per order.\n");
+    // An OKF export gives every page exactly one non-empty type, as OKF requires.
+    s.apply(ctx(), [
+      { op: "write", path: "u/none.md", content: "---\ntitle: None\ndescription: N.\n---\nx\n" },
+      {
+        op: "write",
+        path: "u/empty.md",
+        content: '---\ntype: ""\ntitle: E\ndescription: E.\n---\nx\n',
+      },
+      {
+        op: "write",
+        path: "u/num.md",
+        content: "---\ntype: 3\ntitle: N\ndescription: N.\n---\nx\n",
+      },
+    ]);
+    const okf = new Map(s.exportBundle(undefined, "okf").files.map((f) => [f.path, f.text ?? ""]));
+    for (const p of ["u/none.md", "u/empty.md", "u/num.md"]) {
+      const text = okf.get(p) ?? "";
+      expect(text.match(/^type:/gm)).toEqual(["type:"]);
+      expect(text).toStartWith("---\ntype: Page\n");
+    }
+    expect(okf.get("m/rev.md")).toContain("type: Metric");
+    const plain = new Map(s.exportBundle().files.map((f) => [f.path, f.text ?? ""]));
+    expect(plain.get("u/none.md")).not.toContain("type:");
+    expect(plain.has("u/index.md")).toBe(false);
     expect(errorOf(() => s.index("nope")).status).toBe(404);
   });
 });

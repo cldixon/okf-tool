@@ -8,7 +8,7 @@ description: Read and maintain a Tempra library (folders of markdown pages kept 
 ## What a library is
 
 - A library is a tree of folders of markdown **pages**, each starting with YAML frontmatter, plus attachments (images, video, audio, PDFs, data files).
-- A page's frontmatter holds its `title` and a one-line `description`, and whatever else the page needs: `tags`, `sources`, `status`, `stale_after`, `resource` (the URI of what the page describes), a `type` naming what kind of page it is where the library has several of a kind (Decision, Dataset), or fields of your own.
+- A page's frontmatter holds its `title` and a one-line `description`, and whatever else the page needs: `tags`, `sources`, `status`, `stale_after`, `resource` (the URI of what the page describes), or fields of your own. `tags` let `query` find pages of a kind.
 - A library may say how it likes to be written in a `guide.md` at its root. Read it first when there is one, and follow it.
 - Pages link to each other with ordinary markdown links. Absolute links (`/tables/orders.md`) are preferred.
 - `sources` lists what a page was derived from: each entry is `id`, `title` and `resource` (a URL, or a path in this library); `url` is taken as `resource`. Individual claims cite a source with a footnote whose label is a `sources[].id`: `…is sharded daily.[^ga4-schema]`. A `resource` inside the library (`/policies/margin-standard.md`) is tracked like a link: it follows moves and is flagged when missing.

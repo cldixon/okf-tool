@@ -302,7 +302,7 @@ describe("MCP server", () => {
     });
 
     expect((await call("search", { q: "alpha" })).text).toContain("x.md — X");
-    expect((await call("query", { type: "Memo" })).text).toContain("2 matching pages");
+    expect((await call("query", {})).text).toContain("2 matching pages");
     expect(JSON.parse((await call("links", { path: "y.md" })).text).inbound[0].path).toBe("x.md");
     const log = (await call("log")).text;
     expect(log.split("\n")[0]).toContain("claude-code/test · delta");
@@ -343,6 +343,10 @@ describe("MCP server", () => {
       .map((f) => f.path)
       .sort();
     expect(paths).toEqual(["a.md", "refs/data.bin"]);
+    // `type` is not a filter: asking for one is refused, not quietly ignored.
+    const typed = await call("query", { type: "Note" });
+    expect(typed.isError).toBe(true);
+    expect(typed.text).toContain("not a filter");
     // An OKF bundle adds each directory's index.md and the log.
     const okf = (await call("export", { format: "okf" })).text;
     expect(okf).toContain("OKF bundle at seq");

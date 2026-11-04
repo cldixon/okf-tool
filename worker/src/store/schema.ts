@@ -251,8 +251,8 @@ const RENAMED_INDEXES: [string, string][] = [
 /**
  * Version 1 to 2, in the caller's transaction: `concept_id` columns become `page_id`, the
  * `concepts` table becomes `pages` without `type` (a page's `type`, where it has one, stays in
- * its frontmatter and its `extra`), paths of kind `concept` become `page`, the search index is
- * rebuilt under the new column, and lint the server no longer reports is dropped. Structure flags
+ * its frontmatter, in the record its markdown is rendered from), paths of kind `concept` become
+ * `page`, the search index is rebuilt under the new column, and lint the server no longer reports is dropped. Structure flags
  * are rebuilt by the store when it opens (the `structure` marker is cleared). Tables a later
  * upgrade adds (`fts_rows`, `last_read`, a column such as `stale_ms`) may be missing in an old
  * library; those upgrades run after this one, with the new names.
