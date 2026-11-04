@@ -17,6 +17,8 @@ function fakeAccess(
     org?: Record<string, unknown>;
     /** Team domains someone else holds: renaming to one fails. */
     taken?: string[];
+    /** Access refuses any change to the login design. */
+    refuseDesign?: boolean;
   } = {},
 ) {
   const state = {
@@ -40,8 +42,13 @@ function fakeAccess(
     const b = body as Record<string, unknown>;
     if (path === "/access/organizations") {
       if (method === "GET") return { ...state.org };
+      // Access's update replaces the record; only a PATCH of what changes is safe (TEMPRA-282).
+      if (method !== "PATCH")
+        throw new Error("PUT /access/organizations: 400 12062 invalid_org_config.");
       if ((start.taken ?? []).includes(String(b.auth_domain)))
-        throw new Error("PUT /access/organizations: 400 12130 auth_domain is already in use.");
+        throw new Error("PATCH /access/organizations: 400 12130 auth_domain is already in use.");
+      if (start.refuseDesign && "login_design" in b)
+        throw new Error("PATCH /access/organizations: 400 12062 invalid_org_config.");
       state.org = { ...state.org, ...b };
       return { ...state.org };
     }
@@ -151,36 +158,44 @@ describe("the sign-in page made Tempra's (TEMPRA-282)", () => {
   };
   const BRANDED = { ...WANT, title: "Tempra admin", brand: BRAND };
 
-  test("the organization is named, renamed and styled, keeping its other settings", async () => {
-    const f = fakeAccess({
-      org: {
-        deny_unmatched_requests: true,
-        service_token_inactivity: { enabled: false, inactivity_threshold_days: null, action: null },
-        ui_read_only_toggle_reason: null,
-      },
-    });
+  test("the organization is named and styled, then renamed, each by a PATCH of only that", async () => {
+    const f = fakeAccess({ org: { deny_unmatched_requests: true } });
     const got = await ensureAccess(f.api, BRANDED);
     expect(got.team).toBe("tempra.cloudflareaccess.com");
     expect(got.warnings).toEqual([]);
-    const [method, path, body] = f.writes[0] ?? [];
-    expect(`${method} ${path}`).toBe("PUT /access/organizations");
-    expect(body).toEqual({
-      auth_domain: "tempra.cloudflareaccess.com",
-      name: "Tempra",
-      login_design: {
-        background_color: "#ffffff",
-        text_color: "#282a2f",
-        logo_path: "https://tempra.dev/mark.svg",
-        header_text: "",
-        footer_text: "For Tempra's operator only.",
-      },
-      allow_authenticate_via_warp: false,
-      // Kept as the account has it, without its nulls; read-only fields are not sent back.
-      deny_unmatched_requests: true,
-      service_token_inactivity: { enabled: false },
-    });
+    const org = f.writes.filter(([, p]) => p === "/access/organizations");
+    expect(org).toEqual([
+      [
+        "PATCH",
+        "/access/organizations",
+        {
+          name: "Tempra",
+          // An empty header is left out, not sent as "".
+          login_design: {
+            background_color: "#ffffff",
+            text_color: "#282a2f",
+            logo_path: "https://tempra.dev/mark.svg",
+            footer_text: "For Tempra's operator only.",
+          },
+        },
+      ],
+      ["PATCH", "/access/organizations", { auth_domain: "tempra.cloudflareaccess.com" }],
+    ]);
+    // Settings it does not manage are never sent, so they stay as they were.
+    expect(f.state.org.deny_unmatched_requests).toBe(true);
     // The application is named for the sign-in page.
     expect(f.state.apps[0]).toMatchObject({ name: "Tempra admin", domain: "admin.tempra.dev" });
+  });
+
+  test("a refused design is a warning: the login, policy and application are still ensured", async () => {
+    const f = fakeAccess({ refuseDesign: true });
+    const got = await ensureAccess(f.api, BRANDED);
+    expect(got.warnings[0]).toContain("the sign-in page could not be branded");
+    expect(got.warnings[0]).toContain("12062");
+    expect(got.team).toBe("tempra.cloudflareaccess.com");
+    expect(got.aud).toMatch(/^aud-app-/);
+    expect(f.state.apps).toHaveLength(1);
+    expect(f.state.policies).toHaveLength(1);
   });
 
   test("running again changes nothing", async () => {

@@ -9,7 +9,7 @@
  */
 
 export type Api = (
-  method: "GET" | "POST" | "PUT",
+  method: "GET" | "POST" | "PUT" | "PATCH",
   path: string,
   body?: unknown,
 ) => Promise<unknown>;
@@ -87,46 +87,31 @@ interface App {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-/**
- * The organization's settings an update may carry. Its update replaces the whole record, so every
- * one of these the account has is sent back as it is, and only the brand's fields change.
- */
-const ORG_FIELDS = [
-  "allow_authenticate_via_warp",
-  "auth_domain",
-  "auto_redirect_to_identity",
-  "custom_pages",
-  "deny_unmatched_requests",
-  "deny_unmatched_requests_exempted_zone_names",
-  "is_ui_read_only",
-  "ui_read_only_toggle_reason",
-  "login_design",
-  "mfa_config",
-  "mfa_required_for_all_apps",
-  "name",
-  "service_token_inactivity",
-  "session_duration",
-  "strict_service_token_auth",
-  "user_seat_expiration_inactive_time",
-  "warp_auth_non_browser_401",
-  "warp_auth_session_duration",
-] as const;
-
 const ACCESS_DOMAIN = ".cloudflareaccess.com";
 
-/** A setting as read, without its `null`s (unset fields an update may refuse to take back). */
-function withoutNulls(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withoutNulls);
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, v]) => v !== null)
-        .map(([k, v]) => [k, withoutNulls(v)]),
-    );
-  return value;
+/** The login design's fields, with the empty ones left out (Access stores them unset). */
+function designOf(brand: Brand): Record<string, string> {
+  const all = {
+    background_color: brand.background,
+    text_color: brand.text,
+    logo_path: brand.logo,
+    header_text: brand.header,
+    footer_text: brand.footer,
+  };
+  return Object.fromEntries(Object.entries(all).filter(([, v]) => v !== ""));
 }
 
-/** The sign-in page's look on the organization; returns the team domain in force after it. */
+const why = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/**
+ * The sign-in page's look on the organization; returns the team domain in force after it.
+ *
+ * Two PATCHes, each carrying only what it changes (as Cloudflare's own examples do): the name and
+ * login design, then the team subdomain. A PUT would replace the whole organization, and sending
+ * its other settings back as read was refused (`12062 invalid_org_config`, 2026-11-04). The look is
+ * cosmetic, so a refusal of either is a warning that names it, never a reason to stop the deploy:
+ * the login, the policy and the application, which keep the portal private, are ensured anyway.
+ */
 async function ensureBrand(
   api: Api,
   org: Record<string, unknown>,
@@ -137,44 +122,34 @@ async function ensureBrand(
 ): Promise<string> {
   const current = String(org.auth_domain ?? "");
   const wantDomain = `${brand.team}${ACCESS_DOMAIN}`;
-  const design = {
-    background_color: brand.background,
-    text_color: brand.text,
-    logo_path: brand.logo,
-    header_text: brand.header,
-    footer_text: brand.footer,
-  };
-  const rename = current !== wantDomain;
+  const design = designOf(brand);
   const restyle = org.name !== brand.name || !same(org.login_design ?? {}, design);
-  if (!rename && !restyle) return current;
-  const kept = Object.fromEntries(
-    ORG_FIELDS.filter((k) => k in org && org[k] !== null).map((k) => [k, withoutNulls(org[k])]),
-  );
-  const body = (domain: string) => ({
-    ...kept,
-    name: brand.name,
-    auth_domain: domain,
-    login_design: design,
-  });
-  if (restyle) changes.push(`brand the sign-in page as "${brand.name}"`);
-  if (rename) changes.push(`rename the team ${current} to ${wantDomain}`);
-  if (dryRun) return current;
-  if (!rename) {
-    await api("PUT", "/access/organizations", body(current));
-    return current;
+  const rename = current !== wantDomain;
+  if (restyle) {
+    changes.push(`brand the sign-in page as "${brand.name}"`);
+    if (!dryRun) {
+      try {
+        await api("PATCH", "/access/organizations", { name: brand.name, login_design: design });
+      } catch (e) {
+        changes.pop();
+        warnings.push(`the sign-in page could not be branded (${why(e)}); it stays as it was`);
+      }
+    }
   }
+  if (!rename) return current;
+  changes.push(`rename the team ${current} to ${wantDomain}`);
+  if (dryRun) return current;
   try {
-    const done = (await api("PUT", "/access/organizations", body(wantDomain))) as {
+    const done = (await api("PATCH", "/access/organizations", { auth_domain: wantDomain })) as {
       auth_domain?: string;
     };
     return done?.auth_domain || wantDomain;
   } catch (e) {
-    // Most likely the name is someone else's. Keep the team as it is and brand the page anyway.
+    // Most likely the name is someone else's. Keep the team as it is.
     changes.pop();
     warnings.push(
-      `the team could not be renamed to ${wantDomain} (${e instanceof Error ? e.message : e}); it stays ${current}`,
+      `the team could not be renamed to ${wantDomain} (${why(e)}); it stays ${current}`,
     );
-    if (restyle) await api("PUT", "/access/organizations", body(current));
     return current;
   }
 }
