@@ -1,13 +1,13 @@
 <script lang="ts">
   import { type Snippet, untrack } from "svelte";
   import { api, cache } from "./api";
-  import { isConceptPath } from "./concept/data";
   import FeedNotice from "./FeedNotice.svelte";
   import type { Place } from "./frame";
   import { inboxChanged } from "./inbox";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import { useFeed } from "./live.svelte.ts";
   import { useLoad } from "./load.svelte.ts";
+  import { isPagePath } from "./page/data";
   import { isShared, libraryLabel } from "./role";
   import { useLibrary } from "./role.svelte.ts";
   import Shell from "./Shell.svelte";
@@ -119,8 +119,8 @@
   const shared = $derived(library.current !== undefined && isShared(library.current));
 </script>
 
-<!-- The path of a concept being moved to, from the index, while the page on screen waits. -->
-{#snippet nextPath()}{#if place.file && isConceptPath(place.file)}<TopbarPath
+<!-- The path of a page being moved to, from the index, while the page on screen waits. -->
+{#snippet nextPath()}{#if place.file && isPagePath(place.file)}<TopbarPath
       path={place.file}
       title={index?.find((f) => f.path === place.file)?.title ?? baseName(place.file).replace(/\.md$/, "")}
     />{/if}{/snippet}

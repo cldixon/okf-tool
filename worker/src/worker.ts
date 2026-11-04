@@ -8,7 +8,7 @@ import { notifying, postComment } from "./notify";
 import { type GrantProps, SCOPES } from "./oauth/routes";
 import { mcpOp, withCostHeader, withCosts } from "./op-costs";
 import { RENDER_UNAVAILABLE } from "./render";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 import { createLibraryForGrant, grantAgent, grantLibraries } from "./tenancy";
 import { type Admission, admit, mcpWrites, tokenAdmission } from "./usage";
 
@@ -26,7 +26,7 @@ const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 /** RFC 6750's answer to a token that no longer works: a Bearer challenge naming the metadata. */
 function invalidToken(origin: string, why: string): Response {
-  const e = new OkfError(401, "invalid_token", why);
+  const e = new StoreError(401, "invalid_token", why);
   return Response.json(e.toJSON(), {
     status: 401,
     headers: {
@@ -137,7 +137,7 @@ export function createWorker(deps: (env: Cloudflare.Env) => Deps): {
           try {
             await admit(d, who, write);
           } catch (e) {
-            if (e instanceof OkfError) return Response.json(e.toJSON(), { status: e.status });
+            if (e instanceof StoreError) return Response.json(e.toJSON(), { status: e.status });
             throw e;
           }
           // What the tool call cost its library's object, metered under its name (TEMPRA-228).

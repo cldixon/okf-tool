@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { nightlyBundle } from "../src/export-bundle";
+import { sha256Hex } from "../src/format/hash";
 import { runMaintenance } from "../src/maintain";
-import { sha256Hex } from "../src/okf/hash";
 import { LibraryStore } from "../src/store/store";
 import { readTar, writeTar } from "../src/util/tar";
 import { memoryBlobs, memoryBucket, setup } from "./harness";
@@ -24,9 +24,9 @@ describe("daily maintainers (spec: Tier 3)", () => {
     const run = () => runMaintenance({ store, bucket, libraryId: "lib-x", now: new Date(clock.t) });
 
     const first = await run();
-    expect(first.export).toEqual({ key: "exports/lib-x/2026-09-30/", seq: 1, files: 3 });
+    expect(first.export).toEqual({ key: "exports/lib-x/2026-09-30/", seq: 1, files: 1 });
     const tar = readTar(bucket.objects.get("exports/lib-x/2026-09-30/bundle.tar") as Uint8Array);
-    expect(tar.map((f) => f.path).sort()).toEqual(["a.md", "index.md", "log.md"]);
+    expect(tar.map((f) => f.path).sort()).toEqual(["a.md"]);
     const ledger = new TextDecoder()
       .decode(bucket.objects.get("exports/lib-x/2026-09-30/ledger.jsonl"))
       .trim()
@@ -61,15 +61,10 @@ describe("daily maintainers (spec: Tier 3)", () => {
     ]);
     const res = await runMaintenance({ store, bucket, libraryId: "lib-x", now: new Date(clock.t) });
     const folder = "exports/lib-x/2026-09-30/";
-    // a.md, two attachments, index.md, data/index.md and log.md.
-    expect(res.export).toEqual({ key: folder, seq: 3, files: 6 });
+    // a.md and two attachments: a nightly export is the plain format, with no index.md or log.md.
+    expect(res.export).toEqual({ key: folder, seq: 3, files: 3 });
     const stored = readTar(bucket.objects.get(`${folder}bundle.tar`) as Uint8Array);
-    expect(stored.map((f) => f.path).sort()).toEqual([
-      "a.md",
-      "data/index.md",
-      "index.md",
-      "log.md",
-    ]);
+    expect(stored.map((f) => f.path).sort()).toEqual(["a.md"]);
     const text = (k: string) => new TextDecoder().decode(bucket.objects.get(`${folder}${k}`));
     expect(JSON.parse(text("attachments.json"))).toEqual([
       { path: long, hash, size: bytes.length, media: "text/csv" },
@@ -77,7 +72,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
     ]);
     expect(JSON.parse(text("manifest.json"))).toMatchObject({
       seq: 3,
-      files: 6,
+      files: 3,
       attachments: 1 + 1,
       format: 2,
     });
@@ -93,9 +88,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
       return readTar(new Uint8Array(await new Response(body as BodyInit).arrayBuffer()));
     };
     const whole = await download();
-    expect(whole.map((f) => f.path).sort()).toEqual(
-      ["a.md", "data/index.md", "data/x.csv", "index.md", "log.md", long].sort(),
-    );
+    expect(whole.map((f) => f.path).sort()).toEqual(["a.md", "data/x.csv", long].sort());
     expect(whole.find((f) => f.path === long)?.bytes).toEqual(bytes);
     expect(whole.find((f) => f.path === "data/x.csv")?.bytes).toEqual(bytes);
 
@@ -163,7 +156,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
     const res = await runMaintenance({ store, bucket, libraryId: "lib-x", now: new Date(clock.t) });
     expect(res.export).toMatchObject({ key: "exports/lib-x/2026-09-30/", seq: 0 });
     const tar = readTar(bucket.objects.get("exports/lib-x/2026-09-30/bundle.tar") as Uint8Array);
-    expect(tar.map((f) => f.path).sort()).toEqual(["index.md", "log.md"]);
+    expect(tar.map((f) => f.path).sort()).toEqual([]);
   });
 
   test("retention deletes old exports but always keeps the newest", async () => {
@@ -222,7 +215,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
     expect(usage()).toBe(2);
     const computed = store.read("p.md", { computed: true });
     // Counted before this read is recorded.
-    expect(computed.kind === "concept" && computed.markdown).toContain("usage_count: 2");
+    expect(computed.kind === "page" && computed.markdown).toContain("usage_count: 2");
 
     clock.t += 40 * 86_400_000;
     expect(usage()).toBe(0);
@@ -243,7 +236,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
     ]);
     expect(store.work({ kind: "stale" }).items.map((i) => i.path)).toEqual(["s.md"]);
     const v = store.read("s.md");
-    if (v.kind !== "concept") throw new Error();
+    if (v.kind !== "page") throw new Error();
     store.apply(ctx(), [
       {
         op: "write",
@@ -255,7 +248,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
     expect(store.work({ kind: "stale" }).items).toEqual([]);
   });
 
-  test("staleness: a concept passing stale_after between two runs is flagged after the second", () => {
+  test("staleness: a page passing stale_after between two runs is flagged after the second", () => {
     const clock = { t: Date.parse("2026-09-01T00:00:00Z") };
     const store = newStore(clock);
     store.apply(ctx(), [
@@ -282,7 +275,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
       stale: "stale_soon",
     });
     const view = store.read("s.md");
-    expect(view.kind === "concept" && [view.stale, view.stale_soon]).toEqual([false, true]);
+    expect(view.kind === "page" && [view.stale, view.stale_soon]).toEqual([false, true]);
     // A second run the same day changes nothing.
     expect(run().became).toEqual({ stale: [], stale_soon: [] });
 
@@ -309,7 +302,7 @@ describe("daily maintainers (spec: Tier 3)", () => {
     const stale = () => store.work({ kind: "stale" }).items.map((i) => i.path);
     const hash = () => {
       const v = store.read("s.md");
-      if (v.kind !== "concept") throw new Error();
+      if (v.kind !== "page") throw new Error();
       return v.hash;
     };
     const write = (content: string) =>
@@ -356,14 +349,14 @@ describe("daily maintainers (spec: Tier 3)", () => {
     ]);
     seen.length = 0;
     expect(store.maintainStaleness()).toMatchObject({ stale: 0, stale_soon: 0 });
-    const reads = seen.filter((q) => /^\s*SELECT/i.test(q) && /concepts|flags/.test(q));
+    const reads = seen.filter((q) => /^\s*SELECT/i.test(q) && /pages|flags/.test(q));
     expect(reads.length).toBe(2);
     for (const q of reads) {
       const plan = db
         .query(`EXPLAIN QUERY PLAN ${q}`)
         .all(...(q.includes("?") ? [0] : []))
         .map((r) => (r as { detail: string }).detail);
-      expect(plan.filter((d) => /^SCAN (c|concepts|flags)\b/.test(d))).toEqual([]);
+      expect(plan.filter((d) => /^SCAN (c|pages|flags)\b/.test(d))).toEqual([]);
     }
   });
 
@@ -375,8 +368,8 @@ describe("daily maintainers (spec: Tier 3)", () => {
       { op: "write", path: "s.md", content: md("x\n", "stale_after: 2026-09-01T00:00:00Z\n") },
     ]);
     // As it was stored before TEMPRA-63: no stale_ms, no flags for staleness.
-    db.run("DROP INDEX concepts_stale");
-    db.run("ALTER TABLE concepts DROP COLUMN stale_ms");
+    db.run("DROP INDEX pages_stale");
+    db.run("ALTER TABLE pages DROP COLUMN stale_ms");
     db.run("DELETE FROM flags WHERE kind IN ('stale', 'stale_soon')");
     db.run("DELETE FROM meta WHERE key = 'stale_ms'");
 
@@ -418,7 +411,7 @@ describe("stats, healthz and nightly exports in the UI and API", () => {
     const list = (await (await s.app.request("/api/v1/libraries/owner/demo/exports")).json()) as {
       exports: { date: string; seq: number | null; files: number | null }[];
     };
-    expect(list.exports).toEqual([{ date, seq: 1, files: 3 }]);
+    expect(list.exports).toEqual([{ date, seq: 1, files: 1 }]);
     // People only, like restore: an agent's token cannot list them.
     expect((await s.req("/exports")).status).toBe(403);
     expect((await s.req("/exports", { token: "human" })).status).toBe(200);

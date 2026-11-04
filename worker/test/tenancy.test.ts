@@ -239,7 +239,7 @@ for (const authCache of [false, true])
         response_type: "code",
         client_id,
         redirect_uri: "https://claude.ai/api/mcp/auth_callback",
-        scope: "okf:read okf:write",
+        scope: "tempra:read tempra:write",
         state: "s",
         code_challenge: "x".repeat(43),
         code_challenge_method: "S256",

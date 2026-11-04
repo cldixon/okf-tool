@@ -10,13 +10,13 @@ import type { Accounts } from "../accounts";
 import { agentId, agentName } from "../agents";
 import type { TokenInfo } from "../auth";
 import type { BlobStore, LibraryClient } from "../client";
+import { normalizePath } from "../format/paths";
 import type { Images } from "../images";
 import { appLinks, INSTRUCTIONS, type McpContext } from "../mcp/server";
 import { type NotifyDeps, notifying, postComment } from "../notify";
-import { normalizePath } from "../okf/paths";
 import type { RenderLintDeps } from "../render-lint";
 import type { CommentAction, ThreadView } from "../store/comments";
-import { OkfError } from "../store/errors";
+import { StoreError } from "../store/errors";
 import type { ReadSurface } from "../store/reads";
 import type { RequestContext } from "../store/store";
 import { admit, tokenAdmission, type UsageDeps, WRITE_TOOLS } from "../usage";
@@ -373,7 +373,7 @@ export async function runTurn(
   const by = { person: asker.id, agent };
   const lib0 = d.library(token, "mcp");
   const thread = await lib0.thread(job.thread).catch((e) => {
-    if (e instanceof OkfError && e.status === 404) return null;
+    if (e instanceof StoreError && e.status === 404) return null;
     throw e;
   });
   if (thread?.status !== "open") return { status: "skipped", why: "the thread is closed" };
@@ -441,7 +441,7 @@ export async function runTurn(
   let page: string | null = null;
   if (thread.path) {
     const view = await lib0.read(thread.path).catch(() => null);
-    if (view?.kind === "concept")
+    if (view?.kind === "page")
       page = pageExcerpt(view.markdown, thread.anchor?.quote ?? null, limits.pageChars);
   }
   // It reads the thread's page from the prompt, not with `read`, so say so on the feed.
@@ -521,7 +521,7 @@ export async function runTurn(
       }
       if (!edited) {
         const view = await lib0.read(path).catch(() => null);
-        if (view?.kind !== "concept")
+        if (view?.kind !== "page")
           return refuse(`There is no page ${path} to edit; you only edit pages that exist.`);
         edited = { path: view.path, seq: view.seq, doc: view.doc };
       }
@@ -546,7 +546,7 @@ export async function runTurn(
     if (name === "edit" && edited) {
       wrote = true;
       const after = await lib0.read(edited.path).catch(() => null);
-      if (after?.kind === "concept") editedBlocks = changedBlocks(edited.doc, after.doc);
+      if (after?.kind === "page") editedBlocks = changedBlocks(edited.doc, after.doc);
       const since = `${links.page(edited.path)}?since=${edited.seq}`;
       return { text: `${out.text}\nChanges: ${since}`, isError: false };
     }

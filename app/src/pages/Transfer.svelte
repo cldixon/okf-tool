@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Segmented } from "@tempra/design/components";
   import { api, field, post } from "../api";
   import { useAction, useLoad } from "../load.svelte.ts";
   import { useRole } from "../role.svelte.ts";
@@ -24,6 +25,12 @@
   const action = useAction();
   /** What the last action did: a line, or an import with a link to it in Activity. */
   let result = $state.raw<string | { files: number; name: string } | null>(null);
+  /** The download's format: the files alone, or an OKF bundle (`?format=okf`). */
+  let format = $state<"plain" | "okf">("plain");
+  const formats = [
+    { value: "plain", label: "Files" },
+    { value: "okf", label: "OKF bundle" },
+  ] as const;
 
   function upload(e: SubmitEvent & { currentTarget: HTMLFormElement }) {
     e.preventDefault();
@@ -71,7 +78,10 @@
   <h3>Export</h3>
   <p>Every page and file as they are now, as one .tar bundle.</p>
   <!-- A plain link: the browser downloads the signed export link it redirects to. -->
-  <a class="button primary" href={urls.exportTar()}>Download .tar</a>
+  <p><Segmented label="Format" options={formats} bind:value={format} /></p>
+  <a class="button primary" href={urls.exportTar(undefined, format === "okf" ? "okf" : undefined)}
+    >Download .tar</a
+  >
 </div>
 <div class="panel-box">
   <h3>Import</h3>

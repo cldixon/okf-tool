@@ -19,7 +19,7 @@ const event = (path: string, from: string | null = null): FeedEvent => ({
   request_id: "r1",
   op: from ? "move" : "put",
   path,
-  concept_id: "c1",
+  page_id: "c1",
   hash: "h",
   note: null,
   from_path: from,

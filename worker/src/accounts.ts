@@ -1,10 +1,10 @@
 import { type AgentKey, agentId } from "./agents";
 import { hashToken, newTokenSecret } from "./auth";
+import { sha256Hex } from "./format/hash";
+import { normalizeDir } from "./format/paths";
 import { checkHandle, HANDLE_HOLD_DAYS, handleFromEmail } from "./handles";
 import { type Limits, limitsFrom, overLimit } from "./limits";
-import { sha256Hex } from "./okf/hash";
-import { normalizeDir } from "./okf/paths";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /** A library, addressed as {owner}/{slug} (v2 spec: Tenancy and authorization). */
 export interface LibraryRef {
@@ -77,7 +77,7 @@ export type Theme = "light" | "dark";
 export function checkTheme(v: unknown): Theme | null {
   if (v === null || v === undefined || v === "system" || v === "") return null;
   if (v === "light" || v === "dark") return v;
-  throw new OkfError(400, "bad_theme", "The theme is system, light or dark.");
+  throw new StoreError(400, "bad_theme", "The theme is system, light or dark.");
 }
 
 /** The longest name an account may have, in characters (TEMPRA-54). */
@@ -89,14 +89,18 @@ export const NAME_MAX = 80;
  */
 export function checkName(v: unknown): string | null {
   if (v === null || v === undefined) return null;
-  if (typeof v !== "string") throw new OkfError(400, "bad_name", "The name is text.");
+  if (typeof v !== "string") throw new StoreError(400, "bad_name", "The name is text.");
   const name = v.trim().replace(/ {2,}/g, " ").normalize("NFC");
   if (/[\p{Cc}\p{Zl}\p{Zp}]/u.test(name)) {
-    throw new OkfError(400, "bad_name", "The name cannot hold control characters or line breaks.");
+    throw new StoreError(
+      400,
+      "bad_name",
+      "The name cannot hold control characters or line breaks.",
+    );
   }
   if (name === "") return null;
   if (Array.from(name).length > NAME_MAX) {
-    throw new OkfError(400, "bad_name", `The name is at most ${NAME_MAX} characters.`);
+    throw new StoreError(400, "bad_name", `The name is at most ${NAME_MAX} characters.`);
   }
   return name;
 }
@@ -336,7 +340,7 @@ export function checkNewToken(
   const actor = input.actor.trim().toLowerCase();
   if (actor.startsWith("human:")) {
     if (actor !== human) {
-      throw new OkfError(
+      throw new StoreError(
         403,
         "human_actor",
         human
@@ -345,18 +349,18 @@ export function checkNewToken(
       );
     }
   } else if (!AGENT_ACTOR.test(actor) && !PROCESS_ACTOR.test(actor)) {
-    throw new OkfError(
+    throw new StoreError(
       400,
       "bad_actor",
       "The actor must look like app/label (e.g. claude-code/laptop) or process:name (e.g. process:nightly-verify).",
     );
   }
   if (input.scope !== "read" && input.scope !== "write") {
-    throw new OkfError(400, "bad_scope", "`scope` is read or write.");
+    throw new StoreError(400, "bad_scope", "`scope` is read or write.");
   }
   const rawPrefix = (input.prefix ?? "").trim();
   if (rawPrefix.includes(".."))
-    throw new OkfError(400, "bad_prefix", "The directory cannot contain '..'.");
+    throw new StoreError(400, "bad_prefix", "The directory cannot contain '..'.");
   let expires: string | null = null;
   const e = (input.expires ?? "").trim();
   if (e) {
@@ -364,13 +368,13 @@ export function checkNewToken(
     const iso = /^\d{4}-\d{2}-\d{2}$/.test(e) ? `${e}T23:59:59Z` : e;
     const t = Date.parse(iso);
     if (Number.isNaN(t) || !/(?:Z|[+-]\d\d:\d\d)$/.test(iso)) {
-      throw new OkfError(
+      throw new StoreError(
         400,
         "bad_expires",
         "`expires` is a date (2026-12-31) or an ISO 8601 datetime with an offset.",
       );
     }
-    if (t <= Date.now()) throw new OkfError(400, "bad_expires", "`expires` is in the past.");
+    if (t <= Date.now()) throw new StoreError(400, "bad_expires", "`expires` is in the past.");
     expires = new Date(t).toISOString();
   }
   return {
@@ -387,7 +391,7 @@ const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export function checkSlug(slug: string): string {
   const s = slug.trim().toLowerCase();
   if (!SLUG.test(s)) {
-    throw new OkfError(
+    throw new StoreError(
       400,
       "bad_slug",
       "A library name uses lowercase letters, digits and hyphens, up to 63 characters.",
@@ -408,12 +412,16 @@ export function checkLine(
 ): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== "string")
-    throw new OkfError(400, `bad_${what}`, `The ${what} must be text.`);
+    throw new StoreError(400, `bad_${what}`, `The ${what} must be text.`);
   const s = value.trim();
   if (s === "") return null;
   // biome-ignore lint/suspicious/noControlCharactersInRegex: refusing control characters
   if (/[\u0000-\u001f\u007f\u2028\u2029]/.test(s) || s.length > max) {
-    throw new OkfError(400, `bad_${what}`, `The ${what} is one line of at most ${max} characters.`);
+    throw new StoreError(
+      400,
+      `bad_${what}`,
+      `The ${what} is one line of at most ${max} characters.`,
+    );
   }
   return s;
 }
@@ -511,7 +519,7 @@ export function d1Accounts(db: D1Database): Accounts {
         const raced = await byEmail(email);
         if (raced) return raced;
       }
-      throw new OkfError(500, "internal", "Could not find a free handle.");
+      throw new StoreError(500, "internal", "Could not find a free handle.");
     },
     async mayJoin(email, mode) {
       if (mode === "open" || (await byEmail(email))) return true;
@@ -734,7 +742,7 @@ export function d1Accounts(db: D1Database): Accounts {
     },
     async invite(libraryId, userId, role, invitedBy) {
       if (role !== "read" && role !== "write") {
-        throw new OkfError(400, "bad_role", "A member's role is read or write.");
+        throw new StoreError(400, "bad_role", "A member's role is read or write.");
       }
       const lib = await db
         .prepare(
@@ -743,10 +751,11 @@ export function d1Accounts(db: D1Database): Accounts {
         )
         .bind(libraryId, userId)
         .first<{ owner: string; member: string | null }>();
-      if (!lib) throw new OkfError(404, "no_library", "No such library.");
-      if (lib.owner === userId) throw new OkfError(409, "is_owner", "That's the library's owner.");
+      if (!lib) throw new StoreError(404, "no_library", "No such library.");
+      if (lib.owner === userId)
+        throw new StoreError(409, "is_owner", "That's the library's owner.");
       if (lib.member) {
-        throw new OkfError(
+        throw new StoreError(
           409,
           "already_member",
           `They are already a member, with ${lib.member} access.`,
@@ -784,7 +793,7 @@ export function d1Accounts(db: D1Database): Accounts {
         )
         .run();
       if (!r.meta.changes) {
-        throw new OkfError(
+        throw new StoreError(
           429,
           "too_many_invitations",
           `A library can send ${INVITATIONS_PER_DAY} invitations a day.`,
@@ -887,7 +896,7 @@ export function d1Accounts(db: D1Database): Accounts {
     },
     async share(libraryId, userId, role, grantedBy) {
       if (role !== "read" && role !== "write") {
-        throw new OkfError(400, "bad_role", "A member's role is read or write.");
+        throw new StoreError(400, "bad_role", "A member's role is read or write.");
       }
       const r = await db
         .prepare(
@@ -899,7 +908,7 @@ export function d1Accounts(db: D1Database): Accounts {
         .bind(libraryId, userId, role, grantedBy, new Date().toISOString())
         .run();
       if (!r.meta.changes) {
-        throw new OkfError(409, "is_owner", "The library's owner cannot also be a member.");
+        throw new StoreError(409, "is_owner", "The library's owner cannot also be a member.");
       }
     },
     async unshare(libraryId, userId) {
@@ -972,7 +981,7 @@ export function d1Accounts(db: D1Database): Accounts {
           .bind(owner.id, slug)
           .first();
         if (exists) {
-          throw new OkfError(409, "slug_taken", `You already have a library named ${slug}.`);
+          throw new StoreError(409, "slug_taken", `You already have a library named ${slug}.`);
         }
         throw overLimit("libraries", max, "library_limit");
       }
@@ -989,7 +998,7 @@ export function d1Accounts(db: D1Database): Accounts {
         .prepare("SELECT title, description FROM libraries WHERE id = ?")
         .bind(libraryId)
         .first<{ title: string | null; description: string | null }>();
-      if (!current) throw new OkfError(404, "not_found", "No such library.");
+      if (!current) throw new StoreError(404, "not_found", "No such library.");
       const title =
         about.title === undefined ? current.title : checkLine(about.title, "title", 120);
       const description =
@@ -1042,7 +1051,7 @@ export function d1Accounts(db: D1Database): Accounts {
         .prepare("SELECT owner FROM libraries WHERE id = ?")
         .bind(t.libraryId)
         .first<{ owner: string }>();
-      if (!owner) throw new OkfError(404, "no_library", "No such library.");
+      if (!owner) throw new StoreError(404, "no_library", "No such library.");
       // A token counts against the account that minted it (a member's, on a shared library).
       const account = t.createdBy ?? owner.owner;
       const { tokens: max } = await limitsOf(account);
@@ -1094,7 +1103,7 @@ export function d1Accounts(db: D1Database): Accounts {
         .bind(email, userId)
         .run();
       if (!r.meta.changes) {
-        throw new OkfError(409, "email_taken", "Another account uses that email address.");
+        throw new StoreError(409, "email_taken", "Another account uses that email address.");
       }
     },
     async revokeToken(id, userId) {
@@ -1105,7 +1114,7 @@ export function d1Accounts(db: D1Database): Accounts {
         )
         .bind(new Date().toISOString(), id, userId)
         .run();
-      if (!r.meta.changes) throw new OkfError(404, "not_found", "No such active token.");
+      if (!r.meta.changes) throw new StoreError(404, "not_found", "No such active token.");
     },
     async setHandle(userId, handleInput, opts = {}) {
       const handle = checkHandle(handleInput, opts);
@@ -1115,7 +1124,7 @@ export function d1Accounts(db: D1Database): Accounts {
           .bind(userId)
           .first<User>();
       const before = await byId();
-      if (!before) throw new OkfError(404, "not_found", "No such account.");
+      if (!before) throw new StoreError(404, "not_found", "No such account.");
       if (before.handle === handle) return before;
       const now = new Date().toISOString();
       const [r] = await db.batch([
@@ -1141,7 +1150,7 @@ export function d1Accounts(db: D1Database): Accounts {
           .bind(handle, userId),
       ]);
       if (!r?.meta.changes)
-        throw new OkfError(409, "handle_taken", `The handle ${handle} is taken.`);
+        throw new StoreError(409, "handle_taken", `The handle ${handle} is taken.`);
       return (await byId()) ?? before;
     },
     async heldHandle(handle) {

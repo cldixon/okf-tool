@@ -1,5 +1,5 @@
 import { handleMcp, type McpContext } from "../mcp/server";
-import { OkfError } from "../store/errors";
+import { StoreError } from "../store/errors";
 
 /**
  * Tempra's own MCP server, called in process (TEMPRA-222; after the spike's, cldixon/tempra#62):
@@ -72,7 +72,7 @@ export class LocalMcp {
       error?: { code: number; message: string };
     } | null;
     if (!body || body.error || body.result === undefined) {
-      throw new OkfError(
+      throw new StoreError(
         502,
         "mcp_failed",
         `MCP ${method} failed: ${body?.error?.message ?? `HTTP ${res.status}`}`,

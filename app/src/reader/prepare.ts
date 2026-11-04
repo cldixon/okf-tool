@@ -26,7 +26,7 @@ import type { ChartSource } from "./diagram";
 
 /** How links, images and footnote references in a body point. All optional. */
 export interface BodyOptions {
-  /** The concept's library path, for relative links. */
+  /** The page's library path, for relative links. */
   path?: string;
   /**
    * The href for a link or image target, given how it was classified (null when its scheme is

@@ -271,12 +271,12 @@ describe("magic-link sign-in (v2 spec: Accounts and sign-in)", () => {
   test("without a mail provider, only local dev with DEV_SIGNIN=1 can sign in", async () => {
     const s = setup();
     s.deps.mailer = null;
-    const remote = await s.anon.request("https://okf.example.com/sign-in");
+    const remote = await s.anon.request("https://tempra.example.com/sign-in");
     expect(remote.status).toBe(503);
     expect((await s.anon.request("/sign-in")).status).toBe(503);
 
     Object.assign(s.env, { DEV_SIGNIN: "1" });
-    expect((await s.anon.request("https://okf.example.com/sign-in")).status).toBe(503);
+    expect((await s.anon.request("https://tempra.example.com/sign-in")).status).toBe(503);
     const r = await post(s, "/sign-in", { email: "dev@localhost", next: "/" });
     const html = await r.text();
     expect(html).toContain('id="dev-link"');

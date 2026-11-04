@@ -35,7 +35,7 @@ export interface Scenario {
   run(ctx: ScenarioContext): Promise<void>;
 }
 
-const concept = (title: string, body: string) =>
+const page = (title: string, body: string) =>
   `---\ntype: Agent Memo\ntitle: ${title}\ndescription: Written by scripted agents.\nstatus: draft\n---\n${body}\n`;
 
 /** A write, recorded for the feed measurement. */
@@ -72,7 +72,7 @@ export const SCENARIOS: Scenario[] = [
       const path = `${ctx.dir}/race.md`;
       const created = await write(ctx, a, {
         path,
-        content: concept("Race", "Alpha one.\n\nBeta one."),
+        content: page("Race", "Alpha one.\n\nBeta one."),
         note: "edit-race: create",
       });
       ctx.check(created.ok, `${a.name} creates ${path}`);
@@ -109,28 +109,28 @@ export const SCENARIOS: Scenario[] = [
       const final = await a.call("read", { path });
       ctx.check(
         final.text.includes("Alpha two.") && final.text.includes("Beta two."),
-        "both changes are in the concept",
+        "both changes are in the page",
       );
     },
   },
   {
     name: "live",
     description:
-      "Agents take turns adding to one concept at the run's pace, and one moves a file away and back: open the printed page to watch it live.",
+      "Agents take turns adding to one page at the run's pace, and one moves a file away and back: open the printed page to watch it live.",
     minAgents: 1,
     async run(ctx) {
       const path = `${ctx.dir}/live.md`;
       const [first] = ctx.agents as [Agent];
       const created = await write(ctx, first, {
         path,
-        content: concept("Live", "Agents add lines here."),
+        content: page("Live", "Agents add lines here."),
         note: "live: create",
       });
       ctx.check(created.ok, `${first.name} creates ${path}`);
       const side = `${ctx.dir}/side.md`;
       await write(ctx, first, {
         path: side,
-        content: concept("Side", "Moved around."),
+        content: page("Side", "Moved around."),
         note: "live: side",
       });
       ctx.log(`watch it: ${ctx.page(path)}`);
@@ -168,7 +168,7 @@ export const SCENARIOS: Scenario[] = [
   {
     name: "load",
     description:
-      "Every agent writes and then edits its own concepts, all at once with no pacing: latency and feed delivery under load.",
+      "Every agent writes and then edits its own pages, all at once with no pacing: latency and feed delivery under load.",
     minAgents: 1,
     async run(ctx) {
       await Promise.all(
@@ -177,7 +177,7 @@ export const SCENARIOS: Scenario[] = [
             const path = `${ctx.dir}/${agent.name}/c${i}.md`;
             const w = await write(ctx, agent, {
               path,
-              content: concept(`${agent.name} ${i}`, `Note ${i} from ${agent.name}.`),
+              content: page(`${agent.name} ${i}`, `Note ${i} from ${agent.name}.`),
               note: `load: ${agent.name} ${i}`,
             });
             ctx.check(w.ok, `${agent.name} writes ${path}`);
@@ -207,7 +207,7 @@ export const SCENARIOS: Scenario[] = [
             const base = `${ctx.dir}/${agent.name}/r${i}`;
             const w = await write(ctx, agent, {
               path: `${base}/page.md`,
-              content: concept(`${agent.name} page ${i}`, realisticBody(`${agent.name} ${i}`)),
+              content: page(`${agent.name} page ${i}`, realisticBody(`${agent.name} ${i}`)),
               note: `costs: ${agent.name} ${i}`,
             });
             ctx.check(w.ok, `${agent.name} writes ${base}/page.md`);
@@ -230,7 +230,7 @@ export const SCENARIOS: Scenario[] = [
               ops: ["a", "b"].map((x) => ({
                 op: "write",
                 path: `${base}/batch-${x}.md`,
-                content: concept(`${agent.name} batch ${x} ${i}`, realisticBody(`batch ${x}`)),
+                content: page(`${agent.name} batch ${x} ${i}`, realisticBody(`batch ${x}`)),
               })),
             });
             ctx.wrote(b);

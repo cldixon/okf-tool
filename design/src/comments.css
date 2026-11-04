@@ -1,6 +1,6 @@
 /*
- * Comments on a concept (take 4, TEMPRA-114; tempra-dev: app/comments): the threads in the
- * Comments panel (its frame is concept.css's), Open and Resolved n, a draft at the top while one
+ * Comments on a page (take 4, TEMPRA-114; tempra-dev: app/comments): the threads in the
+ * Comments panel (its frame is page.css's), Open and Resolved n, a draft at the top while one
  * is written, the active thread as a card, the others compact (their quote, then who, the first
  * words, when). Lines and greys only: no colour.
  */
@@ -258,13 +258,13 @@ section.thread.open {
    active one (and a draft) is open in place, and a compact one is a row across the card under a
    hairline. The overlay and the phone's sheet keep the cards above. */
 @container page (width >= 960px) {
-  .concept-side .comments-list .thread.open {
+  .page-side .comments-list .thread.open {
     padding: var(--tempra-space-08) 0;
     border: 0;
     border-radius: 0;
   }
 
-  .concept-side .comments-list .thread.collapsed {
+  .page-side .comments-list .thread.collapsed {
     width: auto;
     margin: 0 calc(-1 * var(--tempra-space-16));
     padding: var(--tempra-space-12) var(--tempra-space-16);
@@ -274,7 +274,7 @@ section.thread.open {
   }
 
   /* Edge to edge in a scroller, so its ring sits just inside it. */
-  .concept-side .comments-list .thread.collapsed:focus-visible {
+  .page-side .comments-list .thread.collapsed:focus-visible {
     outline-offset: calc(-1 * var(--tempra-focus-offset));
   }
 }
@@ -313,7 +313,7 @@ section.thread.open {
   }
 }
 
-/* A mark beside each block of a concept's body that holds open threads (TEMPRA-223): the comment
+/* A mark beside each block of a page's body that holds open threads (TEMPRA-223): the comment
    glyph and the count in muted grey, in the right gutter by the block's first line, or under the
    block's end where there is no gutter (a phone). A layer over the body, outside its text, placed
    by the app through --mark-x and --mark-y. Greys and lines only. */

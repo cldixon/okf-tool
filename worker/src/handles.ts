@@ -1,4 +1,4 @@
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /**
  * Handles are the first segment of every library URL, so they are guarded like domain names
@@ -173,14 +173,14 @@ export const HANDLE_HOLD_DAYS = 90;
 export function checkHandle(input: string, opts: { reserved?: "allow" } = {}): string {
   const h = input.trim().toLowerCase();
   if (!SYNTAX.test(h)) {
-    throw new OkfError(
+    throw new StoreError(
       400,
       "bad_handle",
       "A handle is 2 to 39 lowercase letters and digits, with single - or _ between them.",
     );
   }
   if (opts.reserved !== "allow" && isReservedHandle(h)) {
-    throw new OkfError(400, "reserved_handle", `The handle ${h} is reserved.`);
+    throw new StoreError(400, "reserved_handle", `The handle ${h} is reserved.`);
   }
   return h;
 }

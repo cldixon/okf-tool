@@ -53,7 +53,7 @@ function library(start = "2026-10-20T12:00:00Z", db = new Database(":memory:")) 
 /** A page's history as the app's GET sees it: a session's GETs count nothing. */
 const historyOf = (store: LibraryStore, path: string): ReadHistory => {
   const v = store.reading(personApp, () => store.read(path, { reads: true }));
-  if (v.kind !== "concept" || !v.reads) throw new Error("no reads");
+  if (v.kind !== "page" || !v.reads) throw new Error("no reads");
   return v.reads;
 };
 
@@ -96,7 +96,7 @@ describe("read history in the store", () => {
     // The usage window's count is every read (before this one); a call with no reader (the
     // Worker's own, a store test's) still counts, in totals only, as reads did before.
     const computed = store.read("p.md", { computed: true });
-    expect(computed.kind === "concept" && computed.markdown).toContain("usage_count: 6");
+    expect(computed.kind === "page" && computed.markdown).toContain("usage_count: 6");
     expect(historyOf(store, "p.md").month).toMatchObject({ total: 5, agents: 3, people: 1 });
   });
 
@@ -119,7 +119,7 @@ describe("read history in the store", () => {
     expect(h.week).toMatchObject({ total: 4, agents: 2, people: 2, readers: 2 });
     // The raw count stays for usage_count, as before.
     const computed = store.read("p.md", { computed: true });
-    expect(computed.kind === "concept" && computed.markdown).toContain("usage_count: 10");
+    expect(computed.kind === "page" && computed.markdown).toContain("usage_count: 10");
   });
 
   test("a page an agent shows its person (MCP show) is the person's read", () => {
@@ -181,7 +181,7 @@ describe("read history in the store", () => {
       { surface: "mcp", kind: "agent", n: 20 },
     ]);
     expect(db.query("SELECT COUNT(*) AS n FROM last_read").get()).toEqual({ n: 3 });
-    // One row per day, concept, surface, kind and reader: upserts, not a row per read.
+    // One row per day, page, surface, kind and reader: upserts, not a row per read.
     expect(db.query("SELECT COUNT(*) AS n FROM access_log").get()).toEqual({ n: 3 });
   });
 
@@ -189,7 +189,7 @@ describe("read history in the store", () => {
     const db = new Database(":memory:");
     const { store: first } = library("2026-10-20T12:00:00Z", db);
     const id = (
-      db.query("SELECT concept_id AS id FROM paths WHERE path = 'p.md'").get() as {
+      db.query("SELECT page_id AS id FROM paths WHERE path = 'p.md'").get() as {
         id: string;
       }
     ).id;
@@ -197,8 +197,8 @@ describe("read history in the store", () => {
     // As a library from before TEMPRA-220 has it: no surface or kind, no last_read.
     db.run("DROP TABLE access_log");
     db.run("DROP TABLE last_read");
-    db.run("CREATE TABLE access_log (day TEXT, concept_id TEXT, actor TEXT, reads INTEGER)");
-    db.run("CREATE UNIQUE INDEX access_log_key ON access_log(day, concept_id, actor)");
+    db.run("CREATE TABLE access_log (day TEXT, page_id TEXT, actor TEXT, reads INTEGER)");
+    db.run("CREATE UNIQUE INDEX access_log_key ON access_log(day, page_id, actor)");
     db.run("DELETE FROM meta WHERE key = 'read_history'");
     db.run("INSERT INTO access_log VALUES ('2026-10-19', ?, '', 4), ('2026-10-01', ?, '', 6)", [
       id,
@@ -211,7 +211,7 @@ describe("read history in the store", () => {
     const cols = (db.query("PRAGMA table_info(access_log)").all() as { name: string }[]).map(
       (c) => c.name,
     );
-    expect(cols).toEqual(["day", "concept_id", "actor", "reads", "surface", "kind"]);
+    expect(cols).toEqual(["day", "page_id", "actor", "reads", "surface", "kind"]);
     expect(db.query("SELECT name FROM sqlite_master WHERE name = 'access_log_key'").all()).toEqual(
       [],
     );
@@ -242,7 +242,7 @@ describe("read history in the store", () => {
     expect(db.query("SELECT COUNT(*) AS n FROM last_read").get()).toEqual({ n: 1 });
   });
 
-  test("concepts sort by reads and filter by bounds over 30 days", () => {
+  test("pages sort by reads and filter by bounds over 30 days", () => {
     const { store } = library();
     store.apply(ctx(), [{ op: "write", path: "r.md", content: md("T r", "Rare.\n") }]);
     // Three readers of q (one of them twice: still once that day), one of r.
@@ -250,15 +250,15 @@ describe("read history in the store", () => {
       store.reading(r, () => (r === personApp ? store.viewed("q.md") : store.read("q.md")));
     }
     store.reading(agentMcp, () => store.read("r.md"));
-    const hot = store.concepts({ sort: "reads" });
+    const hot = store.pages({ sort: "reads" });
     expect(hot.items.map((c) => [c.path, "reads" in c ? c.reads : null])).toEqual([
       ["q.md", 3],
       ["r.md", 1],
       ["p.md", 0],
     ]);
-    expect(store.concepts({ max_reads: 0 }).items.map((c) => c.path)).toEqual(["p.md"]);
-    expect(store.concepts({ min_reads: 1 }).items.map((c) => c.path)).toEqual(["q.md", "r.md"]);
-    expect(store.concepts({}).items.every((c) => !("reads" in c))).toBe(true);
+    expect(store.pages({ max_reads: 0 }).items.map((c) => c.path)).toEqual(["p.md"]);
+    expect(store.pages({ min_reads: 1 }).items.map((c) => c.path)).toEqual(["q.md", "r.md"]);
+    expect(store.pages({}).items.every((c) => !("reads" in c))).toBe(true);
   });
 
   test("reader keys are hashed: no raw person or actor id is stored", () => {
@@ -435,10 +435,10 @@ describe("read history over MCP and REST", () => {
     const hot = await call("query", { sort: "reads" });
     expect(hot.indexOf("b.md")).toBeLessThan(hot.indexOf("a.md"));
     // Two readers, one of them twice: two reads.
-    expect(hot).toContain("b.md · Note · stable (not set) · unverified · 2 reads in 30 days");
+    expect(hot).toContain("b.md · stable (not set) · unverified · 2 reads in 30 days");
     const cold = await call("query", { max_reads: 0 });
-    expect(cold).toContain("1 matching concept ");
-    expect(cold).toContain("a.md · Note");
+    expect(cold).toContain("1 matching page ");
+    expect(cold).toContain("a.md · stable");
   });
 
   test("MCP show is the person's read, and counts with their own app read once", async () => {

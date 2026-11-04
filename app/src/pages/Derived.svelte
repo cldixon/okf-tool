@@ -1,6 +1,6 @@
 <script lang="ts">
   import AtNotice from "../AtNotice.svelte";
-  import { bodyHref, type FileJson } from "../concept/data";
+  import { bodyHref, type FileJson } from "../page/data";
   import Reader from "../Reader.svelte";
   import { prepare } from "../reader/prepare";
   import { useLibraryTitle } from "../role.svelte.ts";

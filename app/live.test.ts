@@ -14,7 +14,7 @@ const ev = (seq: number, path = `p${seq}.md`): FeedEvent => ({
   request_id: `r${seq}`,
   op: "put",
   path,
-  concept_id: `c${seq}`,
+  page_id: `c${seq}`,
   hash: null,
   note: null,
   from_path: null,

@@ -138,6 +138,11 @@ describe("the app's pages (TEMPRA-9)", () => {
       expect(block).toContain("X-Content-Type-Options: nosniff");
     }
     expect(readFileSync(join(PUBLIC, "favicon.svg"), "utf8")).toStartWith("<svg");
+    // The Tempra mark, for Access's sign-in page (TEMPRA-282), the design package's own.
+    expect(readFileSync(join(PUBLIC, "mark.svg"), "utf8")).toBe(
+      readFileSync(Bun.resolveSync("@tempra/design/mark.svg", import.meta.dir), "utf8"),
+    );
+    expect(headers).toContain("/mark.svg\n  Cache-Control: public, max-age=86400");
   });
 
   test("the Worker's config serves the app's dist/public/ as its assets", async () => {
@@ -186,9 +191,9 @@ describe("the app's pages (TEMPRA-9)", () => {
       headers: { "Content-Type": "text/markdown", "If-Match": `"${hash}"` },
       body: "---\ntype: Note\ntitle: A\n---\nSecond words.\n",
     });
-    // A concept: frontmatter and the body as a tree, at any sequence.
+    // A page: frontmatter and the body as a tree, at any sequence.
     expect(await get(s, "/files/a.md")).toMatchObject({
-      kind: "concept",
+      kind: "page",
       ...says("Second words."),
     });
     expect(await get(s, `/files/a.md?at=${seq}`)).toMatchObject(says("First words."));
@@ -380,7 +385,7 @@ describe("the first page's data in the shell (TEMPRA-175)", () => {
   };
   const LIB_API = "/api/v1/libraries/owner/demo";
 
-  test("a concept's page carries what its first paint asks for, as the API answers it", async () => {
+  test("a page's view carries what its first paint asks for, as the API answers it", async () => {
     const s = setup();
     await put(s, "notes/a.md", "---\ntype: Note\ntitle: A\n---\nA, with </script> in it.\n");
     const r = await page(s, `${LIB}/notes/a.md`);

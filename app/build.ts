@@ -2,7 +2,7 @@
  * `bun run build` in app/ (also run by `bun install`): bundles src/main.ts (Svelte 5, TEMPRA-176) with Vite into an ES
  * module entry and the chunks it imports on demand (Pele, for pages with a diagram), and writes
  * the Worker's static assets (TEMPRA-174) to dist/public/: the bundle under /_app/, the design
- * stylesheet and its fonts under /_design/ (from @tempra/design), /favicon.svg, and a `_headers`
+ * stylesheet and its fonts under /_design/ (from @tempra/design), /favicon.svg, /mark.svg, and a `_headers`
  * file. Cloudflare serves them before the Worker runs (`assets` in worker/cloudflare.config.ts).
  * dist/app.ts names the entry (`hash`, `href`) and its chunks for the Worker, which writes the
  * entry's URL into the shell; it carries no code. dist/ is not committed.
@@ -47,6 +47,9 @@ export const HEADERS = `/_app/*
   X-Content-Type-Options: nosniff
   Access-Control-Allow-Origin: *
 /favicon.svg
+  Cache-Control: public, max-age=86400
+  X-Content-Type-Options: nosniff
+/mark.svg
   Cache-Control: public, max-age=86400
   X-Content-Type-Options: nosniff
 `;
@@ -98,6 +101,12 @@ export function writePublic(entry: { file: string; code: string }, chunks: Recor
   writeFileSync(
     join(PUBLIC, "favicon.svg"),
     readFileSync(Bun.resolveSync("@tempra/design/favicon.svg", ROOT)),
+  );
+  // The Tempra mark, for Cloudflare Access's sign-in page in front of the operator's portal
+  // (TEMPRA-282): an image there must come from a host Access does not cover.
+  writeFileSync(
+    join(PUBLIC, "mark.svg"),
+    readFileSync(Bun.resolveSync("@tempra/design/mark.svg", ROOT)),
   );
   writeFileSync(join(PUBLIC, "_headers"), HEADERS);
 }

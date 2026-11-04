@@ -18,7 +18,7 @@ import {
 
 const FIXTURES = join(import.meta.dir, "..", "fixtures");
 
-/** Every concept body in Google's sample bundles, frontmatter removed. */
+/** Every page body in Google's sample bundles, frontmatter removed. */
 export function bodies(): { file: string; body: string }[] {
   const walk = (d: string): string[] =>
     readdirSync(d).flatMap((f) => {

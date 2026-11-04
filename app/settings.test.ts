@@ -111,7 +111,7 @@ describe("drawn", () => {
       "[a-z0-9][a-z0-9\\-]{0,62}",
     );
     expect(host.querySelector("label:has(input[name=starter])")?.textContent).toBe(
-      " Add a start-here note",
+      " Add a guide page",
     );
     expect(text(host.querySelector("#welcome-library-hint") as Element)).toBe(
       "The last part of its address. Lowercase letters, digits and -.",

@@ -31,7 +31,7 @@ const filters: { key: string; operation: string; type: string; value: string }[]
 if (values.errors)
   filters.push({ key: "$metadata.error", operation: "exists", type: "string", value: "" });
 const body = {
-  queryId: "okf-logs",
+  queryId: "tempra-logs",
   timeframe: { from, to },
   view: "events",
   limit: Number(values.limit ?? 50),

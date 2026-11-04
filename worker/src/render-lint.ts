@@ -1,6 +1,6 @@
 /**
  * Diagram lint from the real renderer (TEMPRA-167; tempra-dev: app/media, Diagrams): after a write
- * commits, the diagrams it added or changed that the fast checker passed (okf/diagrams.ts) go to
+ * commits, the diagrams it added or changed that the fast checker passed (format/diagrams.ts) go to
  * the render service as SVG only, which also warms its cache. A fence Pele refuses becomes
  * `diagram_unrendered` lint, kept by the library (`setDiagramRenders`, a DO call outside the write
  * transaction) and shown in `work`, the next `read` and, when the answers come within a short
@@ -9,7 +9,7 @@
  */
 import { chartForRender, libraryText } from "./chart-data";
 import type { BlobStore, LibraryClient } from "./client";
-import type { LintWarning } from "./okf/types";
+import type { LintWarning } from "./format/types";
 import { RENDER_UNAVAILABLE, type RenderContext, type RenderDiagram } from "./render";
 import type { ImportResult, OpResult, RenderJob, RenderVerdict } from "./store/store";
 
@@ -24,7 +24,7 @@ export interface RenderLintDeps {
   renderBudgetMs?: number;
 }
 
-/** A concept version's `diagram_unrendered` lint, as the library now holds it. */
+/** A page version's `diagram_unrendered` lint, as the library now holds it. */
 export type RenderedLint = { path: string; hash: string; lint: LintWarning[] }[];
 
 /**
@@ -65,7 +65,7 @@ export async function lintRenders(
   const work = (async (): Promise<RenderedLint> => {
     const done = await Promise.all(
       jobs.map(async (j) => ({
-        concept_id: j.concept_id,
+        page_id: j.page_id,
         hash: j.hash,
         verdicts: (await Promise.all(j.diagrams.map((g) => verdict(g, j.path)))).filter(
           (v): v is RenderVerdict => v !== null,

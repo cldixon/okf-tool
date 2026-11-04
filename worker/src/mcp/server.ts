@@ -14,6 +14,10 @@ import {
   withDimensions,
 } from "../client";
 import { type FetchFn, fetchBlob, selfHosts } from "../fetch-source";
+import { diagramTypeOf, previewLint, vegaErrorText } from "../format/diagrams";
+import { type FigureFact, figureLine, sizeText } from "../format/figures";
+import { normalizePath, underPrefix } from "../format/paths";
+import type { LintWarning } from "../format/types";
 import {
   IMAGE_BYTES_PER_CALL,
   IMAGES_PER_CALL,
@@ -25,10 +29,6 @@ import {
   toBase64,
 } from "../images";
 import { imageInfo } from "../media";
-import { diagramTypeOf, previewLint, vegaErrorText } from "../okf/diagrams";
-import { type FigureFact, figureLine, sizeText } from "../okf/figures";
-import { normalizePath, underPrefix } from "../okf/paths";
-import type { LintWarning } from "../okf/types";
 import {
   drawerOf,
   isRenderLang,
@@ -44,10 +44,11 @@ import {
   sourceLang,
 } from "../render";
 import type { CommentAction, CommentResult } from "../store/comments";
-import { OkfError } from "../store/errors";
+import { StoreError } from "../store/errors";
 import { readsText } from "../store/reads";
 import {
   checkFacts,
+  EXPORT_FORMATS,
   type LibraryHealth,
   type RequestContext,
   type WriteOp,
@@ -116,22 +117,22 @@ export interface McpContext {
 /** Name the MCP server reports; provisional until the product is named (spec: Open questions). */
 export const SERVER_NAME = "tempra";
 /** Resource URI scheme; provisional for the same reason. */
-export const URI_SCHEME = "okf";
+export const URI_SCHEME = "tempra";
 
 const BEYOND = "Beyond files: ";
 
 /** Compressed workflow guidance, sent as the server's instructions (most clients never load a skill). */
-export const INSTRUCTIONS = `This server holds OKF (Open Knowledge Format) libraries: each a tree of markdown concepts with YAML frontmatter, plus attachments. Every change is attributed to your actor and recorded in the library's ledger.
+export const INSTRUCTIONS = `This server holds Tempra libraries: folders of markdown pages, each with YAML frontmatter, plus attachments. Every change is attributed to your actor and recorded in the library's ledger.
 
 How to work:
-1. Call \`start\` first. It opens your library, or lists the libraries you can reach when there are several; then pass \`library\` (owner/slug) on every call. When the person asks for a new library, \`create_library\` makes one they own and opens it (only on a connection they allowed to). Then \`browse\` a directory before reading, follow links, and \`read\` what you need. Check frontmatter (type, status, trust tier, stale) before relying on a body.
-2. Write conformant concepts: a non-empty \`type\` naming what kind of thing it is (Metric, Protocol, Decision; never a generic word like concept, page or note, and reuse the types \`start\` lists), a \`title\` and one-line \`description\`, absolute links like [x](/dir/x.md), footnotes [^id] keyed to \`sources[].id\` (an entry is \`id\`, \`title\` and \`resource\`: a URL or a path in this library), one idea per concept.
-3. Media, where a figure helps: a screenshot of what the page describes, a chart of data it discusses, a diagram of an architecture or a flow. Prefer rendered media, code in the concept that the app draws: a chart as a Vega-Lite spec in a \`vega-lite\` fence (\`\`\`vega-lite alt="what it shows" title="Caption"\`; its data inline in \`values\`, or a CSV, TSV or JSON file in this library named by \`data.url\`; never a picture of a chart), a Mermaid diagram in a \`mermaid\` fence, or a drawing in an \`svg\` fence (\`\`\`svg alt="what it shows" title="Caption"\`; plain shapes and text, \`currentColor\` for ink, no scripts, style elements, images or links). It is text, diffs like text and needs no upload (preview a non-trivial one with \`render\`). A file (an image, video, audio or PDF) comes in only two ways, and never as bytes you type into a call: on the public web, \`attach\` with \`source_url\` (the server fetches it; never hotlink); one you made or the person has, \`prepare_upload\`: run its curl line when your shell reaches this server, else the person sends it from their browser (in a chat that shows apps an upload panel appears with the call; give them its upload link too). A file you made where you cannot reach this server (a chart in a chat's sandbox): give it to the person in the chat, call \`prepare_upload\` with \`origin: "agent"\`, and tell them in a sentence why: you cannot send files to Tempra yourself, so they upload the one you gave them. Put a file beside the concept that uses it, named for what it shows (\`dir/x.md\` uses \`dir/x-architecture.png\`). Write \`![what it shows](/dir/x-architecture.png "Caption")\` (alt says what it shows, the title is the caption), in a \`:::figure\` block for size, placement or a group (\`write\` says how), and cite a work taken from elsewhere (a web image) in \`sources\`, its footnote right after the image (\`![…](/dir/x.jpg "Caption")[^src]\`, still a figure); a file the person gave you or you made carries its own \`credit\` and \`licence\` instead, with no \`sources\` entry. To change a stored image (resize, crop, convert, a thumbnail) or make a video's poster, use \`transform\`: the server does it, since you cannot fetch the file. Before changing a figure or answering a comment on one, \`read\` with \`images: true\` (\`diagrams: true\` for diagrams).
-4. Prefer \`edit\` for small changes, \`write\` for new concepts or rewrites, \`batch\` for related changes so they land as one request. Pass \`if_match\` (the hash from your last read); on a conflict, re-read and reapply. Bodies are stored in a canonical form (\`-\` bullets, \`*\` emphasis, padded tables): what you write reads back normalized, so \`edit\` the text as \`read\` shows it.
-5. Put a one-line \`note\` on every write. Read the \`lint\` in every write result and fix what it reports (figure and diagram lint too: \`image_*\`, \`figure_invalid\`, \`diagram_invalid\`, \`diagram_unrendered\`, \`svg_invalid\`, \`svg_unsafe\`, \`chart_invalid\` mean fix the image or the fence; a fence's lint names it by its number in \`read\`'s Figures list, the number \`render\` and \`read\` take); the result's notes say what else to know (ignored fields, the stored form, open comments). A concept with no frontmatter, invalid YAML or no \`type\` is refused. Keep concepts under 100 KB; split big ones into linked concepts.
-6. Never write index.md or log.md (the server synthesizes them). Never set \`generated\` (the server stamps it) or \`verified\` (not yours to claim). Set \`status\` and \`stale_after\` honestly. Timestamps are full ISO 8601 datetimes with an offset (\`stale_after: 2026-12-31T00:00:00Z\`); a plain date is flagged.
-7. Use \`work\` to find what needs doing: open comments, stale concepts, broken links, lint, hotlinked images (\`external_image\`), and structure (a directory's index.md made poor by its concepts: missing, long or title-repeating descriptions, duplicate titles, concepts nothing links to, a directory with one concept, none, or too many); \`work\` with kind stale_soon lists what goes stale within 14 days. Only a new \`stale_after\` resets a concept's clock; other edits leave it stale.
-8. Comments are how people ask you for changes. Before editing a concept, read its open threads with \`comments\`; make the change a comment asks for, then answer it with \`comment\` (reply, and resolve what you fixed). Ask with a reply when unsure; never resolve a thread you did not address. A concept with open threads cannot be deleted until they are resolved. A thread may be on the whole library rather than a page (no path). A thread marked a \`request\` (\`work\` lists it as a \`request\` item) is a bigger ask someone left for people's agents: do the work it asks for, reply with what you did, then resolve it.
+1. Call \`start\` first. It opens your library, or lists the libraries you can reach when there are several; then pass \`library\` (owner/slug) on every call. When the person asks for a new library, \`create_library\` makes one they own and opens it (only on a connection they allowed to). Then \`browse\` a directory before reading, follow links, and \`read\` what you need. Check a page's trust tier and staleness before relying on it.
+2. Write pages people and agents can find their way through: a \`title\` and a one-line \`description\` (indexes and search show it), absolute links like [x](/dir/x.md), footnotes [^id] keyed to \`sources[].id\` (an entry is \`id\`, \`title\` and \`resource\`: a URL or a path in this library). Shape folders and pages to the content: a long page is fine when it reads as one, and a library may say how it likes to be written in a \`guide.md\` at its root, which you read first when there is one. Other frontmatter is yours to add as a page needs it; \`tags\` let \`query\` find pages of a kind.
+3. Media, where a figure helps: a screenshot of what the page describes, a chart of data it discusses, a diagram of an architecture or a flow. Prefer rendered media, code in the page that the app draws: a chart as a Vega-Lite spec in a \`vega-lite\` fence (\`\`\`vega-lite alt="what it shows" title="Caption"\`; its data inline in \`values\`, or a CSV, TSV or JSON file in this library named by \`data.url\`; never a picture of a chart), a Mermaid diagram in a \`mermaid\` fence, or a drawing in an \`svg\` fence (\`\`\`svg alt="what it shows" title="Caption"\`; plain shapes and text, \`currentColor\` for ink, no scripts, style elements, images or links). It is text, diffs like text and needs no upload (preview a non-trivial one with \`render\`). A file (an image, video, audio or PDF) comes in only two ways, and never as bytes you type into a call: on the public web, \`attach\` with \`source_url\` (the server fetches it; never hotlink); one you made or the person has, \`prepare_upload\`: run its curl line when your shell reaches this server, else the person sends it from their browser (in a chat that shows apps an upload panel appears with the call; give them its upload link too). A file you made where you cannot reach this server (a chart in a chat's sandbox): give it to the person in the chat, call \`prepare_upload\` with \`origin: "agent"\`, and tell them in a sentence why: you cannot send files to Tempra yourself, so they upload the one you gave them. Put a file beside the page that uses it, named for what it shows (\`dir/x.md\` uses \`dir/x-architecture.png\`). Write \`![what it shows](/dir/x-architecture.png "Caption")\` (alt says what it shows, the title is the caption), in a \`:::figure\` block for size, placement or a group (\`write\` says how), and cite a work taken from elsewhere (a web image) in \`sources\`, its footnote right after the image (\`![…](/dir/x.jpg "Caption")[^src]\`, still a figure); a file the person gave you or you made carries its own \`credit\` and \`licence\` instead, with no \`sources\` entry. To change a stored image (resize, crop, convert, a thumbnail) or make a video's poster, use \`transform\`: the server does it, since you cannot fetch the file. Before changing a figure or answering a comment on one, \`read\` with \`images: true\` (\`diagrams: true\` for diagrams).
+4. Prefer \`edit\` for small changes, \`write\` for new pages or rewrites, \`batch\` for related changes so they land as one request. Pass \`if_match\` (the hash from your last read); on a conflict, re-read and reapply. Bodies are stored in a canonical form (\`-\` bullets, \`*\` emphasis, padded tables): what you write reads back normalized, so \`edit\` the text as \`read\` shows it.
+5. Put a one-line \`note\` on every write. Read the \`lint\` in every write result and fix what it reports (figure and diagram lint too: \`image_*\`, \`figure_invalid\`, \`diagram_invalid\`, \`diagram_unrendered\`, \`svg_invalid\`, \`svg_unsafe\`, \`chart_invalid\` mean fix the image or the fence; a fence's lint names it by its number in \`read\`'s Figures list, the number \`render\` and \`read\` take); the result's notes say what else to know (ignored fields, the stored form, open comments). A page with no frontmatter or invalid YAML is refused. Keep pages under 100 KB; split big ones into linked pages.
+6. Never write index.md or log.md (the server synthesizes them). Never set \`generated\` (the server stamps it) or \`verified\` (not yours to claim). \`status\` is optional: \`draft\` while a page is unfinished, \`deprecated\` once it is retired; it is not a review, which only people give. Set \`stale_after\` only when something the page relies on will change. Timestamps are full ISO 8601 datetimes with an offset (\`stale_after: 2026-12-31T00:00:00Z\`); a plain date is flagged.
+7. Use \`work\` to find what needs doing: open comments, stale pages, broken links, lint, hotlinked images (\`external_image\`), and structure (a directory's index.md made poor by its pages: missing, long or title-repeating descriptions, titles that read the same, over 50 pages in one directory); \`work\` with kind stale_soon lists what goes stale within 14 days. Only a new \`stale_after\` resets a page's clock; other edits leave it stale.
+8. Comments are how people ask you for changes. Before editing a page, read its open threads with \`comments\`; make the change a comment asks for, then answer it with \`comment\` (reply, and resolve what you fixed). Ask with a reply when unsure; never resolve a thread you did not address. A page with open threads cannot be deleted until they are resolved. A thread may be on the whole library rather than a page (no path). A thread marked a \`request\` (\`work\` lists it as a \`request\` item) is a bigger ask someone left for people's agents: do the work it asks for, reply with what you did, then resolve it.
 9. When the person asks to see a page, or you want them to read one (e.g. one you just wrote), \`show\` it: a chat that shows apps draws it in a panel as the Tempra app does. Do not \`show\` what you only read for yourself.
 10. When you tell the person about a page, link it by its URL, never its bare path: \`read\` gives a page's \`url\`, a write's result names each written page's, \`search\` gives one per result, and \`start\` gives the library's (a page opens at its path after it).`;
 
@@ -173,7 +174,7 @@ const line = (t: string) => ({ type: "text" as const, text: t });
 
 /** SVG text `read` returns as is (models read it well enough until TEMPRA-165 rasterizes it). */
 const SVG_TEXT_BYTES = 100 * 1024;
-/** Files an `okf://` resource carries as bytes (TEMPRA-155); above it, the download link. */
+/** Files an `tempra://` resource carries as bytes (TEMPRA-155); above it, the download link. */
 const RESOURCE_BYTES = 2 * 1024 * 1024;
 /**
  * A PDF `read` returns as an embedded resource (TEMPRA-164), as much as a call's images may be
@@ -232,7 +233,7 @@ export function healthLines(h: LibraryHealth): string[] {
     `Health (checked ${h.at}): ${counts || "nothing open"}`,
     ...(h.unverified.total > 0
       ? [
-          `Unverified: ${h.unverified.total} concept${h.unverified.total === 1 ? "" : "s"} changed since anyone last verified them; newest ${newest}`,
+          `Unverified: ${h.unverified.total} page${h.unverified.total === 1 ? "" : "s"} changed since anyone last verified them; newest ${newest}`,
         ]
       : []),
   ];
@@ -243,8 +244,8 @@ export function healthLines(h: LibraryHealth): string[] {
  * refused by name, never stored or ignored (TEMPRA-203; tempra-dev
  * decisions/agents-never-type-file-bytes).
  */
-function base64Removed(): OkfError {
-  return new OkfError(
+function base64Removed(): StoreError {
+  return new StoreError(
     400,
     "base64_removed",
     "`attach` no longer takes `content_base64`: a file's bytes never go through a tool argument. For a file on the public web, call `attach` with `source_url` and the server fetches it. For a file you made or the person has, call `prepare_upload`: run its curl line if your shell reaches this server, otherwise the person sends the file from their browser (the upload panel or link). Nothing was written.",
@@ -252,7 +253,7 @@ function base64Removed(): OkfError {
 }
 
 function errorResult(e: unknown): CallToolResult {
-  if (!(e instanceof OkfError)) throw e;
+  if (!(e instanceof StoreError)) throw e;
   const lines = [`Error ${e.status} ${e.code}: ${e.message}`];
   if (e.extra.current_hash !== undefined) {
     lines.push(`current_hash: ${e.extra.current_hash ?? "(none: the path does not exist)"}`);
@@ -341,7 +342,7 @@ const EditSchema = z.object({
 const BatchOpSchema = z.object({
   op: z.enum(["write", "edit", "move", "delete"]),
   path: z.string(),
-  content: z.string().optional().describe("write: the full OKF markdown."),
+  content: z.string().optional().describe("write: the whole page: frontmatter and markdown."),
   edits: z.array(EditSchema).optional().describe("edit: find-and-replace pairs."),
   to: z.string().optional().describe("move: the destination path."),
   if_match: z.string().optional().describe("write (replace), edit, delete: the current hash."),
@@ -365,7 +366,7 @@ export function buildServer(ctx: McpContext): McpServer {
   const pick = (name?: string): { token: TokenInfo; lib: LibraryClient } => {
     const libs = ctx.libraries;
     if (libs.length === 0) {
-      throw new OkfError(
+      throw new StoreError(
         404,
         "no_library",
         `This connection reaches no libraries yet. Create one with \`create_library\` if the person asks for one (and allowed it at consent), or at ${ctx.origin}/, or reconnect and choose one.`,
@@ -376,7 +377,7 @@ export function buildServer(ctx: McpContext): McpServer {
       .replace(/^\/+|\/+$/g, "")
       .toLowerCase();
     if (want === "" && libs.length > 1) {
-      throw new OkfError(
+      throw new StoreError(
         400,
         "library_required",
         `You can reach ${libs.length} libraries; pass library, one of: ${libraryList(libs)}.`,
@@ -392,7 +393,7 @@ export function buildServer(ctx: McpContext): McpServer {
             ? bySlug[0]
             : undefined;
     if (!found) {
-      throw new OkfError(
+      throw new StoreError(
         404,
         "no_library",
         `There is no library ${name} here; you can reach: ${libraryList(libs)}.`,
@@ -417,7 +418,7 @@ export function buildServer(ctx: McpContext): McpServer {
 
   const checkWrite = (token: TokenInfo, ...paths: string[]) => {
     if (token.scope !== "write") {
-      throw new OkfError(
+      throw new StoreError(
         403,
         "read_only",
         "You have read access here: you can read and comment, not change content.",
@@ -433,7 +434,7 @@ export function buildServer(ctx: McpContext): McpServer {
     if (token.prefix === null) return;
     for (const p of paths) {
       if (!underPrefix(normalizePath(p) ?? "", token.prefix)) {
-        throw new OkfError(
+        throw new StoreError(
           403,
           "outside_prefix",
           `This token may only write under ${token.prefix}/.`,
@@ -522,7 +523,7 @@ export function buildServer(ctx: McpContext): McpServer {
     theme: "light" | "dark",
     library?: string,
     lang: RenderLang = "mermaid",
-    /** For a chart: the library and the concept its data paths resolve from (TEMPRA-207). */
+    /** For a chart: the library and the page its data paths resolve from (TEMPRA-207). */
     from?: { lib: LibraryClient; path: string },
   ): Promise<Drawn> => {
     const unavailable = (message = RENDER_UNAVAILABLE): Drawn => ({
@@ -602,11 +603,7 @@ export function buildServer(ctx: McpContext): McpServer {
       lib.read("index.md"),
       ctx.about ? ctx.about(token.library.id).catch(() => null) : null,
     ]);
-    const types = Object.entries(summary.types)
-      .sort((a, b) => b[1] - a[1])
-      .map(([t, n]) => `${t} ${n}`)
-      .join(", ");
-    const empty = summary.concepts + summary.attachments === 0;
+    const empty = summary.pages + summary.attachments === 0;
     const others = ctx.libraries.filter((t) => t !== token);
     const lines = [
       `# Library ${token.library.owner}/${token.library.slug} (seq ${summary.seq})`,
@@ -614,9 +611,8 @@ export function buildServer(ctx: McpContext): McpServer {
       `In the app: ${linksFor(token).library} (a page opens at its path after it; link it when you tell the person about a page)`,
       ...(about?.title ? [`Title: ${about.title}`] : []),
       ...(about?.description ? [`Description: ${about.description}`] : []),
-      `Concepts: ${summary.concepts} · attachments: ${summary.attachments} · open work items: ${summary.open_work} (${summary.open_comments} of them comment threads)${summary.stale_soon > 0 ? ` · stale soon: ${summary.stale_soon} (\`work\` kind stale_soon)` : ""}`,
+      `Pages: ${summary.pages} · attachments: ${summary.attachments} · open work items: ${summary.open_work} (${summary.open_comments} of them comment threads)${summary.stale_soon > 0 ? ` · stale soon: ${summary.stale_soon} (\`work\` kind stale_soon)` : ""}`,
       ...healthLines(summary.health),
-      `Types: ${types || "none yet"}`,
       you(),
       ...(others.length > 0
         ? [`Other libraries you can reach: ${libraryList(others)}. Pass \`library\` on every call.`]
@@ -625,22 +621,23 @@ export function buildServer(ctx: McpContext): McpServer {
       "## Root index.md",
       "",
       empty
-        ? "(The library is empty. Start by writing a concept; `write` describes the format.)"
+        ? "(The library is empty. Start with a `guide.md` at the root that says what the library is for, then the pages; `write` describes the format.)"
         : root.kind === "derived"
           ? root.markdown.trimEnd()
           : "",
       "",
       "## How to work here",
       "",
-      "- `browse` a directory before reading; follow links; check frontmatter (type, status, trust, stale) before relying on a body.",
-      "- `edit` for small changes, `write` for new concepts or rewrites, `batch` for related changes. Pass `if_match` from your last read; on a 412, re-read and reapply.",
+      "- If the root holds a `guide.md`, read it first: it says what the library is for and how it is written.",
+      "- `browse` a directory before reading; follow links; check a page's trust tier and staleness before relying on it.",
+      "- `edit` for small changes, `write` for new pages or rewrites, `batch` for related changes. Pass `if_match` from your last read; on a 412, re-read and reapply.",
       "- A one-line `note` on every write. Fix the `lint` each write returns. Never write index.md or log.md, and never set generated or verified.",
-      "- A concept needs frontmatter with a `type`, or the write is refused. A concept with open comment threads cannot be deleted until they are resolved.",
+      "- A page starts with YAML frontmatter (its `title` and a one-line `description`), or the write is refused. A page with open comment threads cannot be deleted until they are resolved.",
     ];
     if (tier2) {
       lines.push(
-        "- `work` lists open comments, stale concepts, broken links and lint to fix; `log` shows what others changed recently.",
-        "- Comments are requests from people: read a concept's open threads (`comments`) before editing it, then reply and resolve with `comment`.",
+        "- `work` lists open comments, stale pages, broken links and lint to fix; `log` shows what others changed recently.",
+        "- Comments are requests from people: read a page's open threads (`comments`) before editing it, then reply and resolve with `comment`.",
       );
     }
     return lines.join("\n");
@@ -651,7 +648,7 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Start here",
       description:
-        "Call this first in every session. Opens a library: its root index.md (what is here, one level down), counts by concept type, the number of open work items, the daily health check (open work by kind, the newest unverified changes), and how to work in it. When you can reach several libraries and pass no `library`, lists them instead.",
+        "Call this first in every session. Opens a library: its root index.md (what is here, one level down), counts by page type, the number of open work items, the daily health check (open work by kind, the newest unverified changes), and how to work in it. When you can reach several libraries and pass no `library`, lists them instead.",
       inputSchema: libArg,
       annotations: readOnly,
     },
@@ -700,7 +697,7 @@ export function buildServer(ctx: McpContext): McpServer {
     },
     guarded(async ({ slug, title, description }) => {
       if (!ctx.createLibrary) {
-        throw new OkfError(
+        throw new StoreError(
           403,
           "create_not_allowed",
           `This token reaches one library and cannot create libraries. The person can create one at ${ctx.origin}/, or connect an app over OAuth and allow Create libraries.`,
@@ -725,7 +722,7 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Browse a directory",
       description:
-        "One directory level, like `ls` plus `cat index.md`: subdirectories with concept counts, and concepts with their titles and descriptions. The index is synthesized by the server from the concepts' frontmatter. Omit `dir` for the root.",
+        "One directory level, like `ls` plus `cat index.md`: subdirectories with page counts, and pages with their titles and descriptions. The index is synthesized by the server from the pages' frontmatter. Omit `dir` for the root.",
       inputSchema: {
         dir: z.string().optional().describe("Directory path, e.g. `tables`. Omit for the root."),
         ...libArg,
@@ -746,7 +743,7 @@ export function buildServer(ctx: McpContext): McpServer {
   );
 
   /**
-   * The figures `read` of a concept sends as images: internal raster images (TEMPRA-154) and
+   * The figures `read` of a page sends as images: internal raster images (TEMPRA-154) and
    * drawn diagrams (TEMPRA-166), each after a line naming it, within IMAGES_PER_CALL and
    * IMAGE_BYTES_PER_CALL together; then what was left out and why. `want` is every image, every
    * diagram, or figures by number (either kind). External images are never fetched.
@@ -876,9 +873,7 @@ export function buildServer(ctx: McpContext): McpServer {
   };
 
   const readSchema = {
-    path: z
-      .string()
-      .describe("Concept or file path, e.g. `tables/orders.md` (the .md is optional)."),
+    path: z.string().describe("Page or file path, e.g. `tables/orders.md` (the .md is optional)."),
     image: z
       .boolean()
       .optional()
@@ -887,19 +882,19 @@ export function buildServer(ctx: McpContext): McpServer {
       .boolean()
       .optional()
       .describe(
-        `For a concept: true adds its figures' images after the markdown (at most ${IMAGES_PER_CALL}).`,
+        `For a page: true adds its figures' images after the markdown (at most ${IMAGES_PER_CALL}).`,
       ),
     diagrams: z
       .boolean()
       .optional()
       .describe(
-        "For a concept: true adds its Mermaid diagrams drawn as images, as people see them, after the markdown (sharing the cap with `images`).",
+        "For a page: true adds its Mermaid diagrams drawn as images, as people see them, after the markdown (sharing the cap with `images`).",
       ),
     figures: z
       .array(z.number().int().min(1))
       .optional()
       .describe(
-        "For a concept: only these figures (images or diagrams), by number as the Figures list gives them.",
+        "For a page: only these figures (images or diagrams), by number as the Figures list gives them.",
       ),
     ...(tier2
       ? {
@@ -918,7 +913,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "read",
     {
       title: "Read a file",
-      description: `Read a concept as OKF markdown (frontmatter and body), with its hash, sequence, trust tier, staleness, lint, inbound link count and its figures above it (one line each, numbered as the app numbers them: path or URL, alt, caption, dimensions, size, and ok, missing or external; diagrams by type). Pass the hash as \`if_match\` when you edit, replace or delete. Check trust tier and \`stale\` before relying on the content. Ask for the figures' images with \`images: true\`, for the Mermaid diagrams drawn as people see them with \`diagrams: true\`, or for some figures of either kind with \`figures: [n]\`, when you review the page, change a figure or its caption, or answer a comment on one; they come after the markdown, each after a line naming it, at most ${IMAGES_PER_CALL} and ${IMAGE_BYTES_PER_CALL / 1048576} MB a call in all, what was left out listed with the reason (for a diagram that does not draw, Pele's error); external images are not fetched. Also reads index.md and log.md (the latest 200 requests; \`log\` pages back further); for an attachment returns its size and a short-lived download URL, and for an image (PNG, JPEG, GIF, WebP) the image itself, scaled to at most 1568 px (SVG as its text); for a PDF up to ${sizeText(PDF_RESOURCE_BYTES)}, the PDF as an embedded resource.`,
+      description: `Read a page as markdown (frontmatter and body), with its hash, sequence, trust tier, staleness, lint, inbound link count and its figures above it (one line each, numbered as the app numbers them: path or URL, alt, caption, dimensions, size, and ok, missing or external; diagrams by type). Pass the hash as \`if_match\` when you edit, replace or delete. Check trust tier and \`stale\` before relying on the content. Ask for the figures' images with \`images: true\`, for the Mermaid diagrams drawn as people see them with \`diagrams: true\`, or for some figures of either kind with \`figures: [n]\`, when you review the page, change a figure or its caption, or answer a comment on one; they come after the markdown, each after a line naming it, at most ${IMAGES_PER_CALL} and ${IMAGE_BYTES_PER_CALL / 1048576} MB a call in all, what was left out listed with the reason (for a diagram that does not draw, Pele's error); external images are not fetched. Also reads index.md and log.md (the latest 200 requests; \`log\` pages back further); for an attachment returns its size and a short-lived download URL, and for an image (PNG, JPEG, GIF, WebP) the image itself, scaled to at most 1568 px (SVG as its text); for a PDF up to ${sizeText(PDF_RESOURCE_BYTES)}, the PDF as an embedded resource.`,
       inputSchema: readSchema,
       annotations: readOnly,
     },
@@ -1033,10 +1028,10 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Show a page to the person",
       description:
-        "Show one concept to the person you work for, drawn as the Tempra app draws it, in a panel in the chat (in a chat that shows apps; elsewhere give them the link this returns). Use it when they ask to see a page, or when you want them to read one, e.g. after you wrote it. It is for reading only. Writes nothing.",
+        "Show one page to the person you work for, drawn as the Tempra app draws it, in a panel in the chat (in a chat that shows apps; elsewhere give them the link this returns). Use it when they ask to see a page, or when you want them to read one, e.g. after you wrote it. It is for reading only. Writes nothing.",
       _meta: { ui: { resourceUri: PAGE_PANEL_URI } },
       inputSchema: {
-        path: z.string().describe("The concept, e.g. `v2/limits.md`."),
+        path: z.string().describe("The page, e.g. `v2/limits.md`."),
         ...libArg,
       },
       annotations: readOnly,
@@ -1046,7 +1041,7 @@ export function buildServer(ctx: McpContext): McpServer {
       const page = await pagePayload(lib, token, ctx.origin, path, ctx.agentNames);
       const result = text(
         [
-          `Showing "${page.concept.title}" (${page.concept.path}) to the person in the chat, as the app draws it.`,
+          `Showing "${page.page.title}" (${page.page.path}) to the person in the chat, as the app draws it.`,
           `If it does not show, give them the link: ${pageUrl(ctx.origin, page)}`,
         ].join("\n"),
       );
@@ -1059,16 +1054,13 @@ export function buildServer(ctx: McpContext): McpServer {
   server.registerTool(
     "write",
     {
-      title: "Create or replace a concept",
+      title: "Create or replace a page",
       description:
-        'Write a whole concept as OKF markdown: a YAML frontmatter block with a non-empty `type` that names what kind of thing this is, e.g. `Metric`, `BigQuery Table`, `Decision`, not a generic `concept` or `note` (plus `title`, one-line `description`, optional `tags`, `resource`, `sources`, `status`, `stale_after`), then a markdown body. Each `sources` entry is `id`, `title` and `resource` (a URL, or a path in this library such as `/dir/x.md`); `url` is taken as `resource`. `stale_after` and other timestamps are full ISO 8601 datetimes with an offset, e.g. 2026-12-31T00:00:00Z (a plain date is flagged). Prefer absolute links like [orders](/tables/orders.md); cite sources with footnotes: [^id] in the text, matching a `sources[].id`, plus a `[^id]: …` definition line at the end of the body. Diagrams and charts are best as rendered media, code the app draws, rather than a picture: a chart as a Vega-Lite spec in a ```vega-lite fence, Mermaid in a ```mermaid fence, or SVG in a ```svg fence (preview a non-trivial one with `render`); a fence with an unknown type, nothing after its header, or a bracket or quote left open is saved, shown as its source, and reported as `diagram_invalid` lint with the line and column inside the fence; `diagram_unrendered` lint (in the result when the renderer answers quickly, else in `work` and the next `read`) means Pele could not draw the fence, with its message, line and column: fix the fence. An SVG fence (```svg alt="what it shows" title="Caption"; up to 50 KB; `currentColor` takes the text colour in light and dark) is sanitized when drawn: `svg_invalid` lint means it does not parse (line and column given), `svg_unsafe` names what was taken out (scripts, event handlers, `<style>`, images, links, animation, references outside the SVG), and a missing alt (no `alt="…"` nor a `<title>`) is `image_no_alt`. A Vega-Lite fence (```vega-lite alt="what it shows" title="Caption"; a JSON spec, Vega-Lite 6) is drawn in the reader\'s greys in light and dark; its data is inline (`values`, rows or CSV text with `format`) or a CSV, TSV or JSON file in this library (`data.url`, a path such as `/data/sales.csv`, put there with `attach` or `prepare_upload`), nothing else is fetched; `chart_invalid` lint means it is not JSON, names data from elsewhere, does not fit the Vega-Lite schema (said at its path in the spec, e.g. `encoding.x.type: "bogus" is not one of …`), or Vega could not draw it (with its message); no alt (`alt="…"` or the spec\'s `description`) is `image_no_alt`. Images are `![what it shows](/dir/x-architecture.png "Caption")`, the file put beside the concept by `attach` with `source_url` (on the web) or `prepare_upload` (one you made or the person has; never type its bytes); for a width, a placement or a group, wrap one to four images, one to a line, in `:::figure[group caption]{width=480|60% layout=column|wide|full frame}` and a closing `:::` (`frame` is a hairline for screenshots; in a group each title is a small label). An image may carry its footnote right after it, e.g. `![…](/x.jpg "Caption")[^src]` for a web image cited in `sources`: it is still a figure, with the marker at its caption\'s end. Video, audio and PDF use the same spelling (a video\'s poster is `x.poster.png` beside `x.mp4`). Figures are lint, never refused: `image_no_alt` (say what it shows), `image_external` (hotlinked; `attach` it with `source_url`), `image_large` (over 2 MB or 4000 px; make a smaller one with `transform`), `image_not_image` (not an image, video, audio or PDF; link it instead), `figure_invalid` (the markup does not parse). A file with no frontmatter, frontmatter that is not valid YAML, or no `type` is refused (400) and nothing is written. Without `if_match` it creates and fails if the path exists; to replace, pass the hash from your last read. The server stamps `generated` from your token; `verified` is not yours to set. The concept is stored in a canonical form (`-` bullets, `*` emphasis; `sources` entries one key per line, `tags: [a, b]` on one line); when that differs from what you sent, the result shows the diff, so `edit` the stored text. Prefer `edit` for small changes. Read the lint and notes in the result and fix the lint.',
+        'Write a whole page as markdown: a YAML frontmatter block with a `title` and a one-line `description` (plus, as the page needs them, `tags`, `sources`, `status`, `stale_after`, `resource`, or fields of your own), then a markdown body. Each `sources` entry is `id`, `title` and `resource` (a URL, or a path in this library such as `/dir/x.md`); `url` is taken as `resource`. `stale_after` and other timestamps are full ISO 8601 datetimes with an offset, e.g. 2026-12-31T00:00:00Z (a plain date is flagged). Prefer absolute links like [orders](/tables/orders.md); cite sources with footnotes: [^id] in the text, matching a `sources[].id`, plus a `[^id]: …` definition line at the end of the body. Diagrams and charts are best as rendered media, code the app draws, rather than a picture: a chart as a Vega-Lite spec in a ```vega-lite fence, Mermaid in a ```mermaid fence, or SVG in a ```svg fence (preview a non-trivial one with `render`); a fence with an unknown type, nothing after its header, or a bracket or quote left open is saved, shown as its source, and reported as `diagram_invalid` lint with the line and column inside the fence; `diagram_unrendered` lint (in the result when the renderer answers quickly, else in `work` and the next `read`) means Pele could not draw the fence, with its message, line and column: fix the fence. An SVG fence (```svg alt="what it shows" title="Caption"; up to 50 KB; `currentColor` takes the text colour in light and dark) is sanitized when drawn: `svg_invalid` lint means it does not parse (line and column given), `svg_unsafe` names what was taken out (scripts, event handlers, `<style>`, images, links, animation, references outside the SVG), and a missing alt (no `alt="…"` nor a `<title>`) is `image_no_alt`. A Vega-Lite fence (```vega-lite alt="what it shows" title="Caption"; a JSON spec, Vega-Lite 6) is drawn in the reader\'s greys in light and dark; its data is inline (`values`, rows or CSV text with `format`) or a CSV, TSV or JSON file in this library (`data.url`, a path such as `/data/sales.csv`, put there with `attach` or `prepare_upload`), nothing else is fetched; `chart_invalid` lint means it is not JSON, names data from elsewhere, does not fit the Vega-Lite schema (said at its path in the spec, e.g. `encoding.x.type: "bogus" is not one of …`), or Vega could not draw it (with its message); no alt (`alt="…"` or the spec\'s `description`) is `image_no_alt`. Images are `![what it shows](/dir/x-architecture.png "Caption")`, the file put beside the page by `attach` with `source_url` (on the web) or `prepare_upload` (one you made or the person has; never type its bytes); for a width, a placement or a group, wrap one to four images, one to a line, in `:::figure[group caption]{width=480|60% layout=column|wide|full frame}` and a closing `:::` (`frame` is a hairline for screenshots; in a group each title is a small label). An image may carry its footnote right after it, e.g. `![…](/x.jpg "Caption")[^src]` for a web image cited in `sources`: it is still a figure, with the marker at its caption\'s end. Video, audio and PDF use the same spelling (a video\'s poster is `x.poster.png` beside `x.mp4`). Figures are lint, never refused: `image_no_alt` (say what it shows), `image_external` (hotlinked; `attach` it with `source_url`), `image_large` (over 2 MB or 4000 px; make a smaller one with `transform`), `image_not_image` (not an image, video, audio or PDF; link it instead), `figure_invalid` (the markup does not parse). A file with no frontmatter or frontmatter that is not valid YAML is refused (400) and nothing is written. Without `if_match` it creates and fails if the path exists; to replace, pass the hash from your last read. The server stamps `generated` from your token; `verified` is not yours to set. The page is stored in a canonical form (`-` bullets, `*` emphasis; `sources` entries one key per line, `tags: [a, b]` on one line); when that differs from what you sent, the result shows the diff, so `edit` the stored text. Prefer `edit` for small changes. Read the lint and notes in the result and fix the lint.',
       inputSchema: {
         path: z.string().describe("Where to write, e.g. `metrics/revenue.md`."),
-        content: z.string().describe("The full OKF markdown document."),
-        if_match: z
-          .string()
-          .optional()
-          .describe("The current hash, to replace an existing concept."),
+        content: z.string().describe("The whole page: frontmatter and markdown."),
+        if_match: z.string().optional().describe("The current hash, to replace an existing page."),
         note: z.string().optional().describe("One line for the ledger: why you made this change."),
         ...libArg,
       },
@@ -1085,9 +1077,9 @@ export function buildServer(ctx: McpContext): McpServer {
   server.registerTool(
     "edit",
     {
-      title: "Edit a concept",
+      title: "Edit a page",
       description:
-        "Find-and-replace on the rendered document, frontmatter included, like an Edit tool. Each `old` must match exactly once; include enough surrounding text to make it unique; match the text as `read` shows it (stored in canonical form, which may differ from what was written). Edits apply in order. `if_match` is optional because the quoted text guards the edit. Preferred for small changes. On a mismatch the error includes the current document. The result names the concept's open comment threads and any whose quote the edit removed.",
+        "Find-and-replace on the rendered document, frontmatter included, like an Edit tool. Each `old` must match exactly once; include enough surrounding text to make it unique; match the text as `read` shows it (stored in canonical form, which may differ from what was written). Edits apply in order. `if_match` is optional because the quoted text guards the edit. Preferred for small changes. On a mismatch the error includes the current document. The result names the page's open comment threads and any whose quote the edit removed.",
       inputSchema: {
         path: z.string(),
         edits: z.array(EditSchema).min(1),
@@ -1110,7 +1102,7 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Search text",
       description:
-        "Find lines matching a literal string (or a JavaScript regular expression with `regex: true`) across rendered concepts, frontmatter included, like `grep -n`. Returns path:line: text.",
+        "Find lines matching a literal string (or a JavaScript regular expression with `regex: true`) across rendered pages, frontmatter included, like `grep -n`. Returns path:line: text.",
       inputSchema: {
         pattern: z.string(),
         regex: z.boolean().optional(),
@@ -1158,7 +1150,7 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Delete a file",
       description:
-        "Delete a concept or attachment. Requires `if_match` with its current hash. A concept with open comment threads is not deleted (409 `open_comments`): resolve them first. History is kept: the ledger records the delete and it can be reverted. Links pointing here become broken and show up in the work queue.",
+        "Delete a page or attachment. Requires `if_match` with its current hash. A page with open comment threads is not deleted (409 `open_comments`): resolve them first. History is kept: the ledger records the delete and it can be reverted. Links pointing here become broken and show up in the work queue.",
       inputSchema: {
         path: z.string(),
         if_match: z.string(),
@@ -1194,13 +1186,13 @@ export function buildServer(ctx: McpContext): McpServer {
         switch (o.op) {
           case "write":
             if (o.content === undefined)
-              throw new OkfError(400, "bad_op", `write ${o.path}: needs content.`);
+              throw new StoreError(400, "bad_op", `write ${o.path}: needs content.`);
             return { op: "write", path: o.path, content: o.content, if_match: o.if_match };
           case "edit":
-            if (!o.edits) throw new OkfError(400, "bad_op", `edit ${o.path}: needs edits.`);
+            if (!o.edits) throw new StoreError(400, "bad_op", `edit ${o.path}: needs edits.`);
             return { op: "edit", path: o.path, edits: o.edits, if_match: o.if_match };
           case "move":
-            if (!o.to) throw new OkfError(400, "bad_op", `move ${o.path}: needs to.`);
+            if (!o.to) throw new StoreError(400, "bad_op", `move ${o.path}: needs to.`);
             return { op: "move", path: o.path, to: o.to };
           default:
             return { op: "delete", path: o.path, if_match: o.if_match };
@@ -1217,7 +1209,7 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Add an attachment from the web",
       description:
-        "Store a file from the public web at a path: the server fetches `source_url` (https only, no credentials in the URL, at most 3 redirects, 10 s, up to 10 MB; images, video, audio and PDF only, judged by the bytes), so nothing passes through you, and records the URL and fetch time as the file's source; a refused fetch is `fetch_refused` naming the rule. Put a figure beside the concept that uses it, named for what it shows (`dir/x.md` uses `dir/x-architecture.png`), and link it by absolute path. Never hotlink a web image in a concept; bring it in this way, and cite the original in the concept's `sources` (the fetch records where it came from but is not a citation). A file that is not on the web (one you made, or one the person has) goes in with `prepare_upload`. Images (PNG, JPEG, GIF, WebP, AVIF, SVG) are checked on write: a broken or truncated one is refused with `bad_image`, and the type is taken from the bytes, not the extension. `description` says in a line what the file shows (up to 500 characters); `credit` (who made it) and `licence` (free text) a line each, up to 200 characters; they show on the file's page. Replacing needs `if_match`; the same bytes with a new description, credit or licence is a write too. Reading it back with `read` returns its facts, a short-lived download URL and, for an image, the image.",
+        "Store a file from the public web at a path: the server fetches `source_url` (https only, no credentials in the URL, at most 3 redirects, 10 s, up to 10 MB; images, video, audio and PDF only, judged by the bytes), so nothing passes through you, and records the URL and fetch time as the file's source; a refused fetch is `fetch_refused` naming the rule. Put a figure beside the page that uses it, named for what it shows (`dir/x.md` uses `dir/x-architecture.png`), and link it by absolute path. Never hotlink a web image in a page; bring it in this way, and cite the original in the page's `sources` (the fetch records where it came from but is not a citation). A file that is not on the web (one you made, or one the person has) goes in with `prepare_upload`. Images (PNG, JPEG, GIF, WebP, AVIF, SVG) are checked on write: a broken or truncated one is refused with `bad_image`, and the type is taken from the bytes, not the extension. `description` says in a line what the file shows (up to 500 characters); `credit` (who made it) and `licence` (free text) a line each, up to 200 characters; they show on the file's page. Replacing needs `if_match`; the same bytes with a new description, credit or licence is a write too. Reading it back with `read` returns its facts, a short-lived download URL and, for an image, the image.",
       // Loose, so a call that still sends the removed `content_base64` reaches the handler and is
       // refused by name rather than having it silently dropped (TEMPRA-203).
       inputSchema: z.looseObject({
@@ -1251,7 +1243,7 @@ export function buildServer(ctx: McpContext): McpServer {
       checkWrite(token, path);
       if ("content_base64" in args) throw base64Removed();
       if (source_url === undefined) {
-        throw new OkfError(
+        throw new StoreError(
           400,
           "bad_attach",
           "Pass `source_url`, a public https URL the server fetches. A file that is not on the web goes in with `prepare_upload`.",
@@ -1260,7 +1252,7 @@ export function buildServer(ctx: McpContext): McpServer {
       const facts = checkFacts({ description, credit, licence });
       const clean = normalizePath(path) ?? path;
       if (!clean || clean.endsWith(".md")) {
-        throw new OkfError(400, "bad_attachment", "Markdown files are concepts, not attachments.");
+        throw new StoreError(400, "bad_attachment", "Markdown files are pages, not attachments.");
       }
       const got = await fetchBlob(
         {
@@ -1278,7 +1270,7 @@ export function buildServer(ctx: McpContext): McpServer {
       return text(
         [
           writeText("Stored", res, linksFor(token)),
-          `Fetched ${got.bytes.byteLength} bytes from ${got.source.final_url ?? got.source.url} as ${got.blob.media ?? "unknown"}. Cite the original in the concept's \`sources\` too.`,
+          `Fetched ${got.bytes.byteLength} bytes from ${got.source.final_url ?? got.source.url} as ${got.blob.media ?? "unknown"}. Cite the original in the page's \`sources\` too.`,
         ].join("\n"),
       );
     }),
@@ -1289,13 +1281,13 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Upload a file",
       description:
-        "The way to add a file that is not on the web, up to 10 MB: one you made (a screenshot, a processed image, a PDF) or one the person has (a photo they attached in the chat). Never type a file's bytes into a call, and for a chart, a flow or a drawing prefer rendered media in the concept (a ```vega-lite, ```mermaid or ```svg fence) to a picture. Put it beside the concept that uses it, named for what it shows (`dir/x-architecture.png`). Returns a URL good for one PUT within an hour, a ready `curl -T <file> '<url>'` line and an upload link for the person; in a chat that shows apps, an upload panel appears with the call. Then, by where the file is: (1) your shell reaches this server: run the curl line, and the server attaches the file at `path` as you, with your `note`; curl prints the write result as JSON (path, hash, seq, lint). (2) The person has it (you cannot pass on a chat's attachment): ask them to choose it in the panel, and give them the link in case the panel does not show. (3) You made it where you cannot reach this server (curl fails to connect, or a proxy refuses it, as in a chat's sandbox): give the file to the person in the chat, pass `origin` `agent`, and tell them in a sentence or two why they are asked: you cannot send files to Tempra yourself, so they upload the one you gave them (the panel and the link say the same). From their browser it is attached as your write, with your note, description, credit and licence, recorded as supplied by them; `read` the path to see when it has arrived. Whatever file arrives is the file; a transfer cut short is refused (`incomplete_upload`). The URL needs no token, so keep it to yourself; the link needs the person signed in with write access.",
+        "The way to add a file that is not on the web, up to 10 MB: one you made (a screenshot, a processed image, a PDF) or one the person has (a photo they attached in the chat). Never type a file's bytes into a call, and for a chart, a flow or a drawing prefer rendered media in the page (a ```vega-lite, ```mermaid or ```svg fence) to a picture. Put it beside the page that uses it, named for what it shows (`dir/x-architecture.png`). Returns a URL good for one PUT within an hour, a ready `curl -T <file> '<url>'` line and an upload link for the person; in a chat that shows apps, an upload panel appears with the call. Then, by where the file is: (1) your shell reaches this server: run the curl line, and the server attaches the file at `path` as you, with your `note`; curl prints the write result as JSON (path, hash, seq, lint). (2) The person has it (you cannot pass on a chat's attachment): ask them to choose it in the panel, and give them the link in case the panel does not show. (3) You made it where you cannot reach this server (curl fails to connect, or a proxy refuses it, as in a chat's sandbox): give the file to the person in the chat, pass `origin` `agent`, and tell them in a sentence or two why they are asked: you cannot send files to Tempra yourself, so they upload the one you gave them (the panel and the link say the same). From their browser it is attached as your write, with your note, description, credit and licence, recorded as supplied by them; `read` the path to see when it has arrived. Whatever file arrives is the file; a transfer cut short is refused (`incomplete_upload`). The URL needs no token, so keep it to yourself; the link needs the person signed in with write access.",
       _meta: { ui: { resourceUri: UPLOAD_PANEL_URI } },
       inputSchema: {
         path: z
           .string()
           .describe(
-            "Where the file goes, beside the concept that uses it, e.g. `metrics/latency-p99.png`.",
+            "Where the file goes, beside the page that uses it, e.g. `metrics/latency-p99.png`.",
           ),
         media: z.string().optional().describe("MIME type; guessed from the extension if omitted."),
         origin: z
@@ -1328,10 +1320,10 @@ export function buildServer(ctx: McpContext): McpServer {
         checkWrite(picked.token, path);
         const clean = normalizePath(path);
         if (!clean || clean.endsWith(".md")) {
-          throw new OkfError(
+          throw new StoreError(
             400,
             "bad_path",
-            "prepare_upload is for attachments: a file path that is not markdown (use `write` for concepts).",
+            "prepare_upload is for attachments: a file path that is not markdown (use `write` for pages).",
           );
         }
         const req = request(note);
@@ -1437,11 +1429,11 @@ export function buildServer(ctx: McpContext): McpServer {
       const picked = pick(args.library);
       const from = normalizePath(args.path);
       if (!from || from.endsWith(".md")) {
-        throw new OkfError(400, "bad_path", "`transform` works on attachments, not concepts.");
+        throw new StoreError(400, "bad_path", "`transform` works on attachments, not pages.");
       }
       const view = await picked.lib.read(from).catch(() => null);
       if (!view || view.kind !== "attachment") {
-        throw new OkfError(404, "not_found", `No attachment at /${from}.`);
+        throw new StoreError(404, "not_found", `No attachment at /${from}.`);
       }
       const media = (view.media ?? "").toLowerCase();
       const base = from.replace(/\.[^./]+$/, "");
@@ -1459,12 +1451,12 @@ export function buildServer(ctx: McpContext): McpServer {
       }[args.op];
       const to = normalizePath(args.to ?? defaultTo);
       if (!to || to.endsWith(".md")) {
-        throw new OkfError(400, "bad_path", "`to` is an attachment path, not a concept.");
+        throw new StoreError(400, "bad_path", "`to` is an attachment path, not a page.");
       }
       checkWrite(picked.token, to);
       // A replacement in place needs the hash, as any replace does.
       if (to === from && args.if_match === undefined) {
-        throw new OkfError(
+        throw new StoreError(
           400,
           "if_match_required",
           `This replaces /${from}; pass \`if_match\` (its hash, ${view.hash}) or a \`to\` path.`,
@@ -1474,14 +1466,14 @@ export function buildServer(ctx: McpContext): McpServer {
       let op: string;
       if (args.op === "poster") {
         if (!media.startsWith("video/")) {
-          throw new OkfError(
+          throw new StoreError(
             400,
             "not_a_video",
             `/${from} is ${media || "not a video"}; a poster is made from a video.`,
           );
         }
         if (ctx.allowRender && !(await ctx.allowRender())) {
-          throw new OkfError(
+          throw new StoreError(
             429,
             "rate_limited",
             `Over ${RENDERS_PER_MINUTE} renders a minute for this account; try again in a minute.`,
@@ -1503,13 +1495,13 @@ export function buildServer(ctx: McpContext): McpServer {
             media === "video/mp4" && r.error.includes("decoded")
               ? `${r.error} (the server's browser cannot decode MP4's H.264 yet; a WebM poster works, or upload a poster image beside the video as ${base}.poster.png)`
               : r.error;
-          throw new OkfError(502, "transform_failed", `No poster for /${from}: ${why}.`);
+          throw new StoreError(502, "transform_failed", `No poster for /${from}: ${why}.`);
         }
         made = { bytes: r.png, media: "image/png" };
         op = `poster ${time}s`;
       } else {
         if (!["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"].includes(media)) {
-          throw new OkfError(
+          throw new StoreError(
             400,
             "not_an_image",
             `/${from} is ${media || "of no known type"}; resize, crop, convert and thumbnail take PNG, JPEG, GIF, WebP or AVIF.`,
@@ -1518,17 +1510,18 @@ export function buildServer(ctx: McpContext): McpServer {
         let t: ImageTransform;
         if (args.op === "resize" || args.op === "thumbnail") {
           const edge = args.edge ?? (args.op === "thumbnail" ? 320 : undefined);
-          if (edge === undefined) throw new OkfError(400, "bad_request", "`resize` needs `edge`.");
+          if (edge === undefined)
+            throw new StoreError(400, "bad_request", "`resize` needs `edge`.");
           t = { width: edge, height: edge, fit: "scale-down" };
           op = `${args.op} ${edge}`;
         } else if (args.op === "crop") {
           const b = args.box;
-          if (!b) throw new OkfError(400, "bad_request", "`crop` needs `box`.");
+          if (!b) throw new StoreError(400, "bad_request", "`crop` needs `box`.");
           const sized = await withDimensions(picked.lib, ctx.blobs, view);
           const w = sized.kind === "attachment" ? sized.width : null;
           const h = sized.kind === "attachment" ? sized.height : null;
           if (w && h && (b.x + b.width > w || b.y + b.height > h)) {
-            throw new OkfError(
+            throw new StoreError(
               400,
               "bad_request",
               `The box runs past the image, which is ${w}×${h}.`,
@@ -1541,16 +1534,16 @@ export function buildServer(ctx: McpContext): McpServer {
           op = `convert ${format}`;
         }
         const obj = await ctx.blobs.get(view.hash);
-        if (!obj) throw new OkfError(500, "blob_missing", `Bytes for /${from} are missing.`);
+        if (!obj) throw new StoreError(500, "blob_missing", `Bytes for /${from} are missing.`);
         const out = await images.transform(await readBytes(obj.body), t, format).catch((e) => {
-          throw new OkfError(
+          throw new StoreError(
             502,
             "transform_failed",
             `Images could not ${args.op} /${from}: ${e instanceof Error ? e.message : String(e)}.`,
           );
         });
         if (!out) {
-          throw new OkfError(
+          throw new StoreError(
             503,
             "transform_unavailable",
             "Image transforms are not available on this deployment.",
@@ -1603,13 +1596,13 @@ export function buildServer(ctx: McpContext): McpServer {
           path: z
             .string()
             .optional()
-            .describe("A concept holding the diagram, with `figure`, instead of `source`."),
+            .describe("A page holding the diagram, with `figure`, instead of `source`."),
           figure: z
             .number()
             .int()
             .min(1)
             .optional()
-            .describe("The diagram's figure number in that concept, as `read` lists it."),
+            .describe("The diagram's figure number in that page, as `read` lists it."),
           lang: z
             .enum(RENDER_LANGS)
             .optional()
@@ -1639,11 +1632,11 @@ export function buildServer(ctx: McpContext): McpServer {
           let library: string | undefined;
           // A pasted fence's header (its alt and title), for what a write would lint (TEMPRA-213).
           let meta: string | null = null;
-          // Where a chart's data paths resolve (TEMPRA-207): its concept, or the library's root.
+          // Where a chart's data paths resolve (TEMPRA-207): its page, or the library's root.
           let from: { lib: LibraryClient; path: string } | undefined;
           if (args.source !== undefined) {
             if (args.path !== undefined || args.figure !== undefined) {
-              throw new OkfError(
+              throw new StoreError(
                 400,
                 "bad_request",
                 "Pass `source`, or `path` and `figure`, not both.",
@@ -1667,7 +1660,7 @@ export function buildServer(ctx: McpContext): McpServer {
             }
           } else {
             if (args.path === undefined || args.figure === undefined) {
-              throw new OkfError(
+              throw new StoreError(
                 400,
                 "bad_request",
                 "Pass `source` (the fence's Mermaid, SVG or Vega-Lite), or `path` and `figure`.",
@@ -1676,27 +1669,27 @@ export function buildServer(ctx: McpContext): McpServer {
             const picked = pick(args.library);
             library = picked.token.library.id;
             const view = await picked.lib.read(args.path, { figures: true });
-            if (view.kind !== "concept") {
-              throw new OkfError(400, "not_a_concept", `${args.path} is not a concept.`);
+            if (view.kind !== "page") {
+              throw new StoreError(400, "not_a_page", `${args.path} is not a page.`);
             }
             const figures = view.figures ?? [];
             const f = figures[args.figure - 1];
             if (!f) {
-              throw new OkfError(
+              throw new StoreError(
                 404,
                 "no_figure",
                 `${view.path} has no figure ${args.figure} (it has ${figures.length}).`,
               );
             }
             if (f.kind !== "diagram") {
-              throw new OkfError(
+              throw new StoreError(
                 400,
                 "not_a_diagram",
                 `Figure ${f.n} of ${view.path} is an image, not a diagram; \`read\` it with figures: [${f.n}].`,
               );
             }
             if (!isRenderLang(f.lang)) {
-              throw new OkfError(
+              throw new StoreError(
                 400,
                 "not_a_diagram",
                 `Figure ${f.n} of ${view.path} is a ${f.lang} fence, which the server does not draw.`,
@@ -1708,13 +1701,13 @@ export function buildServer(ctx: McpContext): McpServer {
             what = `Figure ${f.n} of /${view.path}${f.title ? ` (${JSON.stringify(f.title)})` : ""}`;
           }
           if (source.trim() === "") {
-            throw new OkfError(400, "bad_request", "The diagram's source is empty.");
+            throw new StoreError(400, "bad_request", "The diagram's source is empty.");
           }
           const theme = args.theme ?? "light";
           const type = lang === "mermaid" ? diagramTypeOf(source) : null;
           const head = `${what} · ${lang}${type ? `, ${type}` : ""} · ${theme}`;
           // A source not yet written gets the lint its write would (TEMPRA-213); one a write would
-          // call invalid is not sent to be drawn. A figure's lint is already on its concept.
+          // call invalid is not sent to be drawn. A figure's lint is already on its page.
           const findings = args.source !== undefined ? previewLint(lang, source, meta) : [];
           const said = findings.length
             ? `\nA write would report:\n${findings.map((l) => `- ${l.code}: ${l.message}`).join("\n")}`
@@ -1760,7 +1753,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "search",
       {
         title: "Ranked search",
-        description: `${BEYOND}ranked full-text search over titles, bodies and tags, with snippets. Any of the words matches, and pages with more of them, rarer ones or ones in the title rank first (BM25); words are stemmed, so comments finds comment. Use it to find concepts by meaning words when you do not know the path; use grep for exact strings.`,
+        description: `${BEYOND}ranked full-text search over titles, bodies and tags, with snippets. Any of the words matches, and pages with more of them, rarer ones or ones in the title rank first (BM25); words are stemmed, so comments finds comment. Use it to find pages by meaning words when you do not know the path; use grep for exact strings.`,
         inputSchema: {
           q: z
             .string()
@@ -1793,9 +1786,14 @@ export function buildServer(ctx: McpContext): McpServer {
       "query",
       {
         title: "Filter by frontmatter",
-        description: `${BEYOND}list concepts by frontmatter: type, tag, status, trust tier, staleness, directory. Faster and exact where grep over YAML is not. Find hot or cold pages by their reads over 30 days (each reader once a day): \`sort: "reads"\` (most read first), \`min_reads\`, \`max_reads\` (\`max_reads: 0\` for pages nobody read).`,
+        description: `${BEYOND}list pages by frontmatter: tag, status, trust tier, staleness, directory. Faster and exact where grep over YAML is not. Find hot or cold pages by their reads over 30 days (each reader once a day): \`sort: "reads"\` (most read first), \`min_reads\`, \`max_reads\` (\`max_reads: 0\` for pages nobody read).`,
         inputSchema: {
-          type: z.string().optional(),
+          type: z
+            .string()
+            .optional()
+            .describe(
+              "Not a filter: pages have no special `type`. Use `tag`, `prefix` or `search` instead.",
+            ),
           tag: z.string().optional(),
           status: z.enum(["draft", "stable", "deprecated"]).optional(),
           trust: z.enum(["unverified", "machine-confirmed", "human-reviewed"]).optional(),
@@ -1813,23 +1811,23 @@ export function buildServer(ctx: McpContext): McpServer {
         },
         annotations: readOnly,
       },
-      guarded(async ({ library, ...args }) => {
-        const { token, lib } = pick(library);
-        const r = await lib.concepts(args);
-        const lines = r.items.map(
-          (c) =>
-            `${c.path} · ${c.type || "(no type)"} · ${c.status}${c.status_set === false ? " (not set)" : ""} · ${c.trust_tier}${c.stale ? " · STALE" : ""}${"reads" in c ? ` · ${c.reads} read${c.reads === 1 ? "" : "s"} in 30 days` : ""} — ${c.title ?? ""}${c.description ? `: ${c.description}` : ""}`,
-        );
-        lines.unshift(
-          `${r.total} matching concept${r.total === 1 ? "" : "s"}${r.next_offset !== null ? ` (next offset ${r.next_offset})` : ""} (each opens in the app at its path under ${linksFor(token).library}):`,
-        );
-        if (r.types) {
-          lines.push(
-            r.types.length > 0
-              ? `No concept has type ${JSON.stringify(args.type)}. ${r.types_near ? "Closest types" : "Types here"}: ${r.types.join(", ")}.`
-              : "The library has no concepts yet.",
+      guarded(async ({ library, type, ...args }) => {
+        if (type !== undefined) {
+          throw new StoreError(
+            400,
+            "bad_param",
+            "`type` is not a filter: pages have no special type. Filter by `tag` or `prefix`, or `search` for words.",
           );
         }
+        const { token, lib } = pick(library);
+        const r = await lib.pages(args);
+        const lines = r.items.map(
+          (c) =>
+            `${c.path} · ${c.status}${c.status_set === false ? " (not set)" : ""} · ${c.trust_tier}${c.stale ? " · STALE" : ""}${"reads" in c ? ` · ${c.reads} read${c.reads === 1 ? "" : "s"} in 30 days` : ""} — ${c.title ?? ""}${c.description ? `: ${c.description}` : ""}`,
+        );
+        lines.unshift(
+          `${r.total} matching page${r.total === 1 ? "" : "s"}${r.next_offset !== null ? ` (next offset ${r.next_offset})` : ""} (each opens in the app at its path under ${linksFor(token).library}):`,
+        );
         return text(lines.join("\n"));
       }),
     );
@@ -1838,7 +1836,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "links",
       {
         title: "Links and backlinks",
-        description: `${BEYOND}a concept's outbound links (with current target paths), inbound links (backlinks), and broken links. \`kind\` is \`body\` for a markdown link or \`source\` for a \`sources[].resource\` inside the library.`,
+        description: `${BEYOND}a page's outbound links (with current target paths), inbound links (backlinks), and broken links. \`kind\` is \`body\` for a markdown link or \`source\` for a \`sources[].resource\` inside the library.`,
         inputSchema: { path: z.string(), ...libArg },
         annotations: readOnly,
       },
@@ -1849,7 +1847,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "sources",
       {
         title: "Sources and citations",
-        description: `${BEYOND}a concept's sources with how often the body cites each (\`cited\`: every [^id] reference), footnotes with no matching source, and for sources inside the library their current path, trust tier and staleness (\`broken: true\` when the path does not exist).`,
+        description: `${BEYOND}a page's sources with how often the body cites each (\`cited\`: every [^id] reference), footnotes with no matching source, and for sources inside the library their current path, trust tier and staleness (\`broken: true\` when the path does not exist).`,
         inputSchema: { path: z.string(), ...libArg },
         annotations: readOnly,
       },
@@ -1897,7 +1895,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "history",
       {
         title: "A file's history",
-        description: `${BEYOND}every ledger event for a concept across moves: sequence, time, actor, op and hash. Read an old version with read(path, at).`,
+        description: `${BEYOND}every ledger event for a page across moves: sequence, time, actor, op and hash. Read an old version with read(path, at).`,
         inputSchema: { path: z.string(), ...libArg },
         annotations: readOnly,
       },
@@ -1915,7 +1913,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "diff",
       {
         title: "Compare versions",
-        description: `${BEYOND}unified diff of a concept between two sequence numbers. Omit both to see its latest change; omit \`to\` for head.`,
+        description: `${BEYOND}unified diff of a page between two sequence numbers. Omit both to see its latest change; omit \`to\` for head.`,
         inputSchema: {
           path: z.string(),
           from: z.number().int().optional(),
@@ -1950,7 +1948,7 @@ export function buildServer(ctx: McpContext): McpServer {
         requireOwner(token.role, "revert changes");
         if (request_id) {
           if (token.prefix !== null) {
-            throw new OkfError(
+            throw new StoreError(
               403,
               "outside_prefix",
               "Prefix-scoped tokens revert one path at a time.",
@@ -1962,7 +1960,7 @@ export function buildServer(ctx: McpContext): McpServer {
           );
         }
         if (!path || to_seq === undefined) {
-          throw new OkfError(400, "bad_revert", "Pass path and to_seq, or request_id.");
+          throw new StoreError(400, "bad_revert", "Pass path and to_seq, or request_id.");
         }
         checkWrite(token, path);
         return text(
@@ -1975,7 +1973,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "work",
       {
         title: "Maintenance queue",
-        description: `${BEYOND}what needs doing in this library: open comment threads (requests from people; a thread with no path is on the library itself), requests (\`request\`: threads marked as a bigger ask, left for people's agents to do, then reply and resolve), stale concepts (past stale_after), broken links (body links and \`sources\` resources in this library that point nowhere; checked on every write and again daily, so a move or delete elsewhere shows here), lint (dangling footnotes included), hotlinked images (\`external_image\`, one item per page: \`attach\` each with \`source_url\`, \`edit\` the image to the attached path, cite the original in \`sources\`), and structure (what makes a directory's index.md poor: descriptions missing, too long or repeating the title, duplicate titles, concepts nothing links to, directories with one concept, none or too many; reported on the concept or on the directory's index.md, and never fixed for you), ranked by how many concepts link in. Each item has a suggested action; fix it through the normal write tools, and answer comments with \`comment\`. \`kind: "stale_soon"\` looks ahead instead: concepts within 14 days of stale_after, to refresh before they go stale; only moving stale_after resets the clock.`,
+        description: `${BEYOND}what needs doing in this library: open comment threads (requests from people; a thread with no path is on the library itself), requests (\`request\`: threads marked as a bigger ask, left for people's agents to do, then reply and resolve), stale pages (past stale_after), broken links (body links and \`sources\` resources in this library that point nowhere; checked on every write and again daily, so a move or delete elsewhere shows here), lint (dangling footnotes included), hotlinked images (\`external_image\`, one item per page: \`attach\` each with \`source_url\`, \`edit\` the image to the attached path, cite the original in \`sources\`), and structure (what makes a directory's index.md poor: descriptions missing, too long or repeating the title, duplicate titles, pages nothing links to, directories with one page, none or too many; reported on the page or on the directory's index.md, and never fixed for you), ranked by how many pages link in. Each item has a suggested action; fix it through the normal write tools, and answer comments with \`comment\`. \`kind: "stale_soon"\` looks ahead instead: pages within 14 days of stale_after, to refresh before they go stale; only moving stale_after resets the clock.`,
         inputSchema: {
           kind: z
             .enum([
@@ -2009,12 +2007,12 @@ export function buildServer(ctx: McpContext): McpServer {
       "comments",
       {
         title: "Read comment threads",
-        description: `${BEYOND}comment threads: requests and questions people (and agents) left on concepts or on the library itself, each with the quoted text it is about, every reply, its kind (comment, or request: a bigger ask left for people's agents) and its thread id. Pass \`path\` for one concept's threads (read them before editing it), an empty \`path\` for the threads on the library itself (on no page), or omit it for all of them. \`status\` is open (default), resolved or all. An outdated thread's quote is no longer in the body.`,
+        description: `${BEYOND}comment threads: requests and questions people (and agents) left on pages or on the library itself, each with the quoted text it is about, every reply, its kind (comment, or request: a bigger ask left for people's agents) and its thread id. Pass \`path\` for one page's threads (read them before editing it), an empty \`path\` for the threads on the library itself (on no page), or omit it for all of them. \`status\` is open (default), resolved or all. An outdated thread's quote is no longer in the body.`,
         inputSchema: {
           path: z
             .string()
             .optional()
-            .describe("A concept, e.g. `metrics/margin.md`; empty for the library's own threads."),
+            .describe("A page, e.g. `metrics/margin.md`; empty for the library's own threads."),
           status: z.enum(["open", "resolved", "all"]).optional(),
           limit: z.number().int().optional().describe("Threads per page (default 50)."),
           before: z.number().int().optional().describe("The `next` cursor from the previous page."),
@@ -2060,14 +2058,14 @@ export function buildServer(ctx: McpContext): McpServer {
       "comment",
       {
         title: "Comment, reply or resolve",
-        description: `${BEYOND}answer a comment thread or start one. \`reply\` adds to a thread; \`resolve\` closes it (with an optional closing reply, e.g. what you changed); \`reopen\` opens it again; \`open\` starts a thread on a concept, optionally on a \`quote\` copied from its body as \`read\` shows it (matched by the text it reads as, markup aside; it must occur once; quote more of the sentence if it repeats), or with no \`path\` on the library itself. \`kind: "request"\` with \`open\` or \`reply\` marks the thread a request, a bigger ask left open for people's agents (\`work\` lists it as a \`request\`); \`kind: "comment"\` makes it a plain thread again. Resolve only what you actually addressed. Write \`@handle\` in a body to address someone who can reach the library: it reaches their inbox. Comments never change the concept; edit it with the write tools.`,
+        description: `${BEYOND}answer a comment thread or start one. \`reply\` adds to a thread; \`resolve\` closes it (with an optional closing reply, e.g. what you changed); \`reopen\` opens it again; \`open\` starts a thread on a page, optionally on a \`quote\` copied from its body as \`read\` shows it (matched by the text it reads as, markup aside; it must occur once; quote more of the sentence if it repeats), or with no \`path\` on the library itself. \`kind: "request"\` with \`open\` or \`reply\` marks the thread a request, a bigger ask left open for people's agents (\`work\` lists it as a \`request\`); \`kind: "comment"\` makes it a plain thread again. Resolve only what you actually addressed. Write \`@handle\` in a body to address someone who can reach the library: it reaches their inbox. Comments never change the page; edit it with the write tools.`,
         inputSchema: {
           action: z.enum(["reply", "resolve", "reopen", "open"]),
           thread: z.string().optional().describe("reply, resolve, reopen: the thread id."),
           path: z
             .string()
             .optional()
-            .describe("open: the concept to comment on; omit it for a thread on the library."),
+            .describe("open: the page to comment on; omit it for a thread on the library."),
           kind: z
             .enum(["comment", "request"])
             .optional()
@@ -2103,9 +2101,9 @@ export function buildServer(ctx: McpContext): McpServer {
           );
         }
         if (!thread)
-          throw new OkfError(400, "bad_request", `\`${action}\` needs the \`thread\` id.`);
+          throw new StoreError(400, "bad_request", `\`${action}\` needs the \`thread\` id.`);
         if (kind && action !== "reply") {
-          throw new OkfError(400, "bad_request", "`kind` goes with `open` or `reply`.");
+          throw new StoreError(400, "bad_request", "`kind` goes with `open` or `reply`.");
         }
         const t = await lib.thread(thread);
         checkComment(token, t.path);
@@ -2126,16 +2124,21 @@ export function buildServer(ctx: McpContext): McpServer {
     server.registerTool(
       "export",
       {
-        title: "Export the bundle",
-        description: `${BEYOND}a short-lived download URL (15 minutes) for the whole library as a conformant OKF bundle (tar), with index.md and log.md materialized and each Mermaid diagram drawn beside its concept as \`<concept>.diagrams/<n>.svg\` (n its figure number; derived, so import ignores them). \`at\` exports an earlier sequence.`,
-        inputSchema: { at: z.number().int().optional(), ...libArg },
+        title: "Export the library",
+        description: `${BEYOND}a short-lived download URL (15 minutes) for the whole library as a tar: every page and attachment as a file, each Mermaid, SVG and Vega-Lite figure drawn beside its page as \`<page>.diagrams/<n>.svg\` (n its figure number; derived, so import ignores them). \`format: "okf"\` makes it a bundle that conforms to Google's Open Knowledge Format instead: each directory's index.md and log.md materialized, and \`type: Page\` on a page with no \`type\`. \`at\` exports an earlier sequence.`,
+        inputSchema: {
+          at: z.number().int().optional(),
+          format: z.enum(EXPORT_FORMATS).optional(),
+          ...libArg,
+        },
         annotations: readOnly,
       },
-      guarded(async ({ at, library }) => {
+      guarded(async ({ at, format, library }) => {
         const picked = pick(library);
         const seq = at ?? (await picked.lib.headSeq());
+        const payload = { k: "export" as const, at: seq, ...(format === "okf" ? { format } : {}) };
         return text(
-          `Bundle at seq ${seq} (valid 15 minutes): ${await downloadUrl(picked, { k: "export", at: seq })}`,
+          `${format === "okf" ? "OKF bundle" : "Export"} at seq ${seq} (valid 15 minutes): ${await downloadUrl(picked, payload)}`,
         );
       }),
     );
@@ -2145,7 +2148,7 @@ export function buildServer(ctx: McpContext): McpServer {
         "verify",
         {
           title: "Record a verification",
-          description: `${BEYOND}record that this process re-checked the concept against its sources and resource: adds { by: ${ctx.actor}, at: now } to \`verified\`. The content is unchanged. Only call it after an actual check.`,
+          description: `${BEYOND}record that this process re-checked the page against its sources and resource: adds { by: ${ctx.actor}, at: now } to \`verified\`. The content is unchanged. Only call it after an actual check.`,
           inputSchema: { path: z.string(), ...libArg },
           annotations: writes,
         },
@@ -2204,7 +2207,7 @@ export function buildServer(ctx: McpContext): McpServer {
   );
 
   server.registerResource(
-    "concept",
+    "page",
     new ResourceTemplate(`${URI_SCHEME}://{owner}/{library}/{+path}`, {
       list: async () => {
         const resources = [];
@@ -2220,7 +2223,7 @@ export function buildServer(ctx: McpContext): McpServer {
               title: "title" in e && e.title ? e.title : undefined,
               description: "description" in e && e.description ? e.description : undefined,
               mimeType:
-                e.kind === "concept" ? "text/markdown" : ("media" in e && e.media) || undefined,
+                e.kind === "page" ? "text/markdown" : ("media" in e && e.media) || undefined,
             });
           }
         }
@@ -2230,7 +2233,7 @@ export function buildServer(ctx: McpContext): McpServer {
     {
       title: "Library files",
       description:
-        "Concepts in your libraries as OKF markdown, and attachments as their bytes (images scaled for the model), addressable by owner, library and path.",
+        "Pages in your libraries as markdown, and attachments as their bytes (images scaled for the model), addressable by owner, library and path.",
       mimeType: "text/markdown",
     },
     async (uri, vars) => {

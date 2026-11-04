@@ -10,7 +10,7 @@ import type { Attachment } from "svelte/attachments";
 /** The fence languages drawn as figures, as the registry maps them. */
 export type FigureLang = "mermaid" | "svg" | "vega-lite";
 
-/** A chart's place in the library: its concept's path, and a library file's text (TEMPRA-207). */
+/** A chart's place in the library: its page's path, and a library file's text (TEMPRA-207). */
 export interface ChartSource {
   path: string;
   read(path: string): Promise<string | null>;

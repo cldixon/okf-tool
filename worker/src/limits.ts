@@ -1,4 +1,4 @@
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /**
  * Per-account limits (v2 spec: Limits, abuse and metering). Defaults here; an account's overrides
@@ -64,8 +64,8 @@ export function limitsFrom(json: string | null | undefined): Limits {
   return limits;
 }
 
-export function overLimit(what: string, limit: number, code = "limit_reached"): OkfError {
-  return new OkfError(
+export function overLimit(what: string, limit: number, code = "limit_reached"): StoreError {
+  return new StoreError(
     403,
     code,
     `You have reached the limit of ${limit} ${what}. Delete some, or ask for more.`,

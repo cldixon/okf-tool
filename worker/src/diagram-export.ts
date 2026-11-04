@@ -1,16 +1,16 @@
 /**
  * Drawn diagrams in exports (TEMPRA-168; tempra-dev: app/media, Diagrams): a downloaded bundle
- * carries, beside each concept with Mermaid or SVG fences, `<concept>.diagrams/<n>.svg`: for
+ * carries, beside each page with Mermaid or SVG fences, `<page>.diagrams/<n>.svg`: for
  * Mermaid the light SVG the render Worker draws (its R2 cache makes an unchanged fence cost
  * nothing), for an SVG fence its sanitized SVG, made here (TEMPRA-206); numbered as the
- * reader numbers figures (`findFigures`). Derived, never written into the concept, and ignored
+ * reader numbers figures (`findFigures`). Derived, never written into the page, and ignored
  * on import. A fence that does not draw, or a render service that is not there, is left out
  * without a word: the export never fails for a diagram. Bounded by MAX_EXPORT_DIAGRAMS, a time
  * budget and a few renders at a time. Free of Worker APIs.
  */
 import { FIGURE_FENCES, findFigures, parseMarkdown, sanitizeSvg } from "@tempra/editor/doc";
 import { chartForRender } from "./chart-data";
-import { splitFrontmatter } from "./okf/concept";
+import { splitFrontmatter } from "./format/page";
 import { RENDER_WIDTH, type RenderContext, type RenderDiagram } from "./render";
 
 /** The most diagrams one export draws; past it the rest are left out. */
@@ -35,15 +35,15 @@ export interface DiagramExport {
 const DERIVED = /^(.*)\.diagrams\/\d+\.svg$/;
 const HAS_FENCE = /(?:`{3,}|~{3,})[ \t]*(?:mermaid|svg|vega-lite)/i;
 
-/** Where a concept's drawn diagrams go: `a/b.md` → `a/b.diagrams/`. */
-export function diagramsDir(conceptPath: string): string {
-  return `${conceptPath.replace(/\.md$/, "")}.diagrams/`;
+/** Where a page's drawn diagrams go: `a/b.md` → `a/b.diagrams/`. */
+export function diagramsDir(pagePath: string): string {
+  return `${pagePath.replace(/\.md$/, "")}.diagrams/`;
 }
 
-/** Whether a bundle path is a drawn diagram beside one of `concepts` (paths ending .md). */
-export function isDrawnDiagram(path: string, concepts: ReadonlySet<string>): boolean {
+/** Whether a bundle path is a drawn diagram beside one of `pages` (paths ending .md). */
+export function isDrawnDiagram(path: string, pages: ReadonlySet<string>): boolean {
   const m = DERIVED.exec(path);
-  return !!m && concepts.has(`${m[1]}.md`);
+  return !!m && pages.has(`${m[1]}.md`);
 }
 
 /** A fence to export: where it goes, its source and its language. */
@@ -51,11 +51,11 @@ export interface DiagramJob {
   path: string;
   source: string;
   lang: string;
-  /** The concept it is in, where a chart's data paths resolve from. */
-  concept: string;
+  /** The page it is in, where a chart's data paths resolve from. */
+  page: string;
 }
 
-/** The drawn fences of a bundle's concepts, as export paths and sources, in bundle order. */
+/** The drawn fences of a bundle's pages, as export paths and sources, in bundle order. */
 export function diagramJobs(files: { path: string; text?: string }[]): DiagramJob[] {
   const taken = new Set(files.map((f) => f.path));
   const jobs: DiagramJob[] = [];
@@ -73,7 +73,7 @@ export function diagramJobs(files: { path: string; text?: string }[]): DiagramJo
           path,
           source: fig.node.value,
           lang: (fig.node.lang ?? "").toLowerCase(),
-          concept: f.path,
+          page: f.path,
         });
       }
     }
@@ -107,7 +107,7 @@ export async function drawnDiagrams(
       const job = jobs[i] as DiagramJob;
       let source = job.source;
       if (job.lang === "vega-lite") {
-        const chart = await chartForRender(source, job.concept, opts.read ?? (async () => null));
+        const chart = await chartForRender(source, job.page, opts.read ?? (async () => null));
         if (!chart.ok) continue;
         source = chart.source;
       }

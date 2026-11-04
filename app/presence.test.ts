@@ -27,7 +27,7 @@ const write = (seq: number, path: string, actor = "claude-code/dev"): FeedEvent 
   request_id: `r${seq}`,
   op: "put",
   path,
-  concept_id: `c${seq}`,
+  page_id: `c${seq}`,
   hash: "h",
   note: null,
   from_path: null,
@@ -133,9 +133,9 @@ afterEach(() => {
 });
 
 const OUTLINE: OutlineFile[] = [
-  { path: "guides/start.md", kind: "concept", title: "Start", seq: 1 },
-  { path: "guides/deep/more.md", kind: "concept", title: "More", seq: 2 },
-  { path: "top.md", kind: "concept", title: "Top", seq: 3 },
+  { path: "guides/start.md", kind: "page", title: "Start", seq: 1 },
+  { path: "guides/deep/more.md", kind: "page", title: "More", seq: 2 },
+  { path: "top.md", kind: "page", title: "Top", seq: 3 },
 ];
 
 describe("the tree shows presence (Tree.svelte)", () => {

@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { OkfError } from "../src/store/errors";
+import { StoreError } from "../src/store/errors";
 import { LibraryStore, type RequestContext } from "../src/store/store";
 import { setup } from "./harness";
 import { bunSqlHandle } from "./sqlite";
@@ -28,23 +28,23 @@ function newStore(sql = bunSqlHandle()) {
   });
 }
 
-function errorOf(fn: () => unknown): OkfError {
+function errorOf(fn: () => unknown): StoreError {
   try {
     fn();
   } catch (e) {
-    if (e instanceof OkfError) return e;
+    if (e instanceof StoreError) return e;
     throw e;
   }
-  throw new Error("expected an OkfError");
+  throw new Error("expected an StoreError");
 }
 
-/** A conformant concept: a specific type, a description and a status. */
+/** A conformant page: a specific type, a description and a status. */
 const md = (body: string, extra = "") =>
-  `---\ntype: Memo\ndescription: A test concept.\nstatus: stable\n${extra}---\n${body}`;
+  `---\ntype: Memo\ndescription: A test page.\nstatus: stable\n${extra}---\n${body}`;
 
-const concept = (s: LibraryStore, path: string) => {
+const page = (s: LibraryStore, path: string) => {
   const v = s.read(path);
-  if (v.kind !== "concept") throw new Error(`${path} is not a concept`);
+  if (v.kind !== "page") throw new Error(`${path} is not a page`);
   return v;
 };
 const codes = (lint: { code: string }[] | undefined) => (lint ?? []).map((l) => l.code);
@@ -73,25 +73,25 @@ describe("MCP trial 2026-10-06", () => {
       { op: "write", path: "g.md", content: md("G.\n") },
       { op: "write", path: "b.md", content: md("See [g](/g.md).\n") },
     ]);
-    const del = s.apply(ctx(), [{ op: "delete", path: "g.md", if_match: concept(s, "g.md").hash }]);
-    expect(codes(concept(s, "b.md").lint)).toEqual(["broken_link"]);
+    const del = s.apply(ctx(), [{ op: "delete", path: "g.md", if_match: page(s, "g.md").hash }]);
+    expect(codes(page(s, "b.md").lint)).toEqual(["broken_link"]);
     expect(s.work({ kind: "broken_link" }).items.map((i) => [i.kind, i.path])).toEqual([
       ["broken_link", "b.md"],
     ]);
 
     s.revert(ctx(), { request_id: del.request_id });
     expect(s.links("g.md").inbound.map((l) => l.path)).toEqual(["b.md"]);
-    expect(concept(s, "b.md").lint).toEqual([]);
+    expect(page(s, "b.md").lint).toEqual([]);
     expect(s.work({ kind: "broken_link" }).items).toEqual([]);
   });
 
-  test("TEMPRA-27: writes refuse a concept with no frontmatter, invalid YAML or no type", () => {
+  test("TEMPRA-27: writes refuse a page with no frontmatter or invalid YAML; type is optional", () => {
     const s = newStore();
     const head = s.headSeq();
     const none = errorOf(() =>
       s.apply(ctx(), [{ op: "write", path: "a.md", content: "# Just a body\n" }]),
     );
-    expect([none.status, none.code]).toEqual([400, "missing_type"]);
+    expect([none.status, none.code]).toEqual([400, "missing_frontmatter"]);
     expect(none.message).toContain("no YAML frontmatter");
     const yaml = errorOf(() =>
       s.apply(ctx(), [
@@ -100,28 +100,31 @@ describe("MCP trial 2026-10-06", () => {
     );
     expect([yaml.status, yaml.code]).toEqual([400, "bad_frontmatter"]);
     expect(yaml.message).toMatch(/not valid YAML \(line \d+ of the file\)/);
-    const untyped = errorOf(() =>
-      s.apply(ctx(), [{ op: "write", path: "a.md", content: "---\ntitle: A\n---\nx\n" }]),
-    );
-    expect([untyped.status, untyped.code]).toEqual([400, "missing_type"]);
     expect(s.headSeq()).toBe(head);
 
-    // Import keeps such files, with lint; a write that fixes one is accepted, an edit that
-    // leaves it invalid is not.
-    s.import(ctx(), [{ path: "b.md", markdown: "---\ntitle: B\n---\nx\n" }]);
-    expect(codes(concept(s, "b.md").lint)).toContain("missing_type");
+    // A page with no `type` is a page like any other (tempra-dev: decisions/pages-not-okf).
+    const untyped = s.apply(ctx(), [
+      { op: "write", path: "a.md", content: "---\ntitle: A\ndescription: A.\n---\nx\n" },
+    ]).results[0];
+    expect(untyped?.lint).toEqual([]);
+
+    // Import keeps a file with no frontmatter, with lint; an edit that leaves it without one is
+    // refused, and one that gives it frontmatter is accepted.
+    s.import(ctx(), [{ path: "b.md", markdown: "Just a body.\n" }]);
+    expect(codes(page(s, "b.md").lint)).toContain("missing_frontmatter");
     const edit = errorOf(() =>
-      s.apply(ctx(), [{ op: "edit", path: "b.md", edits: [{ old: "x", new: "y" }] }]),
+      s.apply(ctx(), [{ op: "edit", path: "b.md", edits: [{ old: "Just", new: "Only" }] }]),
     );
-    expect(edit.code).toBe("missing_type");
+    expect(edit.code).toBe("missing_frontmatter");
     s.apply(ctx(), [
       {
-        op: "edit",
+        op: "write",
         path: "b.md",
-        edits: [{ old: "title: B", new: "type: Memo\ntitle: B\ndescription: B.\nstatus: draft" }],
+        content: "---\ntitle: B\ndescription: B.\n---\nJust a body.\n",
+        if_match: page(s, "b.md").hash,
       },
     ]);
-    expect(concept(s, "b.md").lint).toEqual([]);
+    expect(page(s, "b.md").lint).toEqual([]);
   });
 
   test("TEMPRA-28: search indexes text, highlights runs once, and never inside link targets", () => {
@@ -158,7 +161,7 @@ describe("MCP trial 2026-10-06", () => {
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("A.\n") }]);
     s.apply(ctx("agent/2", "both"), [
       { op: "write", path: "b.md", content: md("B.\n") },
-      { op: "write", path: "a.md", content: md("A2.\n"), if_match: concept(s, "a.md").hash },
+      { op: "write", path: "a.md", content: md("A2.\n"), if_match: page(s, "a.md").hash },
     ]);
     expect(s.log()).toContain(
       "* **Changes** by `agent/2`: both created [b.md](/b.md), updated [a.md](/a.md)",
@@ -183,14 +186,8 @@ describe("MCP trial 2026-10-06", () => {
     const loose =
       "---\ntype: note\nstale_after: 2020-01-01T00:00:00Z\n---\nSee [g](guide.md) and [h](/guide.md#no-such-heading) and [ok](/guide.md#guide).\n\n[^orphan]: Never cited.\n";
     const r = s.apply(ctx(), [{ op: "write", path: "x.md", content: loose }]).results[0];
-    expect(codes(r?.lint)).toEqual([
-      "generic_type",
-      "missing_description",
-      "missing_status",
-      "footnote_uncited",
-      "relative_link",
-      "missing_heading",
-    ]);
+    // A generic type, no status, a relative link and an uncited footnote are the writer's call.
+    expect(codes(r?.lint)).toEqual(["missing_description", "missing_heading"]);
     expect(r?.lint.at(-1)?.message).toContain("#no-such-heading");
     expect(codes(r?.notices)).toEqual(["stale_on_write"]);
 
@@ -212,7 +209,7 @@ describe("MCP trial 2026-10-06", () => {
     expect(r?.normalized).toContain("-* one");
     expect(r?.normalized).toContain("+- one");
     // Writing the stored form back, or editing it, reports nothing.
-    const v = concept(s, "a.md");
+    const v = page(s, "a.md");
     const again = s.apply(ctx(), [
       { op: "write", path: "a.md", content: v.markdown, if_match: v.hash },
     ]);
@@ -223,19 +220,15 @@ describe("MCP trial 2026-10-06", () => {
     expect(edited.results[0]?.notices).toBeUndefined();
   });
 
-  test("TEMPRA-39: diffs leave out the generated stamp; query matches type in any case", () => {
+  test("TEMPRA-39: diffs leave out the generated stamp", () => {
     const s = newStore();
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("One.\n") }]);
     s.apply(ctx(), [
-      { op: "write", path: "a.md", content: md("Two.\n"), if_match: concept(s, "a.md").hash },
+      { op: "write", path: "a.md", content: md("Two.\n"), if_match: page(s, "a.md").hash },
     ]);
     const d = s.diff("a.md").diff;
     expect(d).toContain("+Two.");
     expect(d).not.toContain("generated");
-    expect(s.concepts({ type: "memo" }).total).toBe(1);
-    const none = s.concepts({ type: "mem" });
-    expect(none.total).toBe(0);
-    expect(none.types).toEqual(["Memo"]);
   });
 
   test("TEMPRA-40: an edit names open threads and the ones it left outdated", () => {
@@ -262,7 +255,7 @@ describe("MCP trial 2026-10-06, through the MCP tools", () => {
     const call = await connect(app);
     const plain = "---\ntype: Memo\ndescription: No status.\n---\nBody.\n";
     let r = await call("write", { path: "d/a.md", content: plain });
-    expect(r.text).toContain("missing_status");
+    expect(r.text).toContain("Lint: none.");
     expect((await call("read", { path: "d/a.md" })).text).toContain(
       "status: not set (reads as stable)",
     );
@@ -311,13 +304,13 @@ describe("MCP trial 2026-10-06, through the MCP tools", () => {
 describe("TEMPRA-42", () => {
   test("a list of mappings reads back in block style, however short; scalars stay on one line", () => {
     const s = newStore();
-    // In OKF key order, as an agent following the instructions writes it.
+    // In the format's key order, as an agent following the instructions writes it.
     const sent =
-      "---\ntype: Memo\ndescription: A test concept.\ntags: [x, y]\nstatus: stable\nsources:\n  - id: a\n    resource: https://e.com\n---\nCited.[^a]\n\n[^a]: A.\n";
+      "---\ntype: Memo\ndescription: A test page.\ntags: [x, y]\nstatus: stable\nsources:\n  - id: a\n    resource: https://e.com\n---\nCited.[^a]\n\n[^a]: A.\n";
     const r = s.apply(ctx(), [{ op: "write", path: "a.md", content: sent }]).results[0];
     // What an agent naturally writes is the canonical form: nothing to normalize.
     expect(r?.notices).toBeUndefined();
-    const md2 = concept(s, "a.md").markdown;
+    const md2 = page(s, "a.md").markdown;
     expect(md2).toContain(
       "tags: [x, y]\nstatus: stable\nsources:\n  - id: a\n    resource: https://e.com\n",
     );
@@ -344,7 +337,7 @@ describe("TEMPRA-41", () => {
       { op: "write", path: "b.md", content: md("# Setup\n\nSteps.\n") },
       { op: "write", path: "a.md", content: md("See [setup](/b.md#setup).\n") },
     ]);
-    expect(concept(s, "a.md").lint).toEqual([]);
+    expect(page(s, "a.md").lint).toEqual([]);
     const v1 = s.headSeq();
 
     // B renames the heading: A's link no longer finds it, in read and in work.
@@ -353,11 +346,11 @@ describe("TEMPRA-41", () => {
         op: "write",
         path: "b.md",
         content: md("# Install\n\nSteps.\n"),
-        if_match: concept(s, "b.md").hash,
+        if_match: page(s, "b.md").hash,
       },
     ]);
-    expect(codes(concept(s, "a.md").lint)).toEqual(["missing_heading"]);
-    expect(concept(s, "a.md").lint[0]?.message).toBe(
+    expect(codes(page(s, "a.md").lint)).toEqual(["missing_heading"]);
+    expect(page(s, "a.md").lint[0]?.message).toBe(
       "Link /b.md#setup names a heading /b.md does not have (#setup).",
     );
     expect(s.work({ kind: "lint" }).items.map((i) => [i.path, i.detail])).toEqual([
@@ -366,12 +359,12 @@ describe("TEMPRA-41", () => {
 
     // Reverting B brings the heading back, and A's lint clears.
     s.revert(ctx(), { path: "b.md", to_seq: v1 });
-    expect(concept(s, "a.md").lint).toEqual([]);
+    expect(page(s, "a.md").lint).toEqual([]);
     expect(s.work({ kind: "lint" }).items).toEqual([]);
 
     // It follows a move of the target too.
     s.apply(ctx(), [{ op: "move", path: "b.md", to: "docs/b.md" }]);
-    expect(concept(s, "a.md").lint).toEqual([]);
+    expect(page(s, "a.md").lint).toEqual([]);
     s.apply(ctx(), [
       {
         op: "edit",
@@ -379,7 +372,7 @@ describe("TEMPRA-41", () => {
         edits: [{ old: "# Setup", new: "# Other" }],
       },
     ]);
-    expect(concept(s, "a.md").lint[0]?.message).toBe(
+    expect(page(s, "a.md").lint[0]?.message).toBe(
       "Link /docs/b.md#setup names a heading /docs/b.md does not have (#setup).",
     );
   });
@@ -389,7 +382,7 @@ describe("MCP retest 2026-10-06", () => {
   test("TEMPRA-44: a failed batch's error reports the committed hash and document", () => {
     const s = newStore();
     s.apply(ctx(), [{ op: "write", path: "b.md", content: md("Points at gamma.\n") }]);
-    const head = concept(s, "b.md");
+    const head = page(s, "b.md");
     const e = errorOf(() =>
       s.apply(ctx(), [
         { op: "edit", path: "b.md", edits: [{ old: "Points at", new: "Points to" }] },
@@ -414,7 +407,7 @@ describe("MCP retest 2026-10-06", () => {
   test("TEMPRA-45: the stored-form diff shows what is stored; spacing alone is summarized", () => {
     const s = newStore();
     const fake =
-      "---\ntype: Memo\ndescription: A test concept.\nstatus: stable\ngenerated: { by: me/1, at: 2020-01-01T00:00:00Z }\nverified: { by: human:me, at: 2020-01-01T00:00:00Z }\n---\n* one\n";
+      "---\ntype: Memo\ndescription: A test page.\nstatus: stable\ngenerated: { by: me/1, at: 2020-01-01T00:00:00Z }\nverified: { by: human:me, at: 2020-01-01T00:00:00Z }\n---\n* one\n";
     const r = s.apply(ctx(), [{ op: "write", path: "a.md", content: fake }]).results[0];
     expect(codes(r?.notices)).toEqual(["generated_ignored", "verified_ignored", "normalized"]);
     expect(r?.normalized).toContain("-verified: { by: human:me, at: 2020-01-01T00:00:00Z }");
@@ -428,25 +421,6 @@ describe("MCP retest 2026-10-06", () => {
     expect(t?.normalized).toBeUndefined();
   });
 
-  test("TEMPRA-46: relative_link lint suggests the target's current path after a move", () => {
-    const s = newStore();
-    s.apply(ctx(), [
-      { op: "write", path: "r/beta.md", content: md("Beta.\n") },
-      { op: "write", path: "r/alpha.md", content: md("See [beta](beta.md).\n") },
-    ]);
-    expect(concept(s, "r/alpha.md").lint[0]?.message).toContain("write it as /r/beta.md");
-    s.apply(ctx(), [{ op: "move", path: "r", to: "q" }]);
-    const lint = concept(s, "q/alpha.md").lint;
-    expect(lint.map((l) => l.message)).toEqual([
-      "Link beta.md is relative; write it as /q/beta.md so it reads the same from anywhere.",
-    ]);
-    expect(s.work({ kind: "lint" }).items[0]?.detail).toContain("/q/beta.md");
-    s.apply(ctx(), [{ op: "move", path: "q/beta.md", to: "elsewhere/beta.md" }]);
-    expect(concept(s, "q/alpha.md").lint[0]?.message).toBe(
-      "Link ../elsewhere/beta.md is relative; write it as /elsewhere/beta.md so it reads the same from anywhere.",
-    );
-  });
-
   test("TEMPRA-48: literal asterisks in a snippet are escaped, not read as highlights", () => {
     const s = newStore();
     s.apply(ctx(), [
@@ -456,16 +430,16 @@ describe("MCP retest 2026-10-06", () => {
     expect(hit?.snippet).toContain("\\*\\*\\*\\***markdown**\\*\\*\\*\\*");
   });
 
-  test("TEMPRA-49: delete names the concepts whose links it broke", () => {
+  test("TEMPRA-49: delete names the pages whose links it broke", () => {
     const s = newStore();
     s.apply(ctx(), [
       { op: "write", path: "g.md", content: md("G.\n") },
       { op: "write", path: "b.md", content: md("See [g](/g.md).\n") },
     ]);
-    const r = s.apply(ctx(), [{ op: "delete", path: "g.md", if_match: concept(s, "g.md").hash }])
+    const r = s.apply(ctx(), [{ op: "delete", path: "g.md", if_match: page(s, "g.md").hash }])
       .results[0];
     expect(codes(r?.notices)).toEqual(["broken_links"]);
-    expect(r?.notices?.[0]?.message).toContain("1 concept now links to g.md, which is gone: b.md");
+    expect(r?.notices?.[0]?.message).toContain("1 page now links to g.md, which is gone: b.md");
   });
 
   test("TEMPRA-50: diff sides carry each version's own seq; the YAML error ends its sentence", () => {
@@ -473,7 +447,7 @@ describe("MCP retest 2026-10-06", () => {
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("One.\n") }]);
     s.apply(ctx(), [{ op: "write", path: "other.md", content: md("Other.\n") }]);
     s.apply(ctx(), [
-      { op: "write", path: "a.md", content: md("Two.\n"), if_match: concept(s, "a.md").hash },
+      { op: "write", path: "a.md", content: md("Two.\n"), if_match: page(s, "a.md").hash },
     ]);
     s.comment(human(), { kind: "open", path: "other.md", body: "Later." });
     expect(s.diff("a.md").diff).toContain("--- a.md@1\n+++ a.md@3\n");
@@ -483,13 +457,11 @@ describe("MCP retest 2026-10-06", () => {
     expect(e.message).toMatch(/[.!?] Nothing was written\.$/);
   });
 
-  test("TEMPRA-47, 50: query marks an unset status and names its hint for what it is", async () => {
+  test("TEMPRA-47: query marks an unset status", async () => {
     const { app } = setup();
     const call = await connect(app);
-    await call("write", { path: "a.md", content: "---\ntype: Memo\ndescription: A.\n---\nA.\n" });
-    expect((await call("query", { type: "Memo" })).text).toContain("· stable (not set) ·");
-    expect((await call("query", { type: "mem" })).text).toContain("Closest types: Memo.");
-    expect((await call("query", { type: "zzz" })).text).toContain("Types here: Memo.");
+    await call("write", { path: "a.md", content: "---\ntitle: A\ndescription: A.\n---\nA.\n" });
+    expect((await call("query", { prefix: "" })).text).toContain("· stable (not set) ·");
   });
 });
 
@@ -505,7 +477,7 @@ describe("TEMPRA-199: the 2026-10-26 field report", () => {
     expect(r?.notices?.[0]?.message).toContain("`sources[0]`: `url` stored as `resource`");
     expect(r?.normalized).toBeUndefined();
     expect(codes(r?.lint)).not.toContain("source_missing_resource");
-    const stored = concept(s, "a.md").markdown;
+    const stored = page(s, "a.md").markdown;
     // In place, in the same position; an entry that has a `resource` keeps its `url`.
     expect(stored).toContain("  - id: a\n    title: A\n    resource: https://e.com/a\n");
     expect(stored).toContain("    resource: https://e.com/b\n    url: https://e.com/other\n");

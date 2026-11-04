@@ -54,7 +54,7 @@ describe("OAuth for MCP clients", () => {
     expect(location.startsWith(`${REDIRECT}?`)).toBe(true);
     expect(new URL(location).searchParams.get("state")).toBe("st4te");
     const tokens = await exchange(app, clientId, location, flow.verifier);
-    expect(tokens.scope.split(" ").sort()).toEqual(["okf:read", "okf:write"]);
+    expect(tokens.scope.split(" ").sort()).toEqual(["tempra:read", "tempra:write"]);
     expect((await accounts.user("owner@example.com")).actor).toBe("human:owner");
 
     const { call } = await mcp(app, tokens.access_token);
@@ -71,7 +71,7 @@ describe("OAuth for MCP clients", () => {
   test("a read-only grant cannot write", async () => {
     const { app } = setup();
     const clientId = await register(app, "ChatGPT");
-    const flow = await begin(app, clientId, "okf:read");
+    const flow = await begin(app, clientId, "tempra:read");
     expect(flow.html).toContain('value="read" checked');
     const done = await submit(app, flow, {
       ...approve,
@@ -79,7 +79,7 @@ describe("OAuth for MCP clients", () => {
       actor: "chatgpt/connector",
     });
     const tokens = await exchange(app, clientId, done.headers.get("Location") ?? "", flow.verifier);
-    expect(tokens.scope).toBe("okf:read");
+    expect(tokens.scope).toBe("tempra:read");
     const { call } = await mcp(app, tokens.access_token);
     const w = await call("write", { path: "a.md", content: "---\ntype: Note\n---\nhi\n" });
     expect(w.isError).toBe(true);
@@ -301,7 +301,7 @@ describe("OAuth for MCP clients", () => {
       "Other libraries you can reach: owner/demo",
     );
     const uris = (await client.listResources()).resources.map((r) => r.uri);
-    expect(uris).toContain("okf://owner/developers/a.md");
+    expect(uris).toContain("tempra://owner/developers/a.md");
 
     // Another account's library is not reachable by name.
     const other = await setupStranger(accounts);
@@ -391,7 +391,7 @@ describe("OAuth for MCP clients", () => {
     /** Connects an app as a person, to the owner's demo, and writes one note through it. */
     const connect = async (app: App, name: string, redirect: string, pick: string) => {
       const clientId = await register(app, name, redirect);
-      const flow = await begin(app, clientId, "okf:read okf:write", redirect);
+      const flow = await begin(app, clientId, "tempra:read tempra:write", redirect);
       const done = await submit(app, flow, { ...approve, libraries: "selected", library: pick });
       const t = await exchange(
         app,
@@ -532,7 +532,7 @@ describe("OAuth for MCP clients", () => {
       const clientId = await register(app);
       const flow = await begin(app, clientId);
       expect(flow.html).toContain('name="create_libraries" value="on" checked');
-      const readFlow = await begin(app, clientId, "okf:read");
+      const readFlow = await begin(app, clientId, "tempra:read");
       expect(readFlow.html).not.toContain("create_libraries");
 
       // Only with read and write and all tools: asked for with Read only or File tools only, the

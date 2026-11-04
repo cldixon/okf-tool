@@ -168,7 +168,7 @@ describe("limits (v2 spec: Limits, abuse and metering)", () => {
     const c = costs[0]?.cost;
     expect(c?.calls).toBeGreaterThan(0);
     expect(c?.rowsWritten).toBeGreaterThan(0);
-    // The search index's rows are told apart: a new concept adds its fts row and its rowid.
+    // The search index's rows are told apart: a new page adds its fts row and its rowid.
     expect(c?.ftsRowsWritten).toBeGreaterThanOrEqual(2);
     // Asked for, the answer carries it, each DO call by its operation.
     const header = JSON.parse(put.headers.get("X-Tempra-Cost") ?? "null");

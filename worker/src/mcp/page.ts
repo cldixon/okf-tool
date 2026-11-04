@@ -8,7 +8,7 @@
 import type { Doc } from "@tempra/editor/doc";
 import type { TokenInfo } from "../auth";
 import type { LibraryClient } from "../client";
-import { OkfError } from "../store/errors";
+import { StoreError } from "../store/errors";
 import type { ImageRef } from "../store/store";
 
 /** How long the panel's image links last: as an upload link does. */
@@ -16,14 +16,14 @@ export const PANEL_TTL_SECONDS = 3600;
 /** Images signed for one page; past it the panel shows the rest as broken. */
 const SIGNED_IMAGES = 60;
 
-/** Ops that make a version of a concept (app/src/concept/data.ts CONTENT_OPS, less delete). */
+/** Ops that make a version of a page (app/src/page/data.ts CONTENT_OPS, less delete). */
 const VERSION_OPS = new Set(["put", "import", "revert", "attach"]);
 
 /** What the panel is given (structuredContent.page); app/src/panels/page.ts reads it. */
 export interface PagePayload {
   v: 1;
   library: { owner: string; slug: string };
-  concept: {
+  page: {
     path: string;
     seq: number;
     title: string;
@@ -44,7 +44,7 @@ export interface PagePayload {
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-/** The page panel's payload for one concept at head; `not_concept` for anything else. */
+/** The page panel's payload for one page at head; `not_page` for anything else. */
 export async function pagePayload(
   lib: LibraryClient,
   token: TokenInfo,
@@ -55,13 +55,13 @@ export async function pagePayload(
   // The person sees it: their read, not the agent's (TEMPRA-220).
   const page = await lib.page(path, { shown: true });
   const file = page.file;
-  if (file.kind !== "concept" || !("sources" in page)) {
-    throw new OkfError(400, "not_concept", "`show` draws a page (a concept), not other files.");
+  if (file.kind !== "page" || !("sources" in page)) {
+    throw new StoreError(400, "not_page", "`show` draws a page (a page), not other files.");
   }
   const fm = file.frontmatter;
 
   // Images: one signed link each, so the panel loads them from this deployment with no cookie.
-  const images: PagePayload["concept"]["images"] = {};
+  const images: PagePayload["page"]["images"] = {};
   let signed = 0;
   for (const [p, ref] of Object.entries(file.images ?? {})) {
     let src: string | null = null;
@@ -111,7 +111,7 @@ export async function pagePayload(
   return {
     v: 1,
     library: { owner: token.library.owner, slug: token.library.slug },
-    concept: {
+    page: {
       path: file.path,
       seq: file.seq,
       title: str(fm.title) ?? file.path.split("/").pop() ?? file.path,
@@ -130,5 +130,5 @@ export async function pagePayload(
 export function pageUrl(origin: string, p: PagePayload): string {
   const enc = (s: string) => s.split("/").map(encodeURIComponent).join("/");
   const { owner, slug } = p.library;
-  return `${origin}/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/${enc(p.concept.path)}`;
+  return `${origin}/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/${enc(p.page.path)}`;
 }

@@ -5,7 +5,7 @@ import { baseName, dirOf, folderName, type Urls } from "./urls";
 /** One file of `GET …/outline`: the library's index, without bodies. */
 export interface OutlineFile {
   path: string;
-  kind: "dir" | "concept" | "attachment";
+  kind: "dir" | "page" | "attachment";
   title?: string | null;
   seq?: number | null;
   /** Open comment threads on it. */
@@ -17,9 +17,9 @@ export interface OutlineFile {
 /** Names in the order people read them ("Part 2" before "Part 10"); one collator for every sort. */
 const BY_NAME = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
-/** A file as the tree names it: a concept by its title, anything else by its file name. */
+/** A file as the tree names it: a page by its title, anything else by its file name. */
 export function fileLabel(e: OutlineFile): string {
-  return e.kind === "concept" && e.title ? e.title : baseName(e.path);
+  return e.kind === "page" && e.title ? e.title : baseName(e.path);
 }
 
 /** The least time between two refreshes of the index while writes keep coming. */
@@ -57,7 +57,7 @@ export function saveClosed(urls: Urls, dirs: Set<string>) {
 }
 
 /** Where a row sorts within its folder: folders, then pages, then files (TEMPRA-123). */
-const RANK: Record<OutlineFile["kind"], number> = { dir: 0, concept: 1, attachment: 2 };
+const RANK: Record<OutlineFile["kind"], number> = { dir: 0, page: 1, attachment: 2 };
 
 /** A row as the tree names it, for sorting by what the person sees. */
 const shown = (e: OutlineFile) => (e.kind === "dir" ? folderName(e.path) : fileLabel(e));

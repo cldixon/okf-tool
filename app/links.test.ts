@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { flushSync } from "svelte";
 import { cache } from "./src/api";
-import { fileKey } from "./src/concept/data";
 import { LINK_REST_MS, linkLoad } from "./src/links";
+import { fileKey } from "./src/page/data";
 import { Urls } from "./src/urls";
 import { rootPrefetchLinks } from "./test/runes.svelte.ts";
 
@@ -14,7 +14,7 @@ import { rootPrefetchLinks } from "./test/runes.svelte.ts";
 const urls = new Urls("ann", "notes");
 const lib = { owner: "ann", slug: "notes" };
 let n = 0;
-/** A concept no other test has used, so the page cache starts empty for it. */
+/** A page no other test has used, so the page cache starts empty for it. */
 const freshPath = () => `notes/link-${++n}.md`;
 
 function link(href: string, attrs: Record<string, string> = {}): HTMLAnchorElement {

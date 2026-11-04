@@ -15,7 +15,7 @@ export function newId(): string {
 
 /**
  * Gives every block of `next` an ID, keeping the IDs of `prev` (the stored version, or null for a
- * new concept) where blocks match. An ID `next` already carries is a hint: kept when it names a
+ * new page) where blocks match. An ID `next` already carries is a hint: kept when it names a
  * block of `prev` among the same siblings and no other block claims it. Changes `next` in place.
  */
 export function reconcile(prev: Doc | null, next: Doc, fresh: () => string = newId): Doc {

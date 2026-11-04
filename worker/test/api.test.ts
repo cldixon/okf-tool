@@ -1,7 +1,7 @@
 import { describe, expect, setSystemTime, test } from "bun:test";
 import { type Doc, parseMarkdown, toMarkdown } from "@tempra/editor/doc";
+import { parsePage } from "../src/format/page";
 import { imagesService, VARIANT_EDGES } from "../src/images";
-import { parseConcept } from "../src/okf/concept";
 import { readTar, writeTar } from "../src/util/tar";
 import { compareBundle } from "./compare";
 import { BUNDLES, loadBundle } from "./fixtures";
@@ -46,7 +46,7 @@ describe("a file's page in one request (TEMPRA-191)", () => {
   const write = (req: ReturnType<typeof setup>["req"], path: string, body: string) =>
     req(`/files/${path}`, { method: "PUT", body, headers: { "Content-Type": "text/markdown" } });
 
-  test("a concept: what the five routes say, read together", async () => {
+  test("a page: what the five routes say, read together", async () => {
     const { req } = setup();
     expect((await write(req, "notes/b.md", doc("B.\n", "title: B\n"))).status).toBe(200);
     const body = doc(
@@ -63,7 +63,7 @@ describe("a file's page in one request (TEMPRA-191)", () => {
     expect(page.links).toEqual(await each("/links/notes/a.md"));
     expect(page.history).toEqual(await each("/history/notes/a.md"));
     expect(page.head).toBe(((await each("/stats")) as { seq: number }).seq);
-    // Another spelling of the path: the context is the concept's own.
+    // Another spelling of the path: the context is the page's own.
     const bare = (await (await req("/page/notes/a")).json()) as typeof page;
     expect((bare.file as { path: string }).path).toBe("notes/a.md");
     expect(bare.history).toEqual(page.history);
@@ -119,7 +119,7 @@ describe("files", () => {
     expect(r.headers.get("ETag")).toBe(`"${created.hash}"`);
     expect(r.headers.get("Content-Type")).toContain("text/markdown");
     const md = await r.text();
-    expect(parseConcept(md).generated?.by).toBe("claude-code/test");
+    expect(parsePage(md).generated?.by).toBe("claude-code/test");
 
     r = await req("/files/notes/a.md", { headers: { Accept: "application/json" } });
     const view = (await r.json()) as { frontmatter: { type: string }; trust_tier: string };
@@ -179,9 +179,10 @@ describe("files", () => {
       body: doc("x", "title: X\ndescription: The x.\n"),
     });
     const idx = await (await req("/files/t/index.md")).text();
-    expect(idx).toBe("# Concepts\n\n* [X](x.md) - The x.\n");
+    expect(idx).toBe("# Pages\n\n* [X](x.md) - The x.\n");
     const root = await (await req("/files/index.md")).text();
-    expect(root).toContain('okf_version: "0.2"');
+    // OKF's version is said only by an OKF export.
+    expect(root).not.toContain("okf_version");
     const log = await (await req("/files/log.md")).text();
     expect(log).toContain("* **Creation** by `claude-code/test`: [t/x.md](/t/x.md)");
     expect((await req("/files/t/index.md", { method: "PUT", body: "x" })).status).toBe(405);
@@ -209,13 +210,13 @@ describe("queries and revert", () => {
     expect(r.status).toBe(200);
     const body = (await r.json()) as { seq: number; files: Record<string, unknown>[] };
     expect(body.files).toEqual([
-      { path: "a.md", kind: "concept", title: "Alpha", seq: expect.any(Number) },
-      { path: "deep/er/b.md", kind: "concept", title: null, seq: expect.any(Number) },
+      { path: "a.md", kind: "page", title: "Alpha", seq: expect.any(Number) },
+      { path: "deep/er/b.md", kind: "page", title: null, seq: expect.any(Number) },
     ]);
     expect(body.seq).toBeGreaterThan(0);
   });
 
-  test("tree, concepts, search, grep, links, events, revert", async () => {
+  test("tree, pages, search, grep, links, events, revert", async () => {
     const { req } = setup();
     const batch = await req("/batch", {
       method: "POST",
@@ -237,7 +238,7 @@ describe("queries and revert", () => {
 
     const tree = (await (await req("/tree?prefix=m")).json()) as { entries: { path: string }[] };
     expect(tree.entries.map((e) => e.path)).toEqual(["m/cost.md", "m/rev.md"]);
-    const q = (await (await req("/concepts?tag=finance")).json()) as { items: { path: string }[] };
+    const q = (await (await req("/pages?tag=finance")).json()) as { items: { path: string }[] };
     expect(q.items.map((e) => e.path)).toEqual(["m/rev.md"]);
     const s = (await (await req("/search?q=revenue")).json()) as { results: { path: string }[] };
     expect(s.results.map((e) => e.path)).toEqual(["m/rev.md"]);
@@ -290,15 +291,29 @@ describe("import and export round-trip the sample bundles (through the API)", ()
       const res = (await r.json()) as { files: number };
       expect(res.files).toBe(original.filter((f) => !/(^|\/)(index|log)\.md$/.test(f.path)).length);
 
-      const exp = await req("/export");
+      // An OKF export is the bundle again: every page as it was, every type kept, and
+      // index.md and log.md synthesized at every level the original had them.
+      const exp = await req("/export?format=okf");
       expect(exp.status).toBe(200);
       const out = new Map(
         readTar(new Uint8Array(await exp.arrayBuffer())).map((f) => [f.path, f.bytes]),
       );
       expect(compareBundle(original, out)).toEqual([]);
-      // index.md and log.md are synthesized at every level the original had them.
       for (const f of original)
         if (/(^|\/)index\.md$/.test(f.path)) expect(out.has(f.path)).toBe(true);
+      expect(out.has("log.md")).toBe(true);
+
+      // The plain export is the same pages and attachments, with nothing synthesized.
+      const plain = await req("/export");
+      const files = readTar(new Uint8Array(await plain.arrayBuffer())).map((f) => f.path);
+      expect(files.sort()).toEqual(
+        original
+          .map((f) => f.path)
+          .filter((p) => !/(^|\/)(index|log)\.md$/.test(p))
+          .sort(),
+      );
+      expect((await req("/export?format=tar")).status).toBe(400);
+      expect((await req("/pages?type=Metric")).status).toBe(400);
     });
   }
 });
@@ -665,7 +680,7 @@ describe("the reader's image route (TEMPRA-162)", () => {
     expect(theirs.headers.get("Content-Type")).not.toBe("image/png");
     expect((await s.app.request(`${UI}/-/image/${"0".repeat(64)}`)).status).toBe(404);
     expect((await s.app.request(`${UI}/-/image/not-a-hash`)).status).toBe(404);
-    // A concept's bytes and a file that is not an image are not images.
+    // A page's bytes and a file that is not an image are not images.
     const w = (await (
       await s.req("/files/notes/a.md", {
         method: "PUT",
@@ -732,7 +747,7 @@ describe("the reader's image route (TEMPRA-162)", () => {
     expect(calls).toHaveLength(2);
   });
 
-  test("a concept's JSON lists its images' hashes and sizes, backfilling ones from before", async () => {
+  test("a page's JSON lists its images' hashes and sizes, backfilling ones from before", async () => {
     const s = setup();
     await attach(s, "img/wide.png", PNG, "image/png");
     // An image from before TEMPRA-152: stored by the store alone, no size.
@@ -867,7 +882,7 @@ describe("the reader's media route (TEMPRA-164)", () => {
     expect((await media(s, {}, "not-a-hash")).status).toBe(404);
   });
 
-  test("a concept's JSON lists video, audio and PDFs with their size, and a video's poster", async () => {
+  test("a page's JSON lists video, audio and PDFs with their size, and a video's poster", async () => {
     const s = setup();
     await attach(s, "clips/demo.webm", WEBM, "video/webm");
     const poster = makePng(64, 36);

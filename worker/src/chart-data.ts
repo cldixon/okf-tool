@@ -25,7 +25,7 @@ export function libraryText(
 /** The chart's source as the render Worker takes it: JSON with its data inline; or what is wrong. */
 export async function chartForRender(
   source: string,
-  conceptPath: string,
+  pagePath: string,
   read: (path: string) => Promise<string | null>,
 ): Promise<{ ok: true; source: string } | { ok: false; error: RenderError }> {
   const parsed = parseChart(source);
@@ -36,7 +36,7 @@ export async function chartForRender(
   try {
     return {
       ok: true,
-      source: JSON.stringify(await inlineChartData(parsed.spec, conceptPath, read)),
+      source: JSON.stringify(await inlineChartData(parsed.spec, pagePath, read)),
     };
   } catch (e) {
     if (!(e instanceof ChartDataError)) throw e;

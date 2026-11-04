@@ -15,7 +15,7 @@ import { diagram, svgNode } from "./src/reader/pele";
 const sources = [
   "flowchart LR\n  A[Write] --> B{Parses?}\n  B -->|yes| C[Drawn]\n  style C fill:#eee",
   "sequenceDiagram\n  Alice->>Bob: Hi\n  Bob-->>Alice: Hello",
-  "classDiagram\n  class Concept {\n    +title\n    +read()\n  }",
+  "classDiagram\n  class Page {\n    +title\n    +read()\n  }",
   'pie title Pages\n  "Drawn" : 3\n  "Source" : 1',
 ];
 

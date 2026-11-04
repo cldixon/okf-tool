@@ -10,7 +10,7 @@
  */
 import { type BlobStore, putBlob, WORKER_ATTACHMENT_CAP } from "./client";
 import { IMAGE_MEDIA, sniffImage, sniffMedia } from "./media";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 import type { AttachSource, BlobRef } from "./store/store";
 
 export type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
@@ -41,7 +41,7 @@ export type FetchRule =
   | "network";
 
 export const refused = (rule: FetchRule, message: string, extra: Record<string, unknown> = {}) =>
-  new OkfError(400, "fetch_refused", message, { rule, ...extra });
+  new StoreError(400, "fetch_refused", message, { rule, ...extra });
 
 /** The deployment's own hostnames, from its origin: a source_url never names them. */
 export function selfHosts(origin: string): string[] {
@@ -204,7 +204,7 @@ export async function fetchSource(
           late,
         ]);
       } catch (e) {
-        if (e instanceof OkfError) throw e;
+        if (e instanceof StoreError) throw e;
         throw refused("network", `Could not fetch ${url.host}: ${(e as Error).message}.`);
       }
       if (res.status >= 300 && res.status < 400 && res.headers.has("Location")) {
@@ -216,8 +216,8 @@ export async function fetchSource(
         try {
           url = checkSourceUrl(next.href, selfHosts);
         } catch (e) {
-          if (e instanceof OkfError) {
-            throw new OkfError(e.status, e.code, `A redirect from source_url: ${e.message}`, {
+          if (e instanceof StoreError) {
+            throw new StoreError(e.status, e.code, `A redirect from source_url: ${e.message}`, {
               ...e.extra,
               redirect: next.href,
             });

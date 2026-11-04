@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { IMAGE_MAX_BYTES, IMAGE_MAX_EDGE } from "../src/okf/images";
-import type { LintWarning } from "../src/okf/types";
+import { IMAGE_MAX_BYTES, IMAGE_MAX_EDGE } from "../src/format/images";
+import type { LintWarning } from "../src/format/types";
 import { LibraryStore, type RequestContext } from "../src/store/store";
 import { bunSqlHandle } from "./sqlite";
 
@@ -36,7 +36,7 @@ function store() {
 }
 
 function write(s: LibraryStore, path: string, body: string) {
-  const if_match = s.concepts().items.find((i) => i.path === path)?.hash ?? null;
+  const if_match = s.pages().items.find((i) => i.path === path)?.hash ?? null;
   return (
     s.apply(ctx(), [{ op: "write", path, content: md(body), if_match }]).results[0]?.lint ?? []
   );
@@ -56,13 +56,13 @@ function attach(s: LibraryStore, path: string, b: ReturnType<typeof blob>) {
   return s.apply(ctx(), [{ op: "attach", path, blob: b, if_match }]);
 }
 
-/** The figure lint stored with a concept, as `read` returns it. */
+/** The figure lint stored with a page, as `read` returns it. */
 function stored(s: LibraryStore, path: string) {
   const v = s.read(path);
-  return v.kind === "concept" ? figure(v.lint) : [];
+  return v.kind === "page" ? figure(v.lint) : [];
 }
 
-/** The figure lint in the concept's `work` item. */
+/** The figure lint in the page's `work` item. */
 function work(s: LibraryStore, path: string) {
   const item = s.work({ kind: "lint" }).items.find((i) => i.path === path);
   return item?.detail ?? "";
@@ -170,10 +170,10 @@ describe("figure lint (TEMPRA-159)", () => {
     s.apply(ctx(), [{ op: "delete", path: "a/chart.png", if_match: hashOf(s, "a/chart.png") }]);
     // Deleted: a broken link now, no longer a large image.
     const v = s.read("a/page.md");
-    expect(v.kind === "concept" && v.lint.map((l) => l.code)).toEqual(["broken_link"]);
+    expect(v.kind === "page" && v.lint.map((l) => l.code)).toEqual(["broken_link"]);
   });
 
-  test("an attachment added after the concept that shows it", () => {
+  test("an attachment added after the page that shows it", () => {
     const s = store();
     write(s, "a/page.md", "![Chart](/a/chart.png)");
     attach(s, "a/chart.png", blob("a", IMAGE_MAX_BYTES + 1));
@@ -267,14 +267,12 @@ describe("external_image work (TEMPRA-163)", () => {
     const s = new LibraryStore(sql, { now });
     write(s, "a/page.md", "![](https://a.io/1.png)");
     // As TEMPRA-159 left it: every lint but broken links in the lint flag.
-    const stored = sql.all<{ concept_id: string; lint: string }>(
-      "SELECT concept_id, lint FROM concepts",
-    )[0];
+    const stored = sql.all<{ page_id: string; lint: string }>("SELECT page_id, lint FROM pages")[0];
     sql.run("DELETE FROM flags WHERE kind = 'external_image'");
     sql.run(
-      "UPDATE flags SET detail = ? WHERE kind = 'lint' AND concept_id = ?",
+      "UPDATE flags SET detail = ? WHERE kind = 'lint' AND page_id = ?",
       stored?.lint ?? "[]",
-      stored?.concept_id ?? "",
+      stored?.page_id ?? "",
     );
     sql.run("DELETE FROM meta WHERE key = 'external_image_flags'");
     expect(s.work({ kind: "lint" }).items[0]?.detail).toContain("hotlinked");

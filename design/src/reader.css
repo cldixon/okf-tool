@@ -1,8 +1,8 @@
 /*
- * What sits around a concept body in the reader (tempra-dev: app/reader): the hover cards and the
+ * What sits around a page body in the reader (tempra-dev: app/reader): the hover cards and the
  * selection toolbar (popovers in the top layer, placed by the app through --float-x and
  * --float-y), comment highlights (the CSS Custom Highlight API), diagrams and the full-screen
- * view of a figure. The threads are comments.css's, the Markdown view concept.css's. Lines and
+ * view of a figure. The threads are comments.css's, the Markdown view page.css's. Lines and
  * greys only (no colour until TEMPRA-1).
  */
 

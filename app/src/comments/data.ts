@@ -1,6 +1,6 @@
 /**
- * Comments on a concept (tempra-dev: app/comments, TEMPRA-13): threads live in the ledger; the
- * page loads a concept's with `GET …/comments?path=` (reloaded when the feed says one changed,
+ * Comments on a page (tempra-dev: app/comments, TEMPRA-13): threads live in the ledger; the
+ * page loads a page's with `GET …/comments?path=` (reloaded when the feed says one changed,
  * `data.svelte.ts`), finds each quote in the body on screen, and keeps the draft started from the
  * selection toolbar.
  */
@@ -137,7 +137,7 @@ function libraryPage(rest: string): { path: string; rest: string } | null {
 }
 
 /**
- * Threads of one status in the order the Comments panel lists them: those on the whole concept
+ * Threads of one status in the order the Comments panel lists them: those on the whole page
  * (and those whose quote is gone) first, then the rest in document order.
  */
 export function panelOrder(placed: Placed[], status: Thread["status"]): Placed[] {

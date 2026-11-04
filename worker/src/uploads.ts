@@ -7,7 +7,7 @@
  */
 import type { TokenInfo } from "./auth";
 import { type LibraryClient, WORKER_ATTACHMENT_CAP } from "./client";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 import type { RequestContext } from "./store/store";
 
 /**
@@ -49,7 +49,7 @@ export const UPLOAD_ORIGINS = ["person", "agent"] as const;
 export function checkOrigin(v: unknown): UploadOrigin {
   if (v === undefined || v === null || v === "") return "person";
   if (v === "person" || v === "agent") return v;
-  throw new OkfError(400, "bad_origin", "`origin` is `person` or `agent`.");
+  throw new StoreError(400, "bad_origin", "`origin` is `person` or `agent`.");
 }
 
 /**
@@ -60,7 +60,7 @@ export function checkLength(bytes: Uint8Array, header: string | undefined): void
   if (header === undefined || header.trim() === "") return;
   const want = Number(header);
   if (!Number.isInteger(want) || want < 0 || want === bytes.length) return;
-  throw new OkfError(
+  throw new StoreError(
     400,
     "incomplete_upload",
     `The upload was cut short: the request said ${want} bytes and ${bytes.length} arrived. Nothing was written; send the file again.`,
@@ -110,7 +110,7 @@ export async function readCapped(
     total += value.length;
     if (total > cap) {
       await reader.cancel().catch(() => {});
-      throw new OkfError(413, "attachment_too_large", `Attachments are capped at ${cap} bytes.`);
+      throw new StoreError(413, "attachment_too_large", `Attachments are capped at ${cap} bytes.`);
     }
     chunks.push(value);
   }
@@ -160,7 +160,7 @@ export function checkMedia(declared: string | null, header: string | undefined):
   const sent = header?.split(";")[0]?.trim().toLowerCase();
   if (!sent || sent === "application/octet-stream" || declared === null) return;
   if (sent !== declared.toLowerCase()) {
-    throw new OkfError(
+    throw new StoreError(
       400,
       "media_mismatch",
       `This upload was prepared for ${declared}, but the request says ${sent}. Prepare it again with the right media, or send no Content-Type.`,

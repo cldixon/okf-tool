@@ -1,7 +1,7 @@
 import type { TokenInfo } from "./auth";
-import { sha256Hex } from "./okf/hash";
+import { sha256Hex } from "./format/hash";
 import type { Quota } from "./quota";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /**
  * Rate limits and metering (tempra-dev: v2/limits): tokens and connected apps by request and by
@@ -132,10 +132,10 @@ export async function admit(
 ): Promise<void> {
   const { key, account, library } = who;
   if (limited && d.rateLimit && !(await d.rateLimit("request", key))) {
-    throw new OkfError(429, "rate_limited", "Too many requests from this token; slow down.");
+    throw new StoreError(429, "rate_limited", "Too many requests from this token; slow down.");
   }
   if (limited && write && d.rateLimit && !(await d.rateLimit("write", account))) {
-    throw new OkfError(
+    throw new StoreError(
       429,
       "rate_limited",
       "Too many writes to this account in the last minute; slow down.",
@@ -155,7 +155,7 @@ export async function admit(
  */
 export async function admitSession(d: UsageDeps, secret: string): Promise<void> {
   if (d.rateLimit && !(await d.rateLimit("session", `session:${sha256Hex(secret)}`))) {
-    throw new OkfError(
+    throw new StoreError(
       429,
       "rate_limited",
       "Too many requests from this browser session; wait a minute.",

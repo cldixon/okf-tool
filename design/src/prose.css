@@ -1,6 +1,6 @@
 /*
- * How a rendered concept reads (tempra-dev: app/reader, Reading typography): the body of a
- * concept, in the app and in the page panel MCP `show` draws in a chat. Scoped to .prose. Inter's
+ * How a rendered page reads (tempra-dev: app/reader, Reading typography): the body of a
+ * page, in the app and in the page panel MCP `show` draws in a chat. Scoped to .prose. Inter's
  * text cut at the reading size (17px), about 66 characters to the line, spacing in em so the
  * rhythm scales with the text. Greys, type, spacing and rules only until the palette (TEMPRA-1).
  */
@@ -488,10 +488,10 @@
 /*
  * Figure markup (TEMPRA-161; tempra-dev: app/media, Figure markup). Width: `--figure-width`, set on
  * the figure through the CSSOM, caps its images (max-width only, so an image is never drawn wider
- * than its own pixels). Placement, on a concept's page: wide and full reach past the text,
- * within the text's column (the page's width, 100cqi of `page`, less --concept-side; the text is
+ * than its own pixels). Placement, on a page: wide and full reach past the text,
+ * within the text's column (the page's width, 100cqi of `page`, less --page-side; the text is
  * --doc-max wide at most, --doc-pad from the column's start and --doc-end from its end,
- * concept.css), never past its padding: from the text's end edge leftwards when the text sits at
+ * page.css), never past its padding: from the text's end edge leftwards when the text sits at
  * the column's end (--doc-align 1), centred with it when it is centred (0.5); wide stops at
  * --tempra-figure-wide. Elsewhere they keep the text's width.
  */
@@ -504,7 +504,7 @@
   max-width: min(100%, var(--figure-width));
 }
 
-.concept .prose figure.figure-wide {
+.page-view .prose figure.figure-wide {
   --figure-reach: min(
     var(--tempra-size-figure-wide),
     var(--figure-column) -
@@ -513,13 +513,13 @@
   );
 }
 
-.concept .prose figure.figure-full {
+.page-view .prose figure.figure-full {
   --figure-reach: calc(var(--figure-column) - var(--doc-pad) - var(--doc-end));
 }
 
 @container page (width >= 0px) {
-  .concept .prose figure:is(.figure-wide, .figure-full) {
-    --figure-column: calc(100cqi - var(--concept-side));
+  .page-view .prose figure:is(.figure-wide, .figure-full) {
+    --figure-column: calc(100cqi - var(--page-side));
     --figure-w: max(100%, var(--figure-reach));
     width: var(--figure-w);
     max-width: none;
@@ -641,7 +641,7 @@
 }
 
 /* Changes in the text (review mode, a version chosen in History): insertions underlined on a
-   grey ground, deletions struck through in grey; the changed block's rule is concept.css's. */
+   grey ground, deletions struck through in grey; the changed block's rule is page.css's. */
 .prose ins.diff-added {
   background: var(--tempra-color-ground);
   text-decoration: underline;

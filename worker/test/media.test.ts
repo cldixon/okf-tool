@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { mediaFor } from "../src/client";
 import { checkAttachment, formatOf, imageInfo, sniffImage, videoSize } from "../src/media";
-import { OkfError } from "../src/store/errors";
+import { StoreError } from "../src/store/errors";
 import { makePng, SAMPLES, SVG, sample, truncatedIdatPng } from "./images";
 
 const refused = (bytes: Uint8Array, declared: string | null) => {
   try {
     checkAttachment(bytes, declared, "x");
   } catch (e) {
-    if (e instanceof OkfError && e.code === "bad_image" && e.status === 400) return e.message;
+    if (e instanceof StoreError && e.code === "bad_image" && e.status === 400) return e.message;
     throw e;
   }
   return null;

@@ -10,7 +10,7 @@
 
   /**
    * A new comment: on the selected text (a draft, started from the selection toolbar, at the top
-   * of the Comments panel) or on the whole concept. Escape, Cancel, or leaving it empty drops it.
+   * of the Comments panel) or on the whole page. Escape, Cancel, or leaving it empty drops it.
    */
   let props: {
     urls: Urls;

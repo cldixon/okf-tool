@@ -28,7 +28,7 @@ const CHART_SVG_MAX = 4_000_000;
 export interface ChartContext {
   width: number;
   idPrefix: string;
-  /** The concept's library path, for relative data paths. */
+  /** The page's library path, for relative data paths. */
   path: string;
   read(path: string): Promise<string | null>;
 }

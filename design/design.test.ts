@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { generate, generatePanel, generatePele } from "./build";
+import { generate, generateBrand, generateMark, generatePanel, generatePele } from "./build";
 import { css, fonts, hash, href } from "./dist/tempra";
 
 test("dist/ is up to date with src/ (run `bun run build` in design/)", () => {
@@ -10,6 +10,8 @@ test("dist/ is up to date with src/ (run `bun run build` in design/)", () => {
   expect(readFileSync(join(import.meta.dir, "dist", "tempra.ts"), "utf8")).toBe(fresh.ts);
   expect(readFileSync(join(import.meta.dir, "dist", "pele.ts"), "utf8")).toBe(generatePele());
   expect(readFileSync(join(import.meta.dir, "dist", "panel.ts"), "utf8")).toBe(generatePanel());
+  expect(readFileSync(join(import.meta.dir, "dist", "brand.ts"), "utf8")).toBe(generateBrand());
+  expect(readFileSync(join(import.meta.dir, "dist", "mark.svg"), "utf8")).toBe(generateMark());
 });
 
 test("the diagram theme resolves every --pele-* to a concrete value, light and dark (TEMPRA-165)", async () => {
@@ -72,7 +74,7 @@ test("every --tempra-* a stylesheet reads is defined", () => {
     "prose.css",
     "reader.css",
     "workspace.css",
-    "concept.css",
+    "page.css",
     "comments.css",
     "views.css",
     "public.css",
@@ -117,7 +119,7 @@ test("only tokens.css reads a palette primitive", () => {
     "prose.css",
     "reader.css",
     "workspace.css",
-    "concept.css",
+    "page.css",
     "comments.css",
     "views.css",
     "public.css",

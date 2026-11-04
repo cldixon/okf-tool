@@ -1,5 +1,5 @@
 /**
- * Writes src/okf/vega-lite-schema.ts: the pinned Vega-Lite's JSON schema (worker/render's
+ * Writes src/format/vega-lite-schema.ts: the pinned Vega-Lite's JSON schema (worker/render's
  * vega-lite, VEGA_LITE_VERSION) without its descriptions, as a string the Worker parses on the
  * first chart it checks (TEMPRA-214). `bun scripts/vega-lite-schema.ts` after moving Vega-Lite;
  * worker/test/chart-schema.test.ts fails while the file is stale.
@@ -8,7 +8,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { VEGA_LITE_VERSION } from "../render/src/version";
 
-const OUT = join(import.meta.dir, "../src/okf/vega-lite-schema.ts");
+const OUT = join(import.meta.dir, "../src/format/vega-lite-schema.ts");
 
 /** The schema as the Worker keeps it: the validator's keywords, no prose. */
 export async function schemaText(): Promise<string> {

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cache } from "./src/api";
-import { fileKey } from "./src/concept/data";
 import { HOLD_MS, holdFor } from "./src/hold";
 import { follow, here } from "./src/location.svelte.ts";
+import { fileKey } from "./src/page/data";
 import { homeKey } from "./src/pages/home";
 import { Urls } from "./src/urls";
 
@@ -15,7 +15,7 @@ const base = "http://localhost";
 const at = (path: string) => new URL(path, base);
 const urls = new Urls("ann", "notes");
 let n = 0;
-/** A concept no other test has opened, so the page cache starts empty for it. */
+/** A page no other test has opened, so the page cache starts empty for it. */
 const freshPath = () => `notes/page-${++n}.md`;
 
 /** The API as a test controls it: every answer waits until `release()`. */
@@ -33,11 +33,11 @@ beforeEach(() => {
     const url = new URL(String(input), base);
     asked.push(url.pathname);
     await gate;
-    // The file's page in one call (TEMPRA-191): a concept with its context.
+    // The file's page in one call (TEMPRA-191): a page with its context.
     const path = decodeURIComponent(url.pathname.split("/page/")[1] ?? "");
     const body = url.pathname.includes("/page/")
       ? {
-          file: { kind: "concept", path, seq: 7, hash: "h", doc: { type: "root", children: [] } },
+          file: { kind: "page", path, seq: 7, hash: "h", doc: { type: "root", children: [] } },
           head: 7,
           sources: { sources: [], unmatched_footnotes: [] },
           links: { inbound: [], broken: [] },

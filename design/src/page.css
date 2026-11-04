@@ -1,0 +1,911 @@
+/*
+ * A page's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
+ * bar): the text (title, description, byline, body, sources) at the end of its column, a gap
+ * from the outline as Linear's docs set it (TEMPRA-277), and on the right its contents, or one panel in their place (Comments, History, Properties). The page's
+ * width decides what fits (container queries on `page`, the page's scroller): under 1100px the
+ * contents keep a narrower column of their own down to 700px (TEMPRA-150), and hide below that
+ * (On this page under the byline); a panel takes the column down to 960px and overlays the page
+ * below that; on a phone (900px and under, the window's call) a panel is a sheet from the bottom.
+ */
+
+/* The right column is the panel's width whether it holds the contents or a panel, so opening a
+   panel takes the contents' space and never moves the text (C-17). */
+/* --page-side is the right column's width in each layout below, so a wide or full figure
+   (prose.css, TEMPRA-161) knows the text's column: the page's width (100cqi of `page`) less it. */
+.page-view {
+  --page-side: var(--tempra-size-panel);
+}
+
+.page-grid {
+  display: grid;
+  grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
+  min-height: 100%;
+}
+
+/* The Markdown view has no contents (its headings lead nowhere there): the file takes the room. */
+.page-view.markdown-on:not(.panel-open) {
+  --page-side: 0px;
+}
+
+.page-view.markdown-on:not(.panel-open) .page-grid {
+  grid-template-columns: [text] minmax(0, 1fr);
+}
+
+/* The text, --doc-max wide at most (padding included), at the end of its column: --doc-end from
+   the outline or the panel (room for a block's comment mark, reader/reading.ts), --doc-pad from
+   the column's other edge, and the spare room on the far side. With nothing beside it (the
+   rules below) it is centred, --doc-pad each side. A wide or full figure reads them all, and
+   --doc-align: 1 at the end, 0.5 centred. */
+.page-view .doc {
+  --doc-pad: var(--tempra-space-page);
+  --doc-end: var(--tempra-space-56);
+  --doc-align: 1;
+  --doc-max: calc(var(--tempra-size-column-text) + var(--tempra-space-page) + var(--doc-end));
+  grid-row: 1;
+  grid-column: text;
+  justify-self: end;
+  width: 100%;
+  max-width: var(--doc-max);
+  min-width: 0;
+  padding: var(--tempra-space-40) var(--doc-end) 140px var(--doc-pad); /* one-off: room under the text for the page's actions */
+}
+
+/* Nothing beside the text: centred. */
+.page-view.markdown-on:not(.panel-open) .doc {
+  --doc-end: var(--doc-pad);
+  --doc-align: 0.5;
+  justify-self: center;
+}
+
+/* The Markdown view is wider than the text: the file's lines are long. */
+.page-view.markdown-on .doc {
+  --doc-max: calc(
+    var(--tempra-measure) +
+    2 *
+    var(--tempra-space-page) +
+    var(--tempra-size-contents)
+  );
+}
+
+.page-side {
+  grid-row: 1;
+  grid-column: side;
+  min-width: 0;
+}
+
+/* The contents: the page's headings in small grey type, nested, kept in view; the section in
+   view marked with a rule. No heading over them. */
+.page-contents {
+  position: sticky;
+  top: 0;
+  max-width: calc(var(--tempra-size-contents) + 2 * var(--tempra-space-page));
+  max-height: calc(100dvh - var(--tempra-size-topbar));
+  overflow: auto;
+  padding: var(--tempra-space-48) var(--tempra-space-page) var(--tempra-space-24) 0;
+}
+
+.toc {
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--tempra-color-border);
+  list-style: none;
+  font-size: var(--tempra-text-meta);
+  line-height: var(--tempra-leading-base);
+}
+
+.toc a {
+  display: block;
+  margin-left: -1px; /* over the list's hairline */
+  padding: var(--tempra-space-04) 0 var(--tempra-space-04) var(--tempra-space-14);
+  border-left: 1px solid transparent;
+  color: var(--tempra-color-muted);
+  text-decoration: none;
+}
+
+.toc .sub a {
+  padding-left: 26px; /* one-off: a level in from the 14px above */
+}
+
+.toc a:hover {
+  color: var(--tempra-color-text);
+}
+
+.toc a[aria-current="location"] {
+  border-left-color: var(--tempra-color-text);
+  color: var(--tempra-color-text);
+}
+
+/* "On this page" under the byline, for when the contents have no column. */
+.toc-inline {
+  display: none;
+  margin-top: var(--tempra-space-20);
+  border: 1px solid var(--tempra-color-border);
+  border-radius: var(--tempra-radius-box);
+  font-size: var(--tempra-text-ui);
+}
+
+/* Closed by default: "On this page" and a chevron, turned while open (board 33). */
+.toc-inline summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px; /* one-off: the disclosure's row */
+  padding: 0 var(--tempra-space-16);
+  color: var(--tempra-color-text);
+  list-style: none;
+  cursor: pointer;
+}
+
+.toc-inline summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-inline summary svg {
+  color: var(--tempra-color-faint);
+  transition: transform var(--tempra-motion-quick) ease;
+}
+
+.toc-inline[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.toc-inline .toc {
+  margin: 0 var(--tempra-space-16) var(--tempra-space-12);
+}
+
+/* ---------- A panel: in the contents' column, its title, a count and × ---------- */
+
+.page-aside {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--tempra-size-topbar));
+  border-left: 1px solid var(--tempra-color-border);
+  background: var(--tempra-color-bg);
+  font-size: var(--tempra-text-ui);
+}
+
+.panel-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tempra-space-08);
+  min-height: var(--tempra-size-panel-head);
+  padding: 0 var(--tempra-space-12) 0 var(--tempra-space-20);
+  border-bottom: 1px solid var(--tempra-color-border);
+}
+
+/* Beside the text (960px of page and up), a panel floats in its column as a card (TEMPRA-283;
+   tempra-dev: app/workspace, A panel floats): as tall as what it holds, up to the window, where
+   it scrolls inside; kept near the top, a hairline and the soft shadow round it, no rule down the
+   page and none under its head. The column keeps its width, so the text never moves. Narrower,
+   it overlays the page and on a phone it is the sheet, as before (the rules further down). */
+@container page (width >= 960px) {
+  .page-side > .page-aside {
+    top: var(--tempra-space-16);
+    height: auto;
+    max-height: calc(100dvh - var(--tempra-size-topbar) - 2 * var(--tempra-space-16));
+    margin: var(--tempra-space-16) var(--tempra-space-16) 0 0;
+    overflow: hidden;
+    border: 1px solid var(--tempra-color-border);
+    border-radius: var(--tempra-radius-card);
+    box-shadow: var(--tempra-shadow);
+  }
+
+  .page-side > .page-aside .panel-head {
+    padding: 0 var(--tempra-space-08) 0 var(--tempra-space-16);
+    border-bottom: 0;
+  }
+
+  /* A little room at its top, so a focus ring there is not cut by the scroller. */
+  .page-side > .page-aside .panel-body {
+    padding: var(--tempra-space-04) var(--tempra-space-16) var(--tempra-space-16);
+  }
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: var(--tempra-text-ui);
+  font-weight: var(--tempra-weight-strong);
+}
+
+.panel-head .count {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+.panel-head .icon-button {
+  margin-left: auto;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--tempra-space-16) var(--tempra-space-20) var(--tempra-space-32);
+}
+
+.panel-section {
+  margin-top: var(--tempra-space-24);
+}
+
+.panel-section .label {
+  margin: 0 0 var(--tempra-space-08);
+}
+
+.panel-section .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tempra-space-08);
+  margin: var(--tempra-space-10) 0 0;
+}
+
+/* Check: Mark as checked, or how much changed since someone checked and Show changes. */
+.check {
+  padding: var(--tempra-space-12) var(--tempra-space-14);
+  border-radius: var(--tempra-radius-box);
+  background: var(--tempra-color-ground);
+}
+
+.check-state {
+  margin: 0;
+}
+
+.check .actions:first-child {
+  margin-top: 0;
+}
+
+.doc-head {
+  margin-bottom: var(--tempra-space-32);
+}
+
+.doc-title {
+  font-family: var(--tempra-font-display);
+  font-variation-settings: var(--tempra-font-display-settings);
+  margin: 0 0 var(--tempra-space-12);
+  font-size: var(--tempra-text-title);
+  font-weight: var(--tempra-weight-medium);
+  line-height: var(--tempra-leading-tight);
+  letter-spacing: var(--tempra-tracking-doc);
+}
+
+.doc-tagline {
+  margin: 0;
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-reader);
+  line-height: var(--tempra-leading-base);
+}
+
+/* ---------- The byline: who wrote this version, for whom, when; or who is editing now ---------- */
+
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tempra-space-06) var(--tempra-space-08);
+  margin-top: var(--tempra-space-20);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-ui);
+}
+
+.byline-sep {
+  color: var(--tempra-color-faint);
+}
+
+/* What is exceptional about the page, at the byline's end: "Draft", "Stale" (TEMPRA-139). */
+.byline-pills {
+  display: inline-flex;
+  gap: var(--tempra-space-06);
+}
+
+/* Whether a person checked the page: one quiet line under the byline, only when someone has. */
+.doc-checked {
+  margin: var(--tempra-space-08) 0 0;
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-ui);
+}
+
+.doc-checked a {
+  color: inherit;
+}
+
+.doc-checked a:hover {
+  color: var(--tempra-color-text);
+}
+
+.byline-live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tempra-space-06);
+  color: var(--tempra-color-text);
+}
+
+/* ---------- History: the versions, newest first ---------- */
+
+.versions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.versions a.version {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr); /* one-off: the version's number */
+  gap: var(--tempra-space-08);
+  padding: var(--tempra-space-08) var(--tempra-space-10);
+  border-radius: var(--tempra-radius-row);
+  color: var(--tempra-color-text);
+  text-decoration: none;
+}
+
+.versions a.version:hover {
+  background: var(--tempra-color-hover);
+}
+
+.versions a.version.chosen {
+  background: var(--tempra-color-selected);
+}
+
+.version-n {
+  color: var(--tempra-color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.version-what {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.version-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-who {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+.older-versions {
+  margin-top: var(--tempra-space-12);
+  padding-left: var(--tempra-space-10);
+  font-size: var(--tempra-text-meta);
+  text-decoration: underline;
+}
+
+/* ---------- Review mode, and the changes since a version chosen in History ---------- */
+
+.review-bar {
+  position: sticky;
+  top: var(--tempra-space-12);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tempra-space-08) var(--tempra-space-16);
+  margin: 0 0 var(--tempra-space-32);
+  padding: var(--tempra-space-08) var(--tempra-space-08) var(--tempra-space-08)
+    var(--tempra-space-14);
+  border: 1px solid var(--tempra-color-border);
+  border-radius: var(--tempra-radius-box);
+  background: var(--tempra-color-bg);
+  font-size: var(--tempra-text-ui);
+}
+
+.review-what {
+  flex: 1 1 16rem; /* one-off: what the bar says, before it wraps */
+  min-width: 0;
+}
+
+.review-lead {
+  font-weight: var(--tempra-weight-medium);
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tempra-space-08) var(--tempra-space-12);
+}
+
+.verify-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tempra-space-06);
+}
+
+.verify-form input {
+  flex: 1 1 10rem; /* one-off: the note's field, before it wraps */
+  min-width: 0;
+}
+
+/* The changes in the text (take 4, board 22): a hairline warm rule left of each changed block,
+   insertions underlined on a grey ground, deletions struck through in grey (prose.css). */
+.page-view
+  .prose
+  > :is(p, ul, ol, blockquote, pre, h2, h3, h4, h5, h6, .table):has(
+    ins.diff-added,
+    del.diff-removed
+  ) {
+  margin-left: calc(-1 * var(--tempra-space-16));
+  padding-left: calc(var(--tempra-space-16) - 1px);
+  border-left: 1px solid var(--tempra-color-agent);
+}
+
+/* ---------- The end of the body: sources ---------- */
+
+.doc-sources {
+  max-width: var(--tempra-measure-reader);
+  margin-top: var(--tempra-space-56);
+  padding-top: var(--tempra-space-20);
+  border-top: 1px solid var(--tempra-color-border);
+}
+
+.doc-sources h2 {
+  margin: 0 0 var(--tempra-space-12);
+  font-size: var(--tempra-text-ui);
+  font-weight: var(--tempra-weight-strong);
+}
+
+.doc-sources h3 {
+  margin: var(--tempra-space-20) 0 var(--tempra-space-08);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-medium);
+}
+
+.sources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sources li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr); /* one-off: the source's number */
+  gap: var(--tempra-space-06);
+  margin-bottom: var(--tempra-space-10);
+  font-size: var(--tempra-text-ui);
+  line-height: var(--tempra-leading-base);
+}
+
+.sources li:target {
+  background: var(--tempra-color-ground);
+}
+
+.sources .num {
+  color: var(--tempra-color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sources .meta {
+  display: block;
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+.sources a {
+  color: var(--tempra-color-text);
+}
+
+/* ---------- The Markdown view: the stored file, with line numbers ---------- */
+
+.raw-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tempra-space-08) var(--tempra-space-12);
+  margin-bottom: var(--tempra-space-16);
+}
+
+/* Wrap lines, pressed while long lines wrap. */
+.raw-head button[aria-pressed="true"],
+.raw-head button[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--tempra-color-selected);
+}
+
+.raw-path {
+  flex: 1;
+  min-width: 0;
+  color: var(--tempra-color-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The file in a pre, a line per span; the numbers are CSS counters in the gutter, so they are
+   never selected or copied, and stay on their line when long lines wrap (Wrap lines). */
+.raw-file {
+  margin: 0;
+  padding: var(--tempra-space-16) var(--tempra-space-18) var(--tempra-space-16)
+    calc(var(--raw-gutter) + var(--tempra-space-16));
+  overflow-x: auto;
+  border: 1px solid var(--tempra-color-border);
+  border-radius: var(--tempra-radius-box);
+  background: var(--tempra-color-ground);
+  font-family: var(--tempra-font-mono);
+  font-size: var(--tempra-text-ui);
+  line-height: var(--tempra-leading-base);
+  white-space: pre;
+  counter-reset: line;
+  --raw-gutter: 4ch;
+}
+
+.raw-file.wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.raw-line {
+  position: relative;
+  counter-increment: line;
+}
+
+.raw-line::before {
+  content: counter(line);
+  position: absolute;
+  left: calc(-1 * var(--raw-gutter) - var(--tempra-space-12));
+  width: var(--raw-gutter);
+  color: var(--tempra-color-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+}
+
+/* ---------- Properties: the facts, links, agent notes ---------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr); /* one-off: the facts' names */
+  margin: 0;
+  font-size: var(--tempra-text-ui);
+}
+
+.facts > div {
+  display: contents;
+}
+
+.facts dt,
+.facts dd {
+  padding: 9px 0; /* one-off: a fact's row */
+  border-bottom: 1px solid var(--tempra-color-border);
+  line-height: var(--tempra-leading-base);
+}
+
+.facts dt {
+  color: var(--tempra-color-muted);
+}
+
+.facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.facts pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.linked {
+  margin: 0;
+  padding-left: var(--tempra-space-18);
+}
+
+.linked li {
+  margin-bottom: var(--tempra-space-08);
+  font-size: var(--tempra-text-meta);
+}
+
+/* ---------- What fits: the page's width decides ---------- */
+
+/* No room beside the text: the contents move under the byline, and a panel overlays the page. */
+@container page (width < 1100px) {
+  .page-view {
+    --page-side: 0px;
+  }
+
+  .page-grid,
+  .page-view.panel-open .page-grid {
+    grid-template-columns: [text] minmax(0, 1fr);
+  }
+
+  /* Its column is gone: what it holds is hidden (the contents) or fixed (a panel). */
+  .page-side {
+    display: contents;
+  }
+
+  .page-contents {
+    display: none;
+  }
+
+  .toc-inline {
+    display: block;
+  }
+
+  .page-view .doc {
+    --doc-end: var(--doc-pad);
+    --doc-align: 0.5;
+    justify-self: center;
+  }
+
+  .page-aside {
+    position: fixed;
+    top: var(--tempra-size-topbar);
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    width: min(var(--tempra-size-panel), 100vw);
+    height: auto;
+    box-shadow: var(--tempra-shadow);
+  }
+}
+
+/* Room for the text and the contents, not a panel's width as well (a laptop window, about 964
+   to 1364px with the sidebar shown; TEMPRA-150): the contents keep a column of their own, the
+   contents' width and a gutter, as Linear's docs do, and the page's padding tightens a little. An
+   open panel still takes the column from 960px and overlays below that (the rules around this),
+   and the text moves over for it. */
+@container page (700px <= width < 1100px) {
+  .page-view:not(.panel-open):not(.markdown-on) {
+    --page-side: calc(var(--tempra-size-contents) + var(--tempra-space-24));
+  }
+
+  .page-view:not(.panel-open):not(.markdown-on) .page-grid {
+    grid-template-columns: [text] minmax(0, 1fr) [side] calc(
+        var(--tempra-size-contents) +
+        var(--tempra-space-24)
+      );
+  }
+
+  .page-view:not(.panel-open):not(.markdown-on) .page-side {
+    display: block;
+  }
+
+  .page-view:not(.panel-open) .page-contents {
+    display: block;
+    padding-right: var(--tempra-space-24);
+  }
+
+  .page-view:not(.panel-open):not(.markdown-on) .toc-inline {
+    display: none;
+  }
+
+  .page-view .doc {
+    --doc-pad: var(--tempra-space-32);
+  }
+
+  .page-view:not(.panel-open):not(.markdown-on) .doc {
+    --doc-end: var(--tempra-space-56);
+    --doc-align: 1;
+    justify-self: end;
+  }
+}
+
+/* What an overlaid panel dims: the page, the top bar and the sidebar, which are inert while it
+   is open (TEMPRA-133). The app draws it only then; a tap on it closes the panel. */
+.panel-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  background: var(--tempra-color-scrim);
+}
+
+/* Room for the text and a panel, not the contents as well (a laptop of about 1280px with the
+   sidebar shown): an open panel takes a column again and the text moves over for it, so nothing
+   (On this page included) runs under it. Narrower than this, it overlays. */
+@container page (960px <= width < 1100px) {
+  .page-view.panel-open {
+    --page-side: var(--tempra-size-panel);
+  }
+
+  .page-view.panel-open .page-grid {
+    grid-template-columns: [text] minmax(0, 1fr) [side] var(--tempra-size-panel);
+  }
+
+  .page-view.panel-open .page-side {
+    display: block;
+  }
+
+  .page-view.panel-open .doc {
+    --doc-end: var(--tempra-space-56);
+    --doc-align: 1;
+    justify-self: end;
+  }
+
+  /* Back in the column: the floating card above (TEMPRA-283) takes its top, height and shadow. */
+  .page-view.panel-open .page-aside {
+    position: sticky;
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    width: auto;
+  }
+}
+
+/* The page's folders above its title, only where the tree is out of sight (TEMPRA-139): with the
+   sidebar hidden here, and on a phone below. */
+.doc-crumbs {
+  display: none;
+  flex-wrap: wrap;
+  gap: var(--tempra-space-06);
+  margin-bottom: var(--tempra-space-12);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-ui);
+}
+
+.doc-crumbs:empty {
+  display: none;
+}
+
+/* A phone (take 4, boards 33 and 35): one column with a 16px gutter, "On this page" as a closed
+   disclosure under the byline, and a panel as a sheet from the bottom, the page dimmed behind. */
+@media (max-width: 900px) {
+  .page-view .doc {
+    --doc-pad: var(--tempra-space-16);
+    padding-top: var(--tempra-space-16);
+    padding-bottom: var(--tempra-space-96);
+  }
+
+  .doc-crumbs {
+    display: flex;
+  }
+
+  .doc-crumbs:empty {
+    display: none;
+  }
+
+  .doc-title {
+    font-size: var(--tempra-text-page);
+  }
+
+  .toc-inline summary {
+    min-height: var(--tempra-size-touch);
+    font-size: var(--tempra-text-name);
+  }
+
+  .toc-inline .toc a {
+    padding-top: var(--tempra-space-08);
+    padding-bottom: var(--tempra-space-08);
+  }
+
+  .page-aside {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 7;
+    width: auto;
+    height: var(--tempra-size-sheet);
+    border-top: 1px solid var(--tempra-color-border);
+    border-left: 0;
+    border-radius: var(--tempra-radius-card) var(--tempra-radius-card) 0 0;
+    box-shadow: none;
+  }
+
+  /* The page dimmed behind the sheet, the top bar too (.panel-scrim). */
+  .panel-scrim {
+    z-index: 6;
+  }
+
+  .panel-head {
+    position: relative;
+    min-height: var(--tempra-size-panel-head-phone);
+    padding: var(--tempra-space-12) var(--tempra-space-08) 0 var(--tempra-space-20);
+    touch-action: none;
+  }
+
+  .panel-head h2 {
+    font-size: var(--tempra-text-name);
+  }
+
+  /* The drag handle, centred at the sheet's top edge. */
+  .panel-grip {
+    position: absolute;
+    top: var(--tempra-space-08);
+    left: 50%;
+    width: 36px; /* one-off: the drag handle */
+    height: 4px;
+    border-radius: var(--tempra-radius-pill);
+    background: var(--tempra-color-border-strong);
+    transform: translateX(-50%);
+  }
+
+  .panel-body {
+    padding: var(--tempra-space-16) var(--tempra-space-16) var(--tempra-space-24);
+    overscroll-behavior: contain;
+  }
+}
+
+/* The handle is the phone sheet's alone. */
+@media (min-width: 901px) {
+  .panel-grip {
+    display: none;
+  }
+}
+
+/* ---------- A page's actions (TEMPRA-172; tempra-dev: decisions/a-pages-actions-float) ---------- */
+
+/* One round + at the page's bottom right, in ink, the one raised thing on a flat page; its menu
+   opens upward (Comment, Check). Aside while a panel is open (the app sets `hidden`). In the
+   page, so an overlaid panel or the phone's drawer dims it with the rest; under their scrims. */
+.page-actions {
+  position: fixed;
+  right: max(var(--tempra-space-28), env(safe-area-inset-right));
+  bottom: max(var(--tempra-space-28), env(safe-area-inset-bottom));
+  z-index: 3;
+}
+
+.page-actions[hidden] {
+  display: none;
+}
+
+.page-fab {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--tempra-size-fab);
+  height: var(--tempra-size-fab);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tempra-color-text);
+  color: var(--tempra-color-bg);
+  box-shadow: var(--tempra-shadow);
+}
+
+.page-fab:hover:not(:disabled) {
+  background: var(--tempra-color-text);
+  color: var(--tempra-color-bg);
+}
+
+.page-fab svg {
+  transition: transform var(--tempra-motion-quick) ease;
+}
+
+/* Open, the + turns into × over its menu. */
+.page-fab[aria-expanded="true"] svg {
+  transform: rotate(45deg);
+}
+
+/* Something waits in the menu (open comments, changes since the check): a small ringed dot on
+   the button's corner. Greys only. */
+.page-fab-dot {
+  position: absolute;
+  top: var(--tempra-space-02);
+  right: var(--tempra-space-02);
+  width: 12px; /* one-off: the ringed dot */
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--tempra-color-text);
+  border-radius: 50%;
+  background: var(--tempra-color-bg);
+}
+
+.page-actions-list {
+  min-width: 240px; /* one-off: Review changes and its count on one line */
+}
+
+.menu-list .menu-count {
+  margin-left: auto;
+  padding-left: var(--tempra-space-12);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+/* Who checked the page, when there is nothing to do about it. */
+.menu-list .menu-line {
+  margin: 0;
+  padding: var(--tempra-space-06) var(--tempra-space-10);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+@media (max-width: 900px) {
+  .page-actions {
+    right: max(var(--tempra-space-16), env(safe-area-inset-right));
+    bottom: max(var(--tempra-space-24), env(safe-area-inset-bottom));
+  }
+}

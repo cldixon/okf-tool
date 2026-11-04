@@ -2,7 +2,7 @@
   import type { Snippet } from "svelte";
 
   /**
-   * A page's column in the frame (everything but a concept, which lays out its own columns);
+   * A page's column in the frame (everything but a page, which lays out its own columns);
    * `inert` while a panel over it is modal (the home's Comments, TEMPRA-222).
    */
   let {

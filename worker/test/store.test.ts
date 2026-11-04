@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { normalize } from "@tempra/editor/doc";
-import { jsonEqual, parseConcept, splitFrontmatter } from "../src/okf/concept";
-import { sha256Hex } from "../src/okf/hash";
-import { isConceptPath } from "../src/okf/paths";
-import { OkfError } from "../src/store/errors";
+import { sha256Hex } from "../src/format/hash";
+import { jsonEqual, parsePage, splitFrontmatter } from "../src/format/page";
+import { isPagePath } from "../src/format/paths";
+import { StoreError } from "../src/store/errors";
 import {
   type FileView,
   type ImportFile,
@@ -13,7 +13,7 @@ import {
 import { BUNDLES, loadBundle, text } from "./fixtures";
 import { bunSqlHandle } from "./sqlite";
 
-/** A concept's body as `read` renders it: its markdown without the frontmatter. */
+/** A page's body as `read` renders it: its markdown without the frontmatter. */
 const bodyOf = (v: { kind: string; markdown?: string }) => splitFrontmatter(v.markdown ?? "").body;
 
 let n = 0;
@@ -32,29 +32,29 @@ function newStore() {
   return new LibraryStore(bunSqlHandle(), { now });
 }
 
-function errorOf(fn: () => unknown): OkfError {
+function errorOf(fn: () => unknown): StoreError {
   try {
     fn();
   } catch (e) {
-    if (e instanceof OkfError) return e;
+    if (e instanceof StoreError) return e;
     throw e;
   }
-  throw new Error("expected an OkfError");
+  throw new Error("expected an StoreError");
 }
 
-function conceptView(v: FileView) {
-  if (v.kind !== "concept") throw new Error(`expected a concept, got ${v.kind}`);
+function pageView(v: FileView) {
+  if (v.kind !== "page") throw new Error(`expected a page, got ${v.kind}`);
   return v;
 }
 
-/** A concept as an agent should write it: a specific type, a description and a status. */
+/** A page as an agent should write it: a specific type, a description and a status. */
 /** Lint without `relative_link`, for tests about relative links themselves. */
 const withoutRelative = <T extends { code: string }>(lint: T[]) =>
   lint.filter((l) => l.code !== "relative_link");
 
 const md = (type: string, body: string, extra = "") => {
   const fill = [
-    /^description:/m.test(extra) ? "" : "description: A test concept.\n",
+    /^description:/m.test(extra) ? "" : "description: A test page.\n",
     /^status:/m.test(extra) ? "" : "status: stable\n",
   ].join("");
   return `---\ntype: ${type}\n${fill}${extra}---\n${body}`;
@@ -75,7 +75,7 @@ describe("write path", () => {
     expect(res?.lint).toEqual([]);
     expect(res?.notices?.map((l) => l.code)).toEqual(["generated_ignored"]);
     const view = s.read("a");
-    if (view.kind !== "concept") throw new Error("not a concept");
+    if (view.kind !== "page") throw new Error("not a page");
     expect(view.frontmatter.generated).toEqual({ by: "agent/1", at: "2026-09-29T12:00:01Z" });
 
     // Replace without If-Match fails with the current hash.
@@ -102,14 +102,14 @@ describe("write path", () => {
   });
 
   test("reserved paths and the size cap are refused", () => {
-    const s = new LibraryStore(bunSqlHandle(), { conceptCap: 200 });
+    const s = new LibraryStore(bunSqlHandle(), { pageCap: 200 });
     expect(
       errorOf(() => s.apply(ctx(), [{ op: "write", path: "x/index.md", content: "x" }])).status,
     ).toBe(405);
     const big = errorOf(() =>
       s.apply(ctx(), [{ op: "write", path: "big.md", content: md("Memo", "y".repeat(500)) }]),
     );
-    expect([big.status, big.code]).toEqual([413, "concept_too_large"]);
+    expect([big.status, big.code]).toEqual([413, "page_too_large"]);
     expect(s.headSeq()).toBe(0);
   });
 
@@ -140,7 +140,7 @@ describe("write path", () => {
       },
     ]);
     const v = s.read("a.md");
-    if (v.kind !== "concept") throw new Error();
+    if (v.kind !== "page") throw new Error();
     expect(v.frontmatter.type).toBe("Memo");
     expect(bodyOf(v)).toBe("one 2\n");
     const miss = errorOf(() =>
@@ -154,12 +154,12 @@ describe("write path", () => {
     const s = newStore();
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("Memo", "x\n") }]);
     const v = s.read("a.md");
-    if (v.kind !== "concept") throw new Error();
+    if (v.kind !== "page") throw new Error();
     const echoed = s.apply(ctx(), [
       { op: "write", path: "a.md", content: v.markdown, if_match: v.hash },
     ]);
     expect(echoed.results[0]?.lint).toEqual([]);
-    const v2 = conceptView(s.read("a.md"));
+    const v2 = pageView(s.read("a.md"));
     const changed = v2.markdown.replace(
       /generated: \{[^}]*\}/,
       "generated: { by: me/1, at: 2020-01-01T00:00:00Z }",
@@ -167,8 +167,8 @@ describe("write path", () => {
     const r = s.apply(ctx(), [{ op: "write", path: "a.md", content: changed, if_match: v2.hash }]);
     expect(r.results[0]?.lint).toEqual([]);
     expect(r.results[0]?.notices?.map((l) => l.code)).toEqual(["generated_ignored"]);
-    // Ignored fields are reported with the write only: nothing is left to fix on the concept.
-    expect(conceptView(s.read("a.md")).lint).toEqual([]);
+    // Ignored fields are reported with the write only: nothing is left to fix on the page.
+    expect(pageView(s.read("a.md")).lint).toEqual([]);
     expect(s.work({ kind: "broken_link" }).items).toEqual([]);
   });
 });
@@ -185,7 +185,7 @@ describe("links", () => {
       { op: "write", path: "a/two.md", content: md("Memo", "Back to [one](one.md).\n") },
     ]);
     const lint = s.read("a/one.md");
-    if (lint.kind !== "concept") throw new Error();
+    if (lint.kind !== "page") throw new Error();
     expect(withoutRelative(lint.lint).map((l) => [l.code, l.target])).toEqual([
       ["broken_link", "a/missing.md"],
       ["missing_heading", "a/two.md"],
@@ -194,17 +194,17 @@ describe("links", () => {
 
     s.apply(ctx(), [{ op: "move", path: "a/two.md", to: "b/deep/two.md" }]);
     const one = s.read("a/one.md");
-    if (one.kind !== "concept") throw new Error();
+    if (one.kind !== "page") throw new Error();
     expect(bodyOf(one)).toBe(
       "See [two](../b/deep/two.md), [abs](/b/deep/two.md#x) and [gone](missing.md).\n",
     );
     const two = s.read("b/deep/two.md");
-    if (two.kind !== "concept") throw new Error();
+    if (two.kind !== "page") throw new Error();
     expect(bodyOf(two)).toBe("Back to [one](../../a/one.md).\n");
 
     // Reading as of before the move renders the links as they were then.
     const old = s.read("a/one.md", { at: 1 });
-    if (old.kind !== "concept") throw new Error();
+    if (old.kind !== "page") throw new Error();
     expect(bodyOf(old)).toContain("[two](./two.md)");
 
     // Creating the missing target heals the broken link.
@@ -226,7 +226,7 @@ describe("links", () => {
       ["move", "d/y.md", "e/f/y.md"],
     ]);
     const top = s.read("top.md");
-    if (top.kind !== "concept") throw new Error();
+    if (top.kind !== "page") throw new Error();
     expect(bodyOf(top)).toBe("[x](e/f/x.md)\n");
     // Collisions fail the whole move.
     s.apply(ctx(), [{ op: "write", path: "g/x.md", content: md("Memo", "") }]);
@@ -238,14 +238,14 @@ describe("ledger", () => {
   test("revert a path and a request, forward-only", () => {
     const s = newStore();
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("Memo", "v1\n") }]);
-    const h1 = s.read("a.md").kind === "concept" ? (s.read("a.md") as { hash: string }).hash : "";
+    const h1 = s.read("a.md").kind === "page" ? (s.read("a.md") as { hash: string }).hash : "";
     const r2 = s.apply(ctx(), [
       { op: "write", path: "a.md", content: md("Memo", "v2\n"), if_match: h1 },
     ]);
     const rv = s.revert(ctx("human:me"), { path: "a.md", to_seq: 1 });
     expect(rv.results[0]?.hash).toBe(h1);
     const v = s.read("a.md");
-    if (v.kind !== "concept") throw new Error();
+    if (v.kind !== "page") throw new Error();
     expect(bodyOf(v)).toBe("v1\n");
     expect(v.frontmatter.generated).toEqual({ by: "claude-code/test", at: "2026-09-29T12:00:01Z" });
 
@@ -302,7 +302,7 @@ describe("ledger", () => {
 });
 
 describe("queries", () => {
-  test("tree, concepts, search, grep and index", () => {
+  test("tree, pages, search, grep and index", () => {
     const s = newStore();
     s.apply(ctx(), [
       {
@@ -329,12 +329,9 @@ describe("queries", () => {
       ["m", "dir"],
       ["t", "dir"],
     ]);
-    expect(s.concepts({ type: "Metric" }).items.map((r) => r.path)).toEqual([
-      "m/cost.md",
-      "m/rev.md",
-    ]);
-    expect(s.concepts({ stale: true }).items.map((r) => r.path)).toEqual(["m/rev.md"]);
-    expect(s.concepts({ status: "draft", tag: "finance" }).items).toEqual([]);
+    expect(s.pages({ prefix: "m" }).items.map((r) => r.path)).toEqual(["m/cost.md", "m/rev.md"]);
+    expect(s.pages({ stale: true }).items.map((r) => r.path)).toEqual(["m/rev.md"]);
+    expect(s.pages({ status: "draft", tag: "finance" }).items).toEqual([]);
     expect(
       s
         .search("money")
@@ -350,16 +347,44 @@ describe("queries", () => {
       "t/orders.md",
     ]);
     expect(s.index("")).toBe(
+      "# Subdirectories\n\n* [m](m/index.md) - 2 pages\n* [t](t/index.md) - 1 page\n",
+    );
+    // An OKF export's index says its version and names pages as OKF does.
+    expect(s.index("", undefined, { okf: true })).toBe(
       '---\nokf_version: "0.2"\n---\n\n# Subdirectories\n\n* [m](m/index.md) - 2 concepts\n* [t](t/index.md) - 1 concept\n',
     );
-    expect(s.index("t")).toBe("# Concepts\n\n* [orders](orders.md) - One row per order.\n");
+    expect(s.index("t")).toBe("# Pages\n\n* [orders](orders.md) - One row per order.\n");
+    // An OKF export gives every page exactly one non-empty type, as OKF requires.
+    s.apply(ctx(), [
+      { op: "write", path: "u/none.md", content: "---\ntitle: None\ndescription: N.\n---\nx\n" },
+      {
+        op: "write",
+        path: "u/empty.md",
+        content: '---\ntype: ""\ntitle: E\ndescription: E.\n---\nx\n',
+      },
+      {
+        op: "write",
+        path: "u/num.md",
+        content: "---\ntype: 3\ntitle: N\ndescription: N.\n---\nx\n",
+      },
+    ]);
+    const okf = new Map(s.exportBundle(undefined, "okf").files.map((f) => [f.path, f.text ?? ""]));
+    for (const p of ["u/none.md", "u/empty.md", "u/num.md"]) {
+      const text = okf.get(p) ?? "";
+      expect(text.match(/^type:/gm)).toEqual(["type:"]);
+      expect(text).toStartWith("---\ntype: Page\n");
+    }
+    expect(okf.get("m/rev.md")).toContain("type: Metric");
+    const plain = new Map(s.exportBundle().files.map((f) => [f.path, f.text ?? ""]));
+    expect(plain.get("u/none.md")).not.toContain("type:");
+    expect(plain.has("u/index.md")).toBe(false);
     expect(errorOf(() => s.index("nope")).status).toBe(404);
   });
 });
 
 function importFiles(name: string): ImportFile[] {
   return loadBundle(name).map((f) =>
-    isConceptPath(f.path) || f.path.endsWith(".md")
+    isPagePath(f.path) || f.path.endsWith(".md")
       ? { path: f.path, markdown: text(f.bytes) }
       : { path: f.path, blob: { hash: sha256Hex(f.bytes), size: f.bytes.length, media: null } },
   );
@@ -398,8 +423,8 @@ describe("import and export round-trip the sample bundles (store level)", () => 
           expect(got?.blob?.hash).toBe(f.blob.hash);
           continue;
         }
-        const a = parseConcept(f.markdown);
-        const b = parseConcept(got?.text ?? "");
+        const a = parsePage(f.markdown);
+        const b = parsePage(got?.text ?? "");
         expect(jsonEqual(Object.fromEntries(b.entries), Object.fromEntries(a.entries))).toBe(true);
         expect(jsonEqual(b.generated, a.generated)).toBe(true);
         expect(b.verified).toEqual(a.verified);
@@ -417,9 +442,9 @@ describe("tier 2", () => {
   test("stored lint drops a broken link once its target exists", () => {
     const s = newStore();
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("Memo", "[b](/b.md)\n") }]);
-    expect(conceptView(s.read("a.md")).lint.map((l) => l.code)).toEqual(["broken_link"]);
+    expect(pageView(s.read("a.md")).lint.map((l) => l.code)).toEqual(["broken_link"]);
     s.apply(ctx(), [{ op: "write", path: "b.md", content: md("Memo", "b\n") }]);
-    expect(conceptView(s.read("a.md")).lint).toEqual([]);
+    expect(pageView(s.read("a.md")).lint).toEqual([]);
     expect(s.work({ kind: "broken_link" }).items).toEqual([]);
   });
 
@@ -451,7 +476,7 @@ describe("tier 2", () => {
         content: md("Metric", "Uses [^abs].\n\n[^abs]: a\n", sources),
       },
     ]);
-    const before = conceptView(s.read("m/x.md"));
+    const before = pageView(s.read("m/x.md"));
     expect(before.lint.map((l) => [l.code, l.target])).toEqual([["broken_link", "pol/missing.md"]]);
     expect(before.lint[0]?.message).toContain("Source resource /pol/missing.md");
     // Unmoved, every resource renders exactly as written.
@@ -459,11 +484,11 @@ describe("tier 2", () => {
     expect(s.work({ kind: "broken_link" }).items.map((i) => [i.kind, i.path])).toEqual([
       ["broken_link", "m/x.md"],
     ]);
-    expect(conceptView(s.read("pol/a.md")).inbound_links).toBe(1);
+    expect(pageView(s.read("pol/a.md")).inbound_links).toBe(1);
     const seqBefore = s.headSeq();
 
     s.apply(ctx(), [{ op: "move", path: "pol", to: "policies" }]);
-    const after = conceptView(s.read("m/x.md"));
+    const after = pageView(s.read("m/x.md"));
     const resources = (after.frontmatter.sources as { resource: string }[]).map((x) => x.resource);
     expect(resources).toEqual([
       "/policies/a.md",
@@ -475,7 +500,7 @@ describe("tier 2", () => {
     ]);
     // A move creates no content version, and an old snapshot renders the old paths.
     expect(after.hash).toBe(before.hash);
-    expect(conceptView(s.read("m/x.md", { at: seqBefore })).markdown).toBe(before.markdown);
+    expect(pageView(s.read("m/x.md", { at: seqBefore })).markdown).toBe(before.markdown);
 
     const src = s.sources("m/x.md");
     expect(src.sources.map((x) => [x.id, x.resource, x.cited, x.internal])).toEqual([
@@ -515,7 +540,7 @@ describe("tier 2", () => {
 
     // Writing the missing target clears the flag; exporting renders current paths.
     s.apply(ctx(), [{ op: "write", path: "pol/missing.md", content: md("Policy", "M\n") }]);
-    expect(conceptView(s.read("m/x.md")).lint).toEqual([]);
+    expect(pageView(s.read("m/x.md")).lint).toEqual([]);
     expect(s.work({ kind: "broken_link" }).items).toEqual([]);
     const exported = s.exportBundle().files.find((f) => f.path === "m/x.md");
     expect(exported && "text" in exported ? exported.text : "").toContain("/policies/a.md");
@@ -529,20 +554,20 @@ describe("tier 2", () => {
         path: "m.md",
         content: md(
           "Metric",
-          "A.[^okf] B.[^okf] C.[^okf] D.[^loose]\n\n[^okf]: OKF\n",
-          "sources:\n  - { id: okf, resource: https://e.com }\n  - { id: loose, resource: https://f.com }\n",
+          "A.[^spec] B.[^spec] C.[^spec] D.[^loose]\n\n[^spec]: Spec\n",
+          "sources:\n  - { id: spec, resource: https://e.com }\n  - { id: loose, resource: https://f.com }\n",
         ),
       },
     ]);
     expect(r.results[0]?.lint.map((l) => l.code)).toEqual(["footnote_undefined"]);
     expect(s.sources("m.md").sources.map((x) => [x.id, x.cited])).toEqual([
-      ["okf", 3],
+      ["spec", 3],
       ["loose", 1],
     ]);
     s.apply(ctx(), [{ op: "write", path: "n.md", content: md("Memo", "Orphan.[^nosrc]\n") }]);
     const n = s.sources("n.md");
     expect(n.unmatched_footnotes).toEqual(["nosrc"]);
-    expect(conceptView(s.read("n.md")).lint.map((l) => l.code)).toEqual([
+    expect(pageView(s.read("n.md")).lint.map((l) => l.code)).toEqual([
       "footnote_unmatched",
       "footnote_undefined",
     ]);
@@ -558,18 +583,18 @@ describe("tier 2", () => {
       },
     ]);
     const first = s.headSeq();
-    const h = conceptView(s.read("a.md")).hash;
+    const h = pageView(s.read("a.md")).hash;
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("Memo", "Fixed.\n"), if_match: h }]);
-    expect(conceptView(s.read("a.md")).lint).toEqual([]);
+    expect(pageView(s.read("a.md")).lint).toEqual([]);
     expect(
-      conceptView(s.read("a.md", { at: first })).lint.map((l) => [l.code, l.target ?? null]),
+      pageView(s.read("a.md", { at: first })).lint.map((l) => [l.code, l.target ?? null]),
     ).toEqual([
       ["source_missing_resource", null],
       ["broken_link", "b.md"],
     ]);
     // A link that was broken then but has a target now is still reported as of then.
     s.apply(ctx(), [{ op: "write", path: "b.md", content: md("Memo", "b\n") }]);
-    expect(conceptView(s.read("a.md", { at: first })).lint.map((l) => l.code)).toContain(
+    expect(pageView(s.read("a.md", { at: first })).lint.map((l) => l.code)).toContain(
       "broken_link",
     );
   });
@@ -597,7 +622,7 @@ describe("tier 2", () => {
     ]);
     expect(src.unmatched_footnotes).toEqual(["nope"]);
 
-    const h = conceptView(s.read("p.md")).hash;
+    const h = pageView(s.read("p.md")).hash;
     s.apply(ctx(), [
       { op: "write", path: "p.md", content: md("Policy", "New rules.\n"), if_match: h },
     ]);
@@ -607,7 +632,7 @@ describe("tier 2", () => {
 
     expect(errorOf(() => s.verify(ctx("claude-code/x"), "p.md")).code).toBe("cannot_verify");
     s.verify(ctx("human:me"), "p.md");
-    expect(conceptView(s.read("p.md")).trust_tier).toBe("human-reviewed");
+    expect(pageView(s.read("p.md")).trust_tier).toBe("human-reviewed");
 
     const token = s.signDownload({ k: "export", at: 2 });
     expect(s.openDownload(token)).toMatchObject({ k: "export", at: 2 });

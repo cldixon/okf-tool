@@ -9,8 +9,28 @@ const WANT = {
 };
 
 /** Access as an account holds it: what exists, and every write made. */
-function fakeAccess(start: { idps?: unknown[]; policies?: unknown[]; apps?: unknown[] } = {}) {
+function fakeAccess(
+  start: {
+    idps?: unknown[];
+    policies?: unknown[];
+    apps?: unknown[];
+    org?: Record<string, unknown>;
+    /** Team domains someone else holds: renaming to one fails. */
+    taken?: string[];
+    /** Access refuses any change to the login design. */
+    refuseDesign?: boolean;
+  } = {},
+) {
   const state = {
+    org: {
+      auth_domain: "team.cloudflareaccess.com",
+      name: "team.cloudflareaccess.com",
+      login_design: {},
+      allow_authenticate_via_warp: false,
+      deny_unmatched_requests: false,
+      created_at: "2026-09-29T15:57:04Z",
+      ...start.org,
+    } as Record<string, unknown>,
     idps: [...(start.idps ?? [{ id: "cf", type: "cloudflare" }])] as Record<string, unknown>[],
     policies: [...(start.policies ?? [])] as Record<string, unknown>[],
     apps: [...(start.apps ?? [])] as Record<string, unknown>[],
@@ -20,7 +40,18 @@ function fakeAccess(start: { idps?: unknown[]; policies?: unknown[]; apps?: unkn
   const api: Api = async (method, path, body) => {
     if (method !== "GET") writes.push([method, path, body]);
     const b = body as Record<string, unknown>;
-    if (path === "/access/organizations") return { auth_domain: "team.cloudflareaccess.com" };
+    if (path === "/access/organizations") {
+      if (method === "GET") return { ...state.org };
+      // Access's update replaces the record; only a PATCH of what changes is safe (TEMPRA-282).
+      if (method !== "PATCH")
+        throw new Error("PUT /access/organizations: 400 12062 invalid_org_config.");
+      if ((start.taken ?? []).includes(String(b.auth_domain)))
+        throw new Error("PATCH /access/organizations: 400 12130 auth_domain is already in use.");
+      if (start.refuseDesign && "login_design" in b)
+        throw new Error("PATCH /access/organizations: 400 12062 invalid_org_config.");
+      state.org = { ...state.org, ...b };
+      return { ...state.org };
+    }
     if (path === "/access/identity_providers") {
       if (method === "GET") return state.idps;
       const made = { id: `idp-${++n}`, ...b };
@@ -112,5 +143,116 @@ describe("Access from config (TEMPRA-278)", () => {
         { status: 403 },
       )) as unknown as typeof fetch);
     await expect(ensureAccess(api, WANT)).rejects.toThrow(PERMISSIONS);
+  });
+});
+
+describe("the sign-in page made Tempra's (TEMPRA-282)", () => {
+  const BRAND = {
+    name: "Tempra",
+    team: "tempra",
+    background: "#ffffff",
+    text: "#282a2f",
+    logo: "https://tempra.dev/mark.svg",
+    header: "",
+    footer: "For Tempra's operator only.",
+  };
+  const BRANDED = { ...WANT, title: "Tempra admin", brand: BRAND };
+
+  test("the organization is named and styled, then renamed, each by a PATCH of only that", async () => {
+    const f = fakeAccess({ org: { deny_unmatched_requests: true } });
+    const got = await ensureAccess(f.api, BRANDED);
+    expect(got.team).toBe("tempra.cloudflareaccess.com");
+    expect(got.warnings).toEqual([]);
+    const org = f.writes.filter(([, p]) => p === "/access/organizations");
+    expect(org).toEqual([
+      [
+        "PATCH",
+        "/access/organizations",
+        {
+          name: "Tempra",
+          // An empty header is left out, not sent as "".
+          login_design: {
+            background_color: "#ffffff",
+            text_color: "#282a2f",
+            logo_path: "https://tempra.dev/mark.svg",
+            footer_text: "For Tempra's operator only.",
+          },
+        },
+      ],
+      ["PATCH", "/access/organizations", { auth_domain: "tempra.cloudflareaccess.com" }],
+    ]);
+    // Settings it does not manage are never sent, so they stay as they were.
+    expect(f.state.org.deny_unmatched_requests).toBe(true);
+    // The application is named for the sign-in page.
+    expect(f.state.apps[0]).toMatchObject({ name: "Tempra admin", domain: "admin.tempra.dev" });
+  });
+
+  test("a refused design is a warning: the login, policy and application are still ensured", async () => {
+    const f = fakeAccess({ refuseDesign: true });
+    const got = await ensureAccess(f.api, BRANDED);
+    expect(got.warnings[0]).toContain("the sign-in page could not be branded");
+    expect(got.warnings[0]).toContain("12062");
+    expect(got.team).toBe("tempra.cloudflareaccess.com");
+    expect(got.aud).toMatch(/^aud-app-/);
+    expect(f.state.apps).toHaveLength(1);
+    expect(f.state.policies).toHaveLength(1);
+  });
+
+  test("running again changes nothing", async () => {
+    const f = fakeAccess();
+    await ensureAccess(f.api, BRANDED);
+    const before = f.writes.length;
+    const again = await ensureAccess(f.api, BRANDED);
+    expect(again.changes).toEqual([]);
+    expect(again.team).toBe("tempra.cloudflareaccess.com");
+    expect(f.writes.length).toBe(before);
+  });
+
+  test("a design Access returns in another order is not sent again", async () => {
+    const f = fakeAccess({
+      org: {
+        name: "Tempra",
+        auth_domain: "tempra.cloudflareaccess.com",
+        // Access's own order, not ours (seen 2026-11-04).
+        login_design: {
+          background_color: "#ffffff",
+          logo_path: "https://tempra.dev/mark.svg",
+          text_color: "#282a2f",
+          footer_text: "For Tempra's operator only.",
+        },
+      },
+    });
+    const got = await ensureAccess(f.api, BRANDED);
+    expect(f.writes.some(([, p]) => p === "/access/organizations")).toBe(false);
+    expect(got.changes.some((c) => c.includes("brand"))).toBe(false);
+  });
+
+  test("a taken team name keeps the current one, says so, and still brands the page", async () => {
+    const f = fakeAccess({ taken: ["tempra.cloudflareaccess.com"] });
+    const got = await ensureAccess(f.api, BRANDED);
+    expect(got.team).toBe("team.cloudflareaccess.com");
+    expect(got.warnings[0]).toContain("could not be renamed to tempra.cloudflareaccess.com");
+    expect(got.changes[0]).toBe('brand the sign-in page as "Tempra"');
+    expect(f.state.org).toMatchObject({
+      auth_domain: "team.cloudflareaccess.com",
+      name: "Tempra",
+      login_design: { logo_path: "https://tempra.dev/mark.svg" },
+    });
+  });
+
+  test("a dry run says what it would do and writes nothing", async () => {
+    const f = fakeAccess();
+    const got = await ensureAccess(f.api, BRANDED, true);
+    expect(f.writes).toEqual([]);
+    expect(got.changes.slice(0, 2)).toEqual([
+      'brand the sign-in page as "Tempra"',
+      "rename the team team.cloudflareaccess.com to tempra.cloudflareaccess.com",
+    ]);
+  });
+
+  test("without a brand the organization is left alone", async () => {
+    const f = fakeAccess();
+    await ensureAccess(f.api, WANT);
+    expect(f.writes.some(([, p]) => p === "/access/organizations")).toBe(false);
   });
 });

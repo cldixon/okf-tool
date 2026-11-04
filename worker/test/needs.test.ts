@@ -30,9 +30,9 @@ function newStore() {
 const doc = (title: string, fm = "", body = "Revenue minus cost.") =>
   `---\ntype: Metric\ntitle: ${title}\ndescription: A metric.\n${fm}---\n# ${title}\n\n${body}\n`;
 
-/** Writes a concept, over its current version when there is one. */
+/** Writes a page, over its current version when there is one. */
 function write(s: LibraryStore, c: RequestContext, path: string, content = doc(path)) {
-  const if_match = s.concepts().items.find((i) => i.path === path)?.hash ?? null;
+  const if_match = s.pages().items.find((i) => i.path === path)?.hash ?? null;
   return s.apply(c, [{ op: "write", path, content, if_match }]);
 }
 
@@ -163,7 +163,7 @@ describe("Needs you: to verify", () => {
     s.verify(ana(), "m/a.md");
     // Moved after it was verified: still the version a person verified.
     s.apply(agent(), [{ op: "move", path: "m/a.md", to: "n/a.md" }]);
-    // A process vouching for a concept is not a person verifying it.
+    // A process vouching for a page is not a person verifying it.
     s.verify(ctx("process:recheck"), "p.md");
     expect(s.needs(ME).verify.items).toEqual([]);
     expect(s.needs(ME).unverified.total).toBe(1);
@@ -192,7 +192,7 @@ describe("Needs you: to verify", () => {
 });
 
 describe("Needs you: the agents' housekeeping", () => {
-  test("housekeeping counts the work queue's, stale concepts among it, never a person's count", () => {
+  test("housekeeping counts the work queue's, stale pages among it, never a person's count", () => {
     const s = newStore();
     write(s, agent(), "soon.md", doc("Soon", "stale_after: 2026-10-12T00:00:00Z\n"));
     write(s, agent(), "past.md", doc("Past", "stale_after: 2026-10-01T00:00:00Z\n"));

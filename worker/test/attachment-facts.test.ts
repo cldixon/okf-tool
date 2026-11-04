@@ -143,7 +143,7 @@ describe("an attachment's credit and licence (TEMPRA-170)", () => {
     });
     expect(versions[1]?.file).toMatchObject({ size: bigger.length, width: 30, height: 20 });
     expect(versions[1]?.prev_hash).toBe(hash);
-    // A concept's history carries no file facts.
+    // A page's history carries no file facts.
     await s.req("/files/c.md", {
       method: "PUT",
       body: "---\ntype: Note\ntitle: C\n---\nBody.\n",

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { schemaText } from "../scripts/vega-lite-schema";
-import { checkChartSpec } from "../src/okf/chart-schema";
-import { VEGA_LITE_SCHEMA_JSON } from "../src/okf/vega-lite-schema";
+import { checkChartSpec } from "../src/format/chart-schema";
+import { VEGA_LITE_SCHEMA_JSON } from "../src/format/vega-lite-schema";
 
 const values = [
   { day: "Mon", p50: 40, p99: 78, when: "2026-10-01" },

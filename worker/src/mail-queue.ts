@@ -1,4 +1,4 @@
-import { sha256Hex } from "./okf/hash";
+import { sha256Hex } from "./format/hash";
 import type { Mailer } from "./signin";
 
 /**

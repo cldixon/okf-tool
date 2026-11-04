@@ -3,7 +3,8 @@
  *
  *   OPERATOR_EMAIL=… bun run deploy --mode production|staging [--dry-run]
  *
- * 1. Cloudflare Access (scripts/access.ts): the one-time PIN login, the policy allowing only
+ * 1. Cloudflare Access (scripts/access.ts): the sign-in page made Tempra's (the organization's
+ *    name, team subdomain and look, TEMPRA-282), the one-time PIN login, the policy allowing only
  *    OPERATOR_EMAIL, the application over the portal's host with 2-hour sessions. If this fails
  *    (most often: the API token lacks the Access permissions), it stops and deploys nothing.
  * 2. `cf deploy` with the team domain and the application's audience tag, which the Worker checks
@@ -16,8 +17,27 @@
  */
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { brand, markPath } from "@tempra/design/brand";
 import { deploymentFor } from "../../worker/cloudflare.config";
 import { cloudflareApi, ensureAccess } from "./access";
+
+/**
+ * The sign-in page, made Tempra's (TEMPRA-282): the design package's light colours (the page's
+ * background and text) and the Tempra mark, served by the app at tempra.dev, a host Access does
+ * not cover. Access keeps these on the account's organization, so staging's portal and
+ * production's share them; the team subdomain is renamed to `tempra-admin`
+ * (tempra-admin.cloudflareaccess.com) when it is free.
+ */
+const BRAND = {
+  name: "Tempra",
+  // `tempra` is another account's (409 auth_domain_not_available, 2026-11-04).
+  team: "tempra-admin",
+  background: brand.light.bg,
+  text: brand.light.text,
+  logo: `https://tempra.dev${markPath}`,
+  header: "",
+  footer: "For Tempra's operator only.",
+};
 
 const { values } = parseArgs({
   args: process.argv.slice(2),
@@ -43,7 +63,14 @@ let ensured: Awaited<ReturnType<typeof ensureAccess>>;
 try {
   ensured = await ensureAccess(
     api,
-    { name: admin.name, host: admin.host, operator, sessionDuration: "2h" },
+    {
+      name: admin.name,
+      title: mode === "staging" ? "Tempra admin (staging)" : "Tempra admin",
+      host: admin.host,
+      operator,
+      sessionDuration: "2h",
+      brand: BRAND,
+    },
     dryRun,
   );
 } catch (e) {
@@ -58,6 +85,7 @@ console.log(
     ? `Access${dryRun ? " (dry run, would)" : ""}: ${ensured.changes.join("; ")}.`
     : "Access: as configured.",
 );
+for (const w of ensured.warnings) console.warn(`Access: ${w}.`);
 if (!dryRun && !ensured.aud) {
   console.error("Access gave no audience tag for the application; nothing is deployed.");
   process.exit(1);

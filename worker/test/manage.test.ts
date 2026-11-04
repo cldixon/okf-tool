@@ -32,7 +32,7 @@ describe("verify, work queue, import and export (Phase 3, slice 3)", () => {
   test("verify the current version, from the app", async () => {
     const s = setup();
     await put(s, "a.md", "---\ntype: Note\n---\nChecked content.\n");
-    const concept = async () =>
+    const page = async () =>
       (await (
         await s.app.request(`${API}/files/a.md`, { headers: { Accept: "application/json" } })
       ).json()) as {
@@ -40,7 +40,7 @@ describe("verify, work queue, import and export (Phase 3, slice 3)", () => {
         hash: string;
         frontmatter: { verified?: { by: string }[] };
       };
-    expect((await concept()).trust_tier).toBe("unverified");
+    expect((await page()).trust_tier).toBe("unverified");
 
     const forgedApi = await s.app.request(`${API}/verify/a.md`, {
       method: "POST",
@@ -54,7 +54,7 @@ describe("verify, work queue, import and export (Phase 3, slice 3)", () => {
       headers: { Origin: ORIGIN, "X-Note": "read it" },
     });
     expect(done.status).toBe(200);
-    const after = await concept();
+    const after = await page();
     expect(after.trust_tier).toBe("human-reviewed");
     expect(after.frontmatter.verified?.at(-1)?.by).toBe("human:owner");
     const requests = (await (await s.app.request(`${API}/requests?limit=1`)).json()) as {
@@ -68,7 +68,7 @@ describe("verify, work queue, import and export (Phase 3, slice 3)", () => {
       headers: { "Content-Type": "text/markdown", "If-Match": `"${after.hash}"` },
       body: "---\ntype: Note\n---\nChanged.\n",
     });
-    expect((await concept()).trust_tier).toBe("unverified");
+    expect((await page()).trust_tier).toBe("unverified");
   });
 
   test("the work queue page lists and filters items", async () => {
@@ -89,7 +89,7 @@ describe("verify, work queue, import and export (Phase 3, slice 3)", () => {
     const lint = await work("?kind=lint");
     expect(lint.items.map((i) => i.path)).toContain("b.md");
     expect(lint.items.every((i) => i.kind === "lint")).toBe(true);
-    // One file's items, as a concept page asks for them.
+    // One file's items, as a page's view asks for them.
     const one = await work("?path=a.md");
     expect(new Set(one.items.map((i) => i.path))).toEqual(new Set(["a.md"]));
     expect((await work("?path=nothing.md")).items).toEqual([]);
@@ -110,7 +110,7 @@ describe("verify, work queue, import and export (Phase 3, slice 3)", () => {
     const enc = new TextEncoder();
     const bundle = writeTar([
       { path: "pack/notes/x.md", bytes: enc.encode("---\ntype: Note\n---\nX\n") },
-      { path: "pack/notes/y.md", bytes: enc.encode("---\ntitle: lint me\n---\nY\n") },
+      { path: "pack/notes/y.md", bytes: enc.encode("no frontmatter, lint me\n") },
       { path: "pack/index.md", bytes: enc.encode("# ignored\n") },
     ]);
     const upload = (body: Uint8Array, origin = ORIGIN) =>
@@ -129,7 +129,7 @@ describe("verify, work queue, import and export (Phase 3, slice 3)", () => {
     const result = (await r.json()) as { files: number; warnings: { path: string }[] };
     expect(result.files).toBe(2);
     expect(result.warnings.map((w) => w.path)).toEqual(["notes/y.md"]);
-    expect(s.store().read("notes/x.md").kind).toBe("concept");
+    expect(s.store().read("notes/x.md").kind).toBe("page");
     const ledger = await (await s.app.request(`${API}/requests?limit=1`)).text();
     expect(ledger).toContain("bring in the pack");
     expect(ledger).toContain("human:owner");
@@ -174,7 +174,7 @@ describe("libraries and tokens", () => {
     const created = await post(s, "/api/v1/tokens", form("claude-code/laptop"));
     expect(created.status).toBe(201);
     const { id, secret } = (await created.json()) as { id: string; secret: string };
-    expect(secret).toStartWith("okf_");
+    expect(secret).toStartWith("tempra_");
 
     const write = await s.req("/files/t.md", {
       method: "PUT",
