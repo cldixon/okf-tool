@@ -11,6 +11,7 @@
     "./pele": "./dist/pele.ts",
     "./panel": "./dist/panel.ts",
     "./components": "./src/components/index.ts",
+    "./mark": "./src/components/mark.ts",
     "./fonts/*": "./fonts/*",
     "./favicon.svg": "./favicon.svg"
   },

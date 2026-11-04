@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Chip } from "@tempra/design/components";
+  import { Chip, Mark } from "@tempra/design/components";
   import Reader from "../Reader.svelte";
   import { prepare } from "../reader/prepare";
   import { localTime, relativeTime } from "../ui";
@@ -7,7 +7,7 @@
 
   /**
    * The page panel (tempra-dev: app/page-panel): one page drawn in the chat by the app's reader,
-   * read only: where it sits, its title, description and byline, the body and its sources. The
+   * read only: where it sits (after the Tempra mark, which names the source; TEMPRA-279), its title, description and byline, the body and its sources. The
    * look is @tempra/design's (panel.css, prose.css, reader.css).
    */
   let { host }: { host: PageHost } = $props();
@@ -41,7 +41,7 @@
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
   <article class="page-panel" onclick={follow}>
     <header class="pp-head">
-      <p class="pp-where">{whereOf(page)}</p>
+      <p class="pp-where mark-lockup"><Mark small label="Tempra" />{whereOf(page)}</p>
       <h1 class="pp-title">{page.concept.title}</h1>
       {#if page.concept.description}<p class="pp-description">{page.concept.description}</p>{/if}
       {#if page.byline || (page.concept.status && page.concept.status !== "stable") || page.concept.stale}

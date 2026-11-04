@@ -468,7 +468,7 @@ describe("errors as pages (V-1)", () => {
       expect(r.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
       expect(html).toContain('<a class="skip-link" href="#main">');
       expect(html).toContain('<main id="main" class="public-main">');
-      expect(html).toContain('<a class="wordmark" href="https://tempra.dev/">');
+      expect(html).toContain('<a class="wordmark mark-lockup" href="https://tempra.dev/">');
       expect(html).not.toContain("public-sheet");
       expect(html).toContain('<nav aria-label="Footer"><ul role="list">');
     }

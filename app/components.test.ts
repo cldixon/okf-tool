@@ -9,6 +9,8 @@ import {
   Field,
   Icon,
   IconButton,
+  Mark,
+  markSvg,
   Notice,
   PanelHead,
   PillButton,
@@ -240,6 +242,34 @@ describe("marks and labels", () => {
     l.destroy();
   });
 
+  test("Mark: three plates, the small cut on request, decorative unless named, and as a string", () => {
+    const d = draw(Mark, {});
+    const svg = one(d.host, "svg");
+    expect(svg.getAttribute("class")).toBe("mark");
+    expect(svg.getAttribute("aria-hidden")).toBe("true");
+    expect([...svg.querySelectorAll("path")].map((p) => p.getAttribute("class"))).toEqual([
+      "mark-back",
+      "mark-mid",
+      "mark-front",
+    ]);
+    const standard = svg.querySelector(".mark-back")?.getAttribute("d");
+    d.destroy();
+    const s = draw(Mark, { small: true, label: "Tempra", class: "brand" });
+    const named = one(s.host, "svg");
+    expect(named.getAttribute("class")).toBe("mark brand");
+    expect(named.getAttribute("role")).toBe("img");
+    expect(named.getAttribute("aria-label")).toBe("Tempra");
+    expect(named.querySelector(".mark-back")?.getAttribute("d")).not.toBe(standard);
+    // No ids (any number of marks on a page) and nothing inline: the colours are the CSS's.
+    expect(named.querySelector("[id], [style], [fill]")).toBeNull();
+    s.destroy();
+    const html = markSvg({ small: true, label: 'A "b"' });
+    expect(html).toContain('class="mark"');
+    expect(html).toContain('aria-label="A &#34;b&#34;"');
+    expect(html).toContain('class="mark-front"');
+    expect(markSvg()).toContain('aria-hidden="true"');
+  });
+
   test("Badge: the count, 99+ past 99, nothing at 0", () => {
     const d = draw(Badge, { count: 3 });
     expect(one(d.host, ".badge").textContent).toBe("3");
@@ -361,6 +391,7 @@ describe("the catalogue (/_dev/design)", () => {
         "Notice",
         "AvatarMark",
         "Tile",
+        "Mark",
         "Badge",
         "Menu",
         "Dialog and ComposeDialog",
