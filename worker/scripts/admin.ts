@@ -170,7 +170,9 @@ switch (positionals[0]) {
         `UPDATE waitlist SET decision = 'invited', decided = ${q(new Date().toISOString())} WHERE email = ${q(email)} AND decision IS NULL`,
         where,
       );
-      console.log(`${email} is invited. They are not emailed; approving at /waitlist emails them.`);
+      console.log(
+        `${email} is invited, but not emailed. Invite from the operator's portal (admin.tempra.dev) to email them too.`,
+      );
     } else {
       await d1Sql(`DELETE FROM invites WHERE email = ${q(email)}`, where);
       console.log(`${email} is no longer invited.`);

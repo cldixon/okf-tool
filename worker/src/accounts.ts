@@ -161,6 +161,21 @@ export interface Accounts {
    * waiting (unknown, or decided already).
    */
   decideWaitlist(email: string, decision: "invited" | "dismissed"): Promise<boolean>;
+  /**
+   * The operator invites an email directly (TEMPRA-278, operator.ts): on the invite list, and a
+   * waiting waitlist row decided as invited. `added` when it was not invited before.
+   */
+  inviteEmail(email: string): Promise<{ added: boolean }>;
+  /**
+   * Everyone invited, newest first, with the account each made (TEMPRA-278): `account` is null
+   * until they sign up. Bounded by the invite list, which only the operator grows.
+   */
+  invited(): Promise<InvitedEntry[]>;
+  /**
+   * Counts for the operator's portal (TEMPRA-278): totals, and the people (by session) and agents
+   * seen since each time.
+   */
+  activityCounts(since: { day: string; week: string; month: string }): Promise<ActivityCounts>;
   /** The account by its users row id; null when there is none or it is suspended. */
   account(userId: string): Promise<User | null>;
   /**
@@ -405,6 +420,30 @@ export function checkLine(
 
 export type SignupMode = "open" | "invite" | "closed";
 
+/** An invited email and, once they signed up, their account (TEMPRA-278). */
+export interface InvitedEntry {
+  email: string;
+  /** When they were invited (ISO). */
+  invited: string;
+  /** Their account, once they made one. */
+  account: { handle: string | null; created: string | null } | null;
+}
+
+/** How many of each were seen in the last day, 7 days and 30 days. */
+export interface Windows {
+  day: number;
+  week: number;
+  month: number;
+}
+
+/** The operator's activity numbers (TEMPRA-278): people from sessions, agents from `agents`. */
+export interface ActivityCounts {
+  accounts: number;
+  libraries: number;
+  people: Windows;
+  agents: Windows;
+}
+
 export interface WaitlistEntry {
   email: string;
   created: string;
@@ -531,6 +570,65 @@ export function d1Accounts(db: D1Database): Accounts {
           : [decide],
       );
       return (r?.meta.changes ?? 0) > 0;
+    },
+    async inviteEmail(raw) {
+      const email = raw.trim().toLowerCase();
+      const now = new Date().toISOString();
+      const [added] = await db.batch([
+        db.prepare("INSERT OR IGNORE INTO invites (email, created) VALUES (?, ?)").bind(email, now),
+        db
+          .prepare(
+            "UPDATE waitlist SET decision = 'invited', decided = ? WHERE email = ? AND decision IS NULL",
+          )
+          .bind(now, email),
+      ]);
+      return { added: (added?.meta.changes ?? 0) > 0 };
+    },
+    async invited() {
+      const r = await db
+        .prepare(
+          `SELECT i.email, i.created AS invited, u.id AS uid, u.handle, u.created AS made
+             FROM invites i LEFT JOIN users u ON u.email = i.email
+           ORDER BY i.created DESC`,
+        )
+        .all<{
+          email: string;
+          invited: string;
+          uid: string | null;
+          handle: string | null;
+          made: string | null;
+        }>();
+      return r.results.map((x) => ({
+        email: x.email,
+        invited: x.invited,
+        account: x.uid ? { handle: x.handle, created: x.made } : null,
+      }));
+    },
+    async activityCounts(since) {
+      const total = (sql: string) =>
+        db
+          .prepare(sql)
+          .first<{ n: number }>()
+          .then((r) => r?.n ?? 0);
+      // One row each: who was seen since each time, from the month's rows (last_seen indexed).
+      const seen = (table: "sessions" | "agents", who: "user" | "id") =>
+        db
+          .prepare(
+            `SELECT COUNT(DISTINCT CASE WHEN last_seen >= ?1 THEN ${who} END) AS day,
+                    COUNT(DISTINCT CASE WHEN last_seen >= ?2 THEN ${who} END) AS week,
+                    COUNT(DISTINCT ${who}) AS month
+               FROM ${table} WHERE last_seen >= ?3`,
+          )
+          .bind(since.day, since.week, since.month)
+          .first<Windows>()
+          .then((r) => ({ day: r?.day ?? 0, week: r?.week ?? 0, month: r?.month ?? 0 }));
+      const [accounts, libraries, people, agents] = await Promise.all([
+        total("SELECT COUNT(*) AS n FROM users WHERE suspended IS NULL"),
+        total("SELECT COUNT(*) AS n FROM libraries"),
+        seen("sessions", "user"),
+        seen("agents", "id"),
+      ]);
+      return { accounts, libraries, people, agents };
     },
     async account(userId) {
       return db

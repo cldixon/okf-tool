@@ -1,3 +1,4 @@
+import { WorkerEntrypoint } from "cloudflare:workers";
 import type { AccountFeeds } from "./account-feeds";
 import { d1Accounts } from "./accounts";
 import type { Deps } from "./app";
@@ -9,6 +10,7 @@ import { agentSpendThisMonth } from "./costs";
 import { routedDb, withD1Session } from "./d1session";
 import { type Caller, callerOf, FEED_SOCKETS_PER_ACCOUNT } from "./feed";
 import { deleteVariants, imagesService, r2VariantCache } from "./images";
+import type { SiteService } from "./legal";
 import { type Library, refuseFeed } from "./library";
 import { healthDigest } from "./library-health";
 import { d1SentLog, handleMailMessage, type MailJob, type Outbox, queueOutbox } from "./mail-queue";
@@ -20,6 +22,7 @@ import { fakeModel } from "./managed/fake";
 import type { ModelClient } from "./managed/turn";
 import { d1Notifications } from "./notify";
 import { devMailer, flushMail } from "./notify-mail";
+import { operatorOps } from "./operator";
 import { counterName, Quota, quotaBackend, quotaGuarded } from "./quota";
 import { listRestores, RESTORE_ID, restoresPrefix } from "./recovery";
 import { type RenderService, servicePoster, serviceRenderer } from "./render";
@@ -192,6 +195,7 @@ const depsFor = (env: Env): Deps => {
     },
     meter,
     // Not bound in local dev (cloudflare.config.ts): every render answers "render unavailable".
+    site: (env as unknown as { SITE?: SiteService }).SITE ?? null,
     renderDiagram: serviceRenderer((env as unknown as { RENDER?: RenderService }).RENDER, meter),
     posterFrame: servicePoster((env as unknown as { RENDER?: RenderService }).RENDER, meter),
     // Each blob put is recorded in D1 first, so the sweep never lists the bucket (TEMPRA-81).
@@ -320,6 +324,36 @@ const depsFor = (env: Env): Deps => {
 };
 
 const worker = createWorker(depsFor);
+
+/**
+ * The operator's portal's way in (TEMPRA-278, operator.ts): RPC over the admin Worker's OPERATOR
+ * service binding, with no route. Cloudflare Access signed the operator in before the admin Worker
+ * calls; each method checks the email it passes is OPERATOR_EMAIL again, and refuses otherwise.
+ */
+export class Operator extends WorkerEntrypoint<Env> {
+  private ops(operator: string) {
+    const env = this.env;
+    const expected = env.OPERATOR_EMAIL?.trim().toLowerCase();
+    if (!expected || operator.trim().toLowerCase() !== expected) {
+      throw new Error("Not the operator.");
+    }
+    const d = depsFor(env);
+    return operatorOps(d, env.APP_ORIGIN);
+  }
+  people(operator: string) {
+    return this.ops(operator).people();
+  }
+  invite(operator: string, email: string) {
+    return this.ops(operator).invite(email);
+  }
+  decide(operator: string, email: string, decision: "invited" | "dismissed") {
+    if (decision !== "invited" && decision !== "dismissed") throw new Error("Approve or dismiss.");
+    return this.ops(operator).decide(email, decision);
+  }
+  activity(operator: string) {
+    return this.ops(operator).activity();
+  }
+}
 
 /** The 5-minute cron that sends batched notification mail; any other is the daily one. */
 const NOTIFY_CRON = "*/5 * * * *";

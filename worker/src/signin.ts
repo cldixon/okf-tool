@@ -164,7 +164,7 @@ function sameOrigin(c: C): boolean {
   return fromThisSite(c.req.raw);
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+$/;
+export const EMAIL = /^[^\s@]+@[^\s@]+$/;
 
 const SIGN_IN = { href: "/sign-in", label: "Go to sign in" };
 

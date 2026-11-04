@@ -196,3 +196,40 @@ describe("each deployment has its own render Worker", () => {
     }
   });
 });
+
+// TEMPRA-276 (tempra-dev decisions/the-app-at-tempra-dev.md): the app at the apex, app.tempra.dev
+// an alias, www a redirect, the landing page bound as SITE. Built from the config alone, so a
+// fresh account gets the same hosts from a deploy.
+describe("hosts and the landing page", () => {
+  async function worker(mode?: string) {
+    return (await (
+      await config({ isPreview: false, mode } as never)
+    ).worker) as {
+      domains: string[];
+      env: Record<string, unknown>;
+    };
+  }
+
+  test("production serves tempra.dev, keeps app.tempra.dev, redirects www", async () => {
+    const w = await worker("production");
+    expect(w.domains).toEqual(["tempra.dev", "app.tempra.dev", "www.tempra.dev"]);
+    expect(w.env.APP_ORIGIN).toMatchObject({ value: "https://tempra.dev" });
+    expect(w.env.ALIAS_HOSTS).toMatchObject({ value: "app.tempra.dev" });
+    expect(w.env.REDIRECT_HOSTS).toMatchObject({ value: "www.tempra.dev" });
+    expect(w.env.SITE).toMatchObject({ worker: "tempra-site" });
+  });
+
+  test("staging and previews have one host each and the same landing page", async () => {
+    const w = await worker("staging");
+    expect(w.domains).toEqual(["staging.tempra.dev"]);
+    expect(w.env.SITE).toMatchObject({ worker: "tempra-site" });
+    expect(previewDeployment("7")).toMatchObject({ host: "pr-7.tempra.dev", site: "tempra-site" });
+    expect(previewDeployment("7").aliases).toBeUndefined();
+  });
+
+  test("local dev binds no site and attaches no host", async () => {
+    const w = await worker();
+    expect(w.domains).toEqual([]);
+    expect(w.env.SITE).toBeUndefined();
+  });
+});

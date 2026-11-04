@@ -6,7 +6,7 @@
  *   bun run mcp --pr 39 --library acme-retail tools               the tool list
  *   bun run mcp --pr 39 --library acme-retail work '{"kind":"comment"}'
  *   bun run mcp --pr 39 --library acme-retail comment '{"action":"reply","thread":"…","body":"…"}'
- *   bun run mcp --url https://app.tempra.dev comments             with TEMPRA_TOKEN (any deployment)
+ *   bun run mcp --url https://tempra.dev comments                 with TEMPRA_TOKEN (any deployment)
  *
  * With --pr N, a write token for the operator's library on that preview is made once (through
  * `bun run preview token`) and kept in worker/.mcp-tokens.json (gitignored) for the next calls.

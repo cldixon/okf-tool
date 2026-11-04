@@ -172,13 +172,13 @@ Split when a concept covers more than one idea, mixes definitions with procedure
 
 ## Connecting
 
-The server speaks MCP over Streamable HTTP at `https://app.tempra.dev/mcp`. An app connection reaches the libraries its approver chose (all of the account's, or a selection); a bearer token reaches one library.
+The server speaks MCP over Streamable HTTP at `https://tempra.dev/mcp`. An app connection reaches the libraries its approver chose (all of the account's, or a selection); a bearer token reaches one library.
 
 - **claude.ai, ChatGPT and other apps:** add the URL as a custom connector and approve it in the browser (OAuth; the approver picks all libraries or selected ones, read or write access, whether you may create libraries for them, and the name your changes carry). A connection to selected libraries also reaches the libraries it creates, and nothing else.
-- **Claude Code and scripts:** use a bearer token, minted by a human on the service's Agents page (New token, `https://app.tempra.dev/agents`):
+- **Claude Code and scripts:** use a bearer token, minted by a human on the service's Agents page (New token, `https://tempra.dev/agents`):
 
 ```sh
-claude mcp add --transport http tempra https://app.tempra.dev/mcp \
+claude mcp add --transport http tempra https://tempra.dev/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
