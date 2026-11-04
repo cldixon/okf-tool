@@ -7,8 +7,10 @@
  * dist/panel.ts is the panels' stylesheet (TEMPRA-200), dist/pele.ts the diagram theme. Every
  * output is committed; design.test.ts fails when one is stale.
  */
+
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { MARK_PATHS, MARK_VIEWBOX } from "./src/components/mark";
 
 const ROOT = import.meta.dir;
 export const SOURCES = [
@@ -216,21 +218,21 @@ export function generatePagePanel(): string {
 }
 
 /**
- * The Tempra mark, the wordmark's tile with its initial (`.wordmark-tile` in workspace.css), as a
- * standalone SVG in the light scheme's colours, for places that take an image and no stylesheet:
- * the operator's portal's Cloudflare Access sign-in page (TEMPRA-282), served at /mark.svg by the
- * app. Drawn at the tile's own size (`--tempra-size-tile`), scaled up 4x so it stays sharp.
+ * The Tempra mark (TEMPRA-279: `MARK_PATHS` in src/components/mark.ts) as a standalone SVG in the
+ * light scheme's plate colours (`--tempra-color-mark-*`), for places that take an image and no
+ * stylesheet: the operator's portal's Cloudflare Access sign-in page (TEMPRA-282), served at
+ * /mark.svg by the app. Unlike the favicon, it does not follow the system's dark mode: the page it
+ * sits on is the light scheme's.
  */
 export function generateMark(): string {
   const { token } = tokenResolver();
-  const px = (name: string) => Number.parseFloat(token(name, "light"));
-  const size = px("--tempra-size-tile");
-  const s = size * 4;
-  const font = token("--tempra-font-text", "light").replaceAll('"', "'");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 ${size} ${size}">
+  const p = MARK_PATHS.standard;
+  const [, , w, h] = MARK_VIEWBOX.split(" ").map(Number);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK_VIEWBOX}" width="${(w ?? 0) * 2}" height="${(h ?? 0) * 2}">
 <title>Tempra</title>
-<rect width="${size}" height="${size}" rx="${px("--tempra-radius-tile")}" fill="${token("--tempra-color-text", "light")}"/>
-<text x="${size / 2}" y="${size / 2}" dy="0.36em" text-anchor="middle" fill="${token("--tempra-color-bg", "light")}" font-family="${font}" font-size="${px("--tempra-text-name")}" font-weight="${token("--tempra-weight-strong", "light")}">T</text>
+<path fill="${token("--tempra-color-mark-back", "light")}" d="${p.back}"/>
+<path fill="${token("--tempra-color-mark-mid", "light")}" d="${p.middle}"/>
+<path fill="${token("--tempra-color-mark-front", "light")}" d="${p.front}"/>
 </svg>
 `;
 }
