@@ -30,14 +30,13 @@ export type BootPage =
 
 const enc = (path: string) => path.split("/").map(encodeURIComponent).join("/");
 
-/** Whether a path can be a concept: markdown, and not a synthesized index.md or log.md. */
-const isConceptPath = (path: string) =>
-  path.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(path);
+/** Whether a path can be a page: markdown, and not a synthesized index.md or log.md. */
+const isPagePath = (path: string) => path.endsWith(".md") && !/(^|\/)(index|log)\.md$/.test(path);
 
 /**
  * The API calls the app makes first on a page, as it builds them: the frame's (who the person
  * is, their libraries, the bell's count), a library's (the tree, its agents), and a
- * file's page (app/src/concept/data.ts `loadFile`, `GET …/page/{path}`, and the Comments
+ * file's page (app/src/page/data.ts `loadFile`, `GET …/page/{path}`, and the Comments
  * panel's threads). Most
  * important first, since the size budget keeps what fits in order.
  */
@@ -52,9 +51,9 @@ export function bootUrls(page: BootPage): string[] {
   if (page.kind === "library") return [...frame, ...library];
   const p = enc(page.path);
   const at = page.at === undefined ? "" : `?at=${page.at}`;
-  // The file's page in one call (TEMPRA-191), then a concept's comment threads.
+  // The file's page in one call (TEMPRA-191), then a page's comment threads.
   const file = [`${lib}/page/${p}${at}`];
-  if (isConceptPath(page.path)) {
+  if (isPagePath(page.path)) {
     if (page.at === undefined) {
       file.push(
         `${lib}/comments?${new URLSearchParams({ path: page.path, status: "all", limit: "200" })}`,

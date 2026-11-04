@@ -15,7 +15,7 @@ import { bunSqlHandle } from "./sqlite";
 
 const fence = (src: string) => `\`\`\`mermaid\n${src}\n\`\`\``;
 const md = (body: string) =>
-  `---\ntype: Memo\ntitle: D\ndescription: A test concept.\nstatus: stable\n---\n${body}\n`;
+  `---\ntype: Memo\ntitle: D\ndescription: A test page.\nstatus: stable\n---\n${body}\n`;
 const GOOD = "flowchart LR\n  A --> B";
 /** Balanced and of a known type, so the fast checker passes it; Pele refuses the arrow. */
 const SUBTLE = "flowchart LR\n  A -->> B";
@@ -184,7 +184,7 @@ describe("diagram_unrendered (TEMPRA-167)", () => {
     expect(await w.lintOf("e.md")).toEqual([]);
   });
 
-  test("the store ignores verdicts for a version that is not the concept's current one", () => {
+  test("the store ignores verdicts for a version that is not the page's current one", () => {
     const s = new LibraryStore(bunSqlHandle());
     const ctx = (id: string) => ({ actor: "claude-code/test", request_id: id });
     const a = s.apply(ctx("a"), [{ op: "write", path: "d.md", content: md(fence(SUBTLE)) }]);
@@ -202,18 +202,18 @@ describe("diagram_unrendered (TEMPRA-167)", () => {
     const error = { message: "Expecting 'NODE_STRING', got 'TAGEND'", line: 2, column: 8 };
     expect(
       s.setDiagramRenders([
-        { concept_id: job?.concept_id ?? "", hash: job?.hash ?? "", verdicts: [{ key, error }] },
+        { page_id: job?.page_id ?? "", hash: job?.hash ?? "", verdicts: [{ key, error }] },
       ]),
     ).toEqual([]);
     const v = s.read("d");
-    expect(v.kind === "concept" && v.lint).toEqual([]);
+    expect(v.kind === "page" && v.lint).toEqual([]);
     // The verdict is kept, so the next write lints at once without asking.
     const c = s.apply(ctx("c"), [
       {
         op: "write",
         path: "d.md",
         content: md(`Other.\n\n${fence(SUBTLE)}`),
-        if_match: v.kind === "concept" ? v.hash : null,
+        if_match: v.kind === "page" ? v.hash : null,
       },
     ]);
     expect(c.render).toBeUndefined();
@@ -244,13 +244,13 @@ describe("diagram_unrendered (TEMPRA-167)", () => {
     const error = { message: "Expecting 'NODE_STRING', got 'TAGEND'", line: 2, column: 8 };
     old.setDiagramRenders([
       {
-        concept_id: job?.concept_id ?? "",
+        page_id: job?.page_id ?? "",
         hash: job?.hash ?? "",
         verdicts: [{ key: job?.diagrams[0]?.key ?? "", error }],
       },
     ]);
     const v = old.read("d");
-    expect(v.kind === "concept" && codes(v.lint)).toEqual(["diagram_unrendered"]);
+    expect(v.kind === "page" && codes(v.lint)).toEqual(["diagram_unrendered"]);
 
     // The same library under a newer Pele: the old failure is not trusted, and is asked again.
     const upgraded = new LibraryStore(sql, { peleVersion: "1.7.0" });
@@ -259,7 +259,7 @@ describe("diagram_unrendered (TEMPRA-167)", () => {
         op: "write",
         path: "d.md",
         content: md(`Text.\n\n${fence(SUBTLE)}`),
-        if_match: v.kind === "concept" ? v.hash : null,
+        if_match: v.kind === "page" ? v.hash : null,
       },
     ]);
     expect(codes(b.results[0]?.lint ?? [])).toEqual([]);

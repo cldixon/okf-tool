@@ -3,8 +3,8 @@
   import Avatar from "../Avatar.svelte";
   import { type ActorView, actorText } from "../agents";
   import { useActors } from "../agents.svelte.ts";
-  import { threadElementId } from "../concept/panel";
   import Moment from "../Moment.svelte";
+  import { threadElementId } from "../page/panel";
   import { revealOffset } from "../reader/reading";
   import { clip } from "../ui";
   import type { Urls } from "../urls";

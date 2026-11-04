@@ -925,7 +925,7 @@ describe("what a reply costs (TEMPRA-231)", () => {
     const kept = serverInstructions();
     // Each item it keeps is still in the server's instructions (a rename there fails here).
     for (const item of SERVER_ITEMS) expect(INSTRUCTIONS).toContain(`. ${item}`);
-    expect(kept).toContain("This server holds OKF");
+    expect(kept).toContain("This server holds Tempra libraries");
     expect(kept).toContain("Prefer `edit`");
     // Not what it never does, or does the other way.
     expect(kept).not.toContain("Call `start` first");

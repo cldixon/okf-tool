@@ -1,7 +1,7 @@
 <script lang="ts">
   import AgentName from "../AgentName.svelte";
-  import type { AttachSource, MadeFrom } from "../concept/data";
   import Moment from "../Moment.svelte";
+  import type { AttachSource, MadeFrom } from "../page/data";
   import { baseName, type Urls } from "../urls";
   import { hostOf, type Name, type Use, type Version } from "./attachment";
 

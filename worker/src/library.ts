@@ -44,7 +44,7 @@ import { usagePoint } from "./usage";
 /** How long reads counted in memory wait before they are written to `access_log`. */
 const READ_FLUSH_MS = 5000;
 
-/** One OKF library: its blobs, ledger and derived indexes in the object's SQLite. */
+/** One library: its blobs, ledger and derived indexes in the object's SQLite. */
 export class Library extends DurableObject<Env> {
   private opened: LibraryStore | null = null;
   private alarmChecked = false;

@@ -1,10 +1,14 @@
-/** The starter concept a first library may begin with (v2 spec: Onboarding). */
-export const STARTER = `---
-type: Guide
-title: Start here
-description: What this library is and how to add to it.
----
-This library holds concepts: one markdown file per idea, with YAML frontmatter.
+/**
+ * The guide a first library may begin with (v2 spec: Onboarding): `guide.md` at the root, which
+ * the library's home links ("Start with the guide") and `start` tells agents to read first.
+ */
+export const STARTER_PATH = "guide.md";
 
-Connect an agent, then ask it to read this note and add what you know.
+export const STARTER = `---
+title: Guide
+description: What this library is for and how to add to it.
+---
+This library holds pages in markdown. Say here what it is for and how its pages are written; agents read this page first.
+
+Connect an agent, then ask it to read this page and add what you know.
 `;

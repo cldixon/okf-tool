@@ -6,11 +6,11 @@
  */
 import { resolveLinkPath } from "@tempra/editor";
 import type { ActedBy, ActorView } from "../agents";
-import { type AttachSource, actedBy, type FileJson, type HistoryEvent } from "../concept/data";
+import { type AttachSource, actedBy, type FileJson, type HistoryEvent } from "../page/data";
 import { prepare } from "../reader/prepare";
 import { formatSize } from "../ui";
 
-type Concept = Extract<FileJson, { kind: "concept" }>;
+type PageFile = Extract<FileJson, { kind: "page" }>;
 
 /** A page that uses the file: the figures it appears as, and the source entry citing it. */
 export interface Use {
@@ -37,15 +37,15 @@ export function hostOf(url: string): string {
  */
 export function figureUse(
   file: string,
-  concept: Concept,
+  page: PageFile,
   source: AttachSource | null | undefined,
 ): Use {
-  const prepared = prepare(concept.doc, { path: concept.path });
+  const prepared = prepare(page.doc, { path: page.path });
   const figures = prepared.figures.flatMap((f) =>
     f.kind === "image" && f.path === file ? [{ n: f.n, caption: f.caption, alt: f.alt }] : [],
   );
   const urls = new Set([source?.url, source?.final_url].filter((u): u is string => !!u));
-  const list = concept.frontmatter.sources;
+  const list = page.frontmatter.sources;
   let cites: string | null = null;
   for (const s of Array.isArray(list) ? list : []) {
     if (!s || typeof s !== "object" || Array.isArray(s)) continue;
@@ -57,7 +57,7 @@ export function figureUse(
       break;
     }
   }
-  return { path: concept.path, figures, cites };
+  return { path: page.path, figures, cites };
 }
 
 /**

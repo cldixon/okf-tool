@@ -3,7 +3,7 @@ import { parseMarkdown, reconcile } from "@tempra/editor/doc";
 // Pele is a dev dependency only: the Worker checks diagrams without it (tempra-dev: app/diagrams),
 // and these tests hold the check to what Pele accepts and refuses.
 import { parse } from "pele";
-import { checkDiagram, diagramLint } from "../src/okf/diagrams";
+import { checkDiagram, diagramLint } from "../src/format/diagrams";
 import { LibraryStore, type RequestContext } from "../src/store/store";
 import { bunSqlHandle } from "./sqlite";
 
@@ -105,7 +105,7 @@ let n = 0;
 const ctx = (): RequestContext => ({ actor: "claude-code/test", request_id: `req-${++n}` });
 const codes = (lint: { code: string }[]) => lint.map((l) => l.code);
 const md = (body: string) =>
-  `---\ntype: Memo\ndescription: A test concept.\nstatus: stable\n---\n${body}\n`;
+  `---\ntype: Memo\ndescription: A test page.\nstatus: stable\n---\n${body}\n`;
 const pele = (src: string) => {
   try {
     parse(src);
@@ -244,9 +244,9 @@ describe("diagram check (TEMPRA-98)", () => {
     const res = s.apply(ctx(), [{ op: "write", path: "d.md", content: md(fence(broken)) }]);
     expect(codes(res.results[0]?.lint ?? [])).toEqual(["diagram_invalid"]);
     const v = s.read("d");
-    expect(v.kind === "concept" && codes(v.lint)).toEqual(["diagram_invalid"]);
+    expect(v.kind === "page" && codes(v.lint)).toEqual(["diagram_invalid"]);
     expect(s.work({ kind: "lint" }).items.map((i) => i.path)).toEqual(["d.md"]);
-    const hash = v.kind === "concept" ? v.hash : "";
+    const hash = v.kind === "page" ? v.hash : "";
     const fixed = s.apply(ctx(), [
       { op: "write", path: "d.md", content: md(fence(VALID.graph ?? "")), if_match: hash },
     ]);

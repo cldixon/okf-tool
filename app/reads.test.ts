@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { actorView } from "./src/agents";
-import type { Concept, Standing } from "./src/concept/data";
-import PropertiesList from "./src/concept/PropertiesList.svelte";
-import { type ReadHistory, readWords } from "./src/concept/reads";
+import type { PageFile, Standing } from "./src/page/data";
+import PropertiesList from "./src/page/PropertiesList.svelte";
+import { type ReadHistory, readWords } from "./src/page/reads";
 import { Urls } from "./src/urls";
 import { draw } from "./test/dom";
 
@@ -36,8 +36,8 @@ describe("read history in people's words", () => {
   });
 
   test("Properties shows Read and Last read, and nothing of who", () => {
-    const concept = {
-      kind: "concept",
+    const page = {
+      kind: "page",
       path: "a.md",
       seq: 2,
       hash: "h",
@@ -46,12 +46,12 @@ describe("read history in people's words", () => {
       trust_tier: "unverified",
       stale: false,
       doc: { type: "root", children: [] },
-    } as unknown as Concept;
+    } as unknown as PageFile;
     const standing: Standing = { versions: [], current: null, verified: null, since: 0 };
     const twoHours = new Date(Date.now() - 2 * 3_600_000 - 60_000).toISOString();
     const props = {
       urls: new Urls("ann", "notes"),
-      concept,
+      page,
       links: { inbound: [], broken: [] },
       head: 2,
       standing,

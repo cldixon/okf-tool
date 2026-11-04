@@ -15,11 +15,11 @@
   let page = $state.raw<PagePayload | null | undefined>(undefined);
   $effect(() => host.subscribe((p) => (page = p)));
 
-  const prepared = $derived(page ? prepare(page.concept.doc, bodyOptions(page)) : null);
+  const prepared = $derived(page ? prepare(page.page.doc, bodyOptions(page)) : null);
   // A leading heading that repeats the title is not shown twice, as on the app's page.
   const hideFirst = $derived.by(() => {
     const first = prepared?.headings[0];
-    const title = page?.concept.title.trim().toLowerCase() ?? "";
+    const title = page?.page.title.trim().toLowerCase() ?? "";
     return first?.first === true && first.text.trim().toLowerCase() === title;
   });
 
@@ -42,22 +42,22 @@
   <article class="page-panel" onclick={follow}>
     <header class="pp-head">
       <p class="pp-where mark-lockup"><Mark small label="Tempra" />{whereOf(page)}</p>
-      <h1 class="pp-title">{page.concept.title}</h1>
-      {#if page.concept.description}<p class="pp-description">{page.concept.description}</p>{/if}
-      {#if page.byline || (page.concept.status && page.concept.status !== "stable") || page.concept.stale}
+      <h1 class="pp-title">{page.page.title}</h1>
+      {#if page.page.description}<p class="pp-description">{page.page.description}</p>{/if}
+      {#if page.byline || (page.page.status && page.page.status !== "stable") || page.page.stale}
         <p class="pp-byline">
           {#if page.byline}<span
               >{bylineName(page.byline)}{" · edited "}<time datetime={page.byline.at} title={localTime(page.byline.at)}
                 >{relativeTime(page.byline.at)}</time
               ></span
-            >{/if}{#if page.concept.status && page.concept.status !== "stable"}<Chip
-              >{page.concept.status[0]?.toUpperCase()}{page.concept.status.slice(1)}</Chip
-            >{/if}{#if page.concept.stale}<Chip>Stale</Chip>{/if}
+            >{/if}{#if page.page.status && page.page.status !== "stable"}<Chip
+              >{page.page.status[0]?.toUpperCase()}{page.page.status.slice(1)}</Chip
+            >{/if}{#if page.page.stale}<Chip>Stale</Chip>{/if}
         </p>
       {/if}
     </header>
     <div class="doc">
-      <Reader {prepared} diff={null} {hideFirst} figureView={{ title: page.concept.title }} />
+      <Reader {prepared} diff={null} {hideFirst} figureView={{ title: page.page.title }} />
       {#if page.sources.length > 0}
         <section class="pp-sources prose" aria-labelledby="pp-sources">
           <h2 id="pp-sources">Sources</h2>

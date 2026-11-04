@@ -1,4 +1,4 @@
-import { sha256Hex } from "./okf/hash";
+import { sha256Hex } from "./format/hash";
 
 /**
  * Agent identity (tempra-dev: decisions/agents-act-for-a-person, TEMPRA-75). An agent acts for

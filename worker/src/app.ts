@@ -17,8 +17,11 @@ import {
   WORKER_ATTACHMENT_CAP,
   withDimensions,
 } from "./client";
-import { bundleStream } from "./export-bundle";
+import { bundleStream, exportFormat } from "./export-bundle";
 import { type FetchFn, fetchBlob } from "./fetch-source";
+import { splitFrontmatter } from "./format/page";
+import { normalizePath, underPrefix } from "./format/paths";
+import type { JsonObject } from "./format/types";
 import type { Images } from "./images";
 import { registerInboxApi } from "./inbox-api";
 import { registerLegalRoutes, type SiteService } from "./legal";
@@ -28,9 +31,6 @@ import type { ManagedDeps } from "./managed/agent";
 import { managedAgents, type Notifications, notifying, postComment } from "./notify";
 import { messagePage, wantsPage } from "./oauth/pages";
 import { type GrantProps, registerAppRoutes } from "./oauth/routes";
-import { splitFrontmatter } from "./okf/concept";
-import { normalizePath, underPrefix } from "./okf/paths";
-import type { JsonObject } from "./okf/types";
 import { withCostHeader, withCosts } from "./op-costs";
 import { fromThisSite } from "./origin";
 import type { RestoreOutcome, RestoreRecord } from "./recovery";
@@ -38,14 +38,15 @@ import type { PosterFrame, RenderContext, RenderDiagram } from "./render";
 import { readCookie, SESSION_COOKIE, type Sessions } from "./session";
 import { type Mailer, registerSignInRoutes } from "./signin";
 import { threadKind } from "./store/comments";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 import type { ReadSurface } from "./store/reads";
 import {
   type AttachFacts,
   type BlobRef,
-  type ConceptContent,
   checkFacts,
+  type ExportFormat,
   type FileView,
+  type PageContent,
   type RequestContext,
   type WriteOp,
   type WriteResult,
@@ -59,7 +60,7 @@ import {
   sessionToken,
 } from "./tenancy";
 import { registerUiRoutes } from "./ui/routes";
-import { STARTER } from "./ui/starter";
+import { STARTER, STARTER_PATH } from "./ui/starter";
 import {
   checkLength,
   checkMedia,
@@ -220,7 +221,8 @@ function num(c: C, name: string): number | undefined {
   const v = c.req.query(name);
   if (v === undefined || v === "") return undefined;
   const n = Number(v);
-  if (!Number.isInteger(n)) throw new OkfError(400, "bad_param", `\`${name}\` must be an integer.`);
+  if (!Number.isInteger(n))
+    throw new StoreError(400, "bad_param", `\`${name}\` must be an integer.`);
   return n;
 }
 
@@ -282,8 +284,8 @@ function requireComment(c: C, path: string) {
   underTokenPrefix(c.var.token, [path]);
 }
 
-function readOnly(t: TokenInfo): OkfError {
-  return new OkfError(
+function readOnly(t: TokenInfo): StoreError {
+  return new StoreError(
     403,
     "read_only",
     t.role === "read"
@@ -298,7 +300,7 @@ function underTokenPrefix(t: TokenInfo, paths: string[]) {
   for (const p of paths) {
     const n = normalizePath(p) ?? "";
     if (!underPrefix(n, prefix)) {
-      throw new OkfError(403, "outside_prefix", `This token may only write under ${prefix}/.`);
+      throw new StoreError(403, "outside_prefix", `This token may only write under ${prefix}/.`);
     }
   }
 }
@@ -307,7 +309,7 @@ async function json<T>(c: C): Promise<T> {
   try {
     return (await c.req.json()) as T;
   } catch {
-    throw new OkfError(400, "bad_json", "The request body must be JSON.");
+    throw new StoreError(400, "bad_json", "The request body must be JSON.");
   }
 }
 
@@ -323,7 +325,7 @@ type WireOp =
   | {
       op: "write";
       path: string;
-      content: ConceptContent;
+      content: PageContent;
       if_match?: string;
       if_none_match?: boolean;
     }
@@ -359,7 +361,7 @@ async function attachFromUrl(c: C, path: string): Promise<Response> {
     : {};
   const from = c.req.query("from") ?? body.source_url;
   if (typeof from !== "string" || from === "") {
-    throw new OkfError(
+    throw new StoreError(
       400,
       "bad_attach",
       "POST /files/{path} attaches from a URL: pass ?from=<https URL> or a JSON body { source_url }; or POST /files/{path}/move.",
@@ -367,7 +369,7 @@ async function attachFromUrl(c: C, path: string): Promise<Response> {
   }
   const clean = normalizePath(path);
   if (!clean || clean.endsWith(".md")) {
-    throw new OkfError(400, "bad_attachment", "Markdown files are concepts, not attachments.");
+    throw new StoreError(400, "bad_attachment", "Markdown files are pages, not attachments.");
   }
   const facts = queryFacts(c, body);
   const d = c.var.deps;
@@ -421,7 +423,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   const app = new Hono<Env>();
 
   app.onError((err, c) => {
-    if (err instanceof OkfError) {
+    if (err instanceof StoreError) {
       // Over a per-minute limit: when to try again, for scripts and the app's quiet backoff.
       if (err.status === 429) c.header("Retry-After", String(RETRY_AFTER_S));
       if (err.status === 429 && !c.req.path.startsWith("/api/")) {
@@ -533,16 +535,16 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       c.header("X-Content-Type-Options", "nosniff");
       if (c.req.method === "HEAD") return c.body(null);
       const obj = await c.var.deps.blobs.get(view.hash);
-      if (!obj) throw new OkfError(500, "blob_missing", `Bytes for ${view.path} are missing.`);
+      if (!obj) throw new StoreError(500, "blob_missing", `Bytes for ${view.path} are missing.`);
       return c.body(obj.body as ReadableStream);
     }
-    if (view.kind === "concept") c.header("ETag", `"${view.hash}"`);
+    if (view.kind === "page") c.header("ETag", `"${view.hash}"`);
     if (wantsJson) return c.json(await fileJson(c.var.lib, c.var.deps.blobs, view));
     return c.body(view.markdown, 200, { "Content-Type": "text/markdown; charset=utf-8" });
   });
 
   // A file's page in one request (TEMPRA-191): the file as `files/{path}` describes it in JSON,
-  // the head, and for a concept its sources, links and versions, read together at one seq. The
+  // the head, and for a page its sources, links and versions, read together at one seq. The
   // app asked for these five separately; the separate routes stay for agents and the API.
   app.get(`${BASE}/page/*`, async (c) => {
     const { file, ...rest } = await c.var.lib.page(tail(c, "/page/"), { at: num(c, "at") });
@@ -556,7 +558,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // counted as they happen. Answers the page's read history with this read in it.
   app.post(`${BASE}/read/*`, async (c) => {
     if (!c.var.token.id.startsWith("session:")) {
-      throw new OkfError(
+      throw new StoreError(
         400,
         "app_only",
         "This route is the app's. Reads through the API and MCP are counted as they happen.",
@@ -588,7 +590,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       };
     } else if (isMarkdownRequest(c, path)) {
       const type = (c.req.header("Content-Type") ?? "").toLowerCase();
-      const content: ConceptContent = type.startsWith("application/json")
+      const content: PageContent = type.startsWith("application/json")
         ? await json<{ frontmatter: JsonObject; doc: Doc }>(c)
         : await c.req.text();
       op = { op: "write", path, content, if_match: ifMatch, if_none_match: ifNoneMatch };
@@ -637,7 +639,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     if (!path.endsWith("/move")) return attachFromUrl(c, path);
     const from = path.slice(0, -"/move".length);
     const body = await json<{ to: string; note?: string }>(c);
-    if (typeof body.to !== "string") throw new OkfError(400, "bad_move", "Send { to }.");
+    if (typeof body.to !== "string") throw new StoreError(400, "bad_move", "Send { to }.");
     requireWrite(c, from, body.to);
     const res = await c.var.lib.apply(requestContext(c, body.note), [
       { op: "move", path: from, to: body.to },
@@ -680,7 +682,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   app.post(`${BASE}/batch`, async (c) => {
     const body = await json<{ ops: WireOp[]; note?: string }>(c);
-    if (!Array.isArray(body.ops)) throw new OkfError(400, "bad_batch", "Send { ops: [...] }.");
+    if (!Array.isArray(body.ops)) throw new StoreError(400, "bad_batch", "Send { ops: [...] }.");
     requireWrite(c, ...body.ops.flatMap((o) => (o.op === "move" ? [o.path, o.to] : [o.path])));
     const ops: WriteOp[] = [];
     for (const o of body.ops) {
@@ -714,10 +716,16 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // file's path, kind, title and sequence, no bodies or other frontmatter.
   app.get(`${BASE}/outline`, async (c) => c.json(await c.var.lib.outline({ at: num(c, "at") })));
 
-  app.get(`${BASE}/concepts`, async (c) =>
-    c.json(
-      await c.var.lib.concepts({
-        type: c.req.query("type"),
+  app.get(`${BASE}/pages`, async (c) => {
+    if (c.req.query("type") !== undefined) {
+      throw new StoreError(
+        400,
+        "bad_param",
+        "`type` is not a filter: pages have no special type. Filter by `tag` or `prefix`.",
+      );
+    }
+    return c.json(
+      await c.var.lib.pages({
         tag: c.req.query("tag"),
         status: c.req.query("status"),
         trust: c.req.query("trust"),
@@ -731,8 +739,8 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
         min_reads: num(c, "min_reads"),
         max_reads: num(c, "max_reads"),
       }),
-    ),
-  );
+    );
+  });
 
   app.get(`${BASE}/search`, async (c) =>
     c.json(
@@ -798,7 +806,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     let target: { path: string; to_seq: number } | { request_id: string };
     if (typeof body.request_id === "string") {
       if (c.var.token.prefix !== null) {
-        throw new OkfError(
+        throw new StoreError(
           403,
           "outside_prefix",
           "Prefix-scoped tokens revert one path at a time.",
@@ -810,7 +818,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       requireWrite(c, body.path);
       target = { path: body.path, to_seq: body.to_seq as number };
     } else {
-      throw new OkfError(400, "bad_revert", "Send { path, to_seq } or { request_id }.");
+      throw new StoreError(400, "bad_revert", "Send { path, to_seq } or { request_id }.");
     }
     return c.json(await c.var.lib.revert(requestContext(c, body.note), target));
   });
@@ -840,14 +848,18 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     return c.json(res);
   });
 
+  // A tar of the library's files; `format=okf` makes it a bundle that conforms to Google's OKF.
   app.get(`${BASE}/export`, async (c) => {
-    const format = c.req.query("format") ?? "tar";
-    if (format !== "tar") throw new OkfError(400, "bad_format", "Only format=tar is supported.");
+    const format = exportFormat(c.req.query("format"));
     const who = tokenAdmission(c.var.token);
-    return exportTar(c.var.lib, c.var.deps, num(c, "at"), c.var.token.library.slug, {
-      account: who.account,
-      library: who.library,
-    });
+    return exportTar(
+      c.var.lib,
+      c.var.deps,
+      num(c, "at"),
+      c.var.token.library.slug,
+      { account: who.account, library: who.library },
+      format,
+    );
   });
 
   // ------------------------------------------------------------------ tier 2 extras
@@ -858,7 +870,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   app.get(`${BASE}/diff`, async (c) => {
     const path = c.req.query("path");
-    if (!path) throw new OkfError(400, "bad_param", "Send `path`.");
+    if (!path) throw new StoreError(400, "bad_param", "Send `path`.");
     return c.json(await c.var.lib.diff(path, { from: num(c, "from"), to: num(c, "to") }));
   });
 
@@ -906,27 +918,27 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // must open it from this site's own pages. GET /events?since=N is the catch-up.
   app.get(`${BASE}/feed`, async (c) => {
     if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") {
-      throw new OkfError(426, "upgrade_required", "Open the feed as a WebSocket.");
+      throw new StoreError(426, "upgrade_required", "Open the feed as a WebSocket.");
     }
     const token = c.var.token;
     if (token.id.startsWith("session:") && !fromThisSite(c.req.raw)) {
-      throw new OkfError(403, "cross_origin", "Open the feed from this site's own pages.");
+      throw new StoreError(403, "cross_origin", "Open the feed from this site's own pages.");
     }
     const feed = c.var.deps.feed;
-    if (!feed) throw new OkfError(501, "unavailable", "The change feed is not wired here.");
+    if (!feed) throw new StoreError(501, "unavailable", "The change feed is not wired here.");
     const account = token.person || token.library.owner || token.library.id;
     c.var.deps.meter?.({ kind: "feed", account, library: token.library.id });
     return feed(token.library.do_id, c.req.raw, { prefix: c.req.query("prefix") ?? "", account });
   });
 
-  // Counts for the library's home page: concepts, attachments, types, open work.
+  // Counts for the library's home page: pages, attachments, types, open work.
   app.get(`${BASE}/summary`, async (c) => c.json(await c.var.lib.summary()));
 
   // The daily health summary (TEMPRA-66): open work by kind and the newest unverified changes.
   app.get(`${BASE}/health`, async (c) => c.json(await c.var.lib.health()));
 
   // Needs you (layout take 3): what only the person asking can do here (replies waiting on
-  // them, concepts to verify), with the agents' housekeeping (staleness among it) counted.
+  // them, pages to verify), with the agents' housekeeping (staleness among it) counted.
   app.get(`${BASE}/needs`, async (c) => {
     const t = c.var.token;
     // The person behind the caller, and the human: actor they write with in person.
@@ -957,7 +969,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   // ------------------------------------------------------------------ comments
 
-  // Threads on concepts (tempra-dev: app/comments). Every post is one `comment` event.
+  // Threads on pages (tempra-dev: app/comments). Every post is one `comment` event.
   app.get(`${BASE}/comments`, async (c) =>
     c.json(
       await c.var.lib.comments({
@@ -978,7 +990,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       kind?: string;
     }>(c);
     if (body.path !== undefined && body.path !== null && typeof body.path !== "string") {
-      throw new OkfError(400, "bad_request", "A concept's `path` is a string.");
+      throw new StoreError(400, "bad_request", "A page's `path` is a string.");
     }
     const path = body.path ?? "";
     const kind = threadKind(body.kind);
@@ -1014,7 +1026,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     try {
       raw = sent ? JSON.parse(sent) : {};
     } catch {
-      throw new OkfError(400, "bad_json", "The request body must be JSON.");
+      throw new StoreError(400, "bad_json", "The request body must be JSON.");
     }
     const text = typeof raw.body === "string" ? raw.body : "";
     // A reply may mark the thread a request, or a comment again (TEMPRA-222).
@@ -1041,12 +1053,12 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // only, from the app's pages; managing them is the owner's, leaving is any member's.
   const sessionOnly = (c: C, what: string) => {
     if (!c.var.token.id.startsWith("session:")) {
-      throw new OkfError(403, "session_only", `${what} only from the app's pages.`);
+      throw new StoreError(403, "session_only", `${what} only from the app's pages.`);
     }
   };
   const memberRole = (v: unknown): MemberRole => {
     if (v !== "read" && v !== "write") {
-      throw new OkfError(400, "bad_role", "A member's role is read or write.");
+      throw new StoreError(400, "bad_role", "A member's role is read or write.");
     }
     return v;
   };
@@ -1077,7 +1089,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     const body = await json<{ to?: string; role?: string }>(c);
     const role = memberRole(body.role);
     const to = String(body.to ?? "").trim();
-    if (!to) throw new OkfError(400, "bad_request", "Give a handle or an email address.");
+    if (!to) throw new StoreError(400, "bad_request", "Give a handle or an email address.");
     const accounts = c.var.deps.accounts;
     const ref = c.var.token.library;
     const byEmail = to.includes("@") && !to.startsWith("@");
@@ -1085,7 +1097,11 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     if (!invitee) {
       // An email is never confirmed or denied as an account: the answer is the same either way.
       if (byEmail) return c.json({ sent: "if_account" }, 202);
-      throw new OkfError(404, "no_account", `There is no Tempra account @${to.replace(/^@/, "")}.`);
+      throw new StoreError(
+        404,
+        "no_account",
+        `There is no Tempra account @${to.replace(/^@/, "")}.`,
+      );
     }
     const inviter = c.var.token.created_by ?? "";
     const { id: invitation, renewed } = await accounts.invite(ref.id, invitee.id, role, inviter);
@@ -1135,7 +1151,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       c.req.param("id"),
       c.var.token.library.id,
     );
-    if (!ok) throw new OkfError(404, "not_found", "No such pending invitation.");
+    if (!ok) throw new StoreError(404, "not_found", "No such pending invitation.");
     return c.body(null, 204);
   });
 
@@ -1144,7 +1160,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     const accounts = c.var.deps.accounts;
     const person = await accounts.findAccount({ handle: c.req.param("member") ?? "" });
     const role = person ? await accounts.memberRole(c.var.token.library.id, person.id) : null;
-    if (!person || !role) throw new OkfError(404, "not_found", "No such member.");
+    if (!person || !role) throw new StoreError(404, "not_found", "No such member.");
     return person;
   };
 
@@ -1191,19 +1207,27 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   app.get("/dl/:lib/:token", async (c) => {
     const d = deps(c.env);
     const lib = await d.libraryByDoId(c.req.param("lib"));
-    const bad = new OkfError(403, "bad_download", "This download link is invalid or has expired.");
+    const bad = new StoreError(
+      403,
+      "bad_download",
+      "This download link is invalid or has expired.",
+    );
     if (!lib) throw bad;
     const payload = await lib.openDownload(c.req.param("token"));
     if (payload.k === "export") {
       // The link is the credential; the library's owner is whose renders the diagrams count as.
       const ref = await d.accounts.libraryByDoId(c.req.param("lib"));
-      return exportTar(lib, d, payload.at, payload.name ?? "library", {
-        account: ref?.owner ?? c.req.param("lib"),
-        library: ref?.id,
-      });
+      return exportTar(
+        lib,
+        d,
+        payload.at,
+        payload.name ?? "library",
+        { account: ref?.owner ?? c.req.param("lib"), library: ref?.id },
+        payload.format ?? "plain",
+      );
     }
     const obj = await d.blobs.get(payload.hash);
-    if (!obj) throw new OkfError(404, "not_found", "The file's bytes are missing.");
+    if (!obj) throw new StoreError(404, "not_found", "The file's bytes are missing.");
     return c.body(obj.body as ReadableStream, 200, {
       "Content-Type": payload.media ?? "application/octet-stream",
       "Content-Disposition": `attachment; filename="${payload.path.split("/").pop()}"`,
@@ -1253,7 +1277,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       who = tokenAdmission(grant.token);
       const length = Number(c.req.header("Content-Length") ?? Number.NaN);
       if (length > WORKER_ATTACHMENT_CAP) {
-        throw new OkfError(
+        throw new StoreError(
           413,
           "attachment_too_large",
           `Attachments are capped at ${WORKER_ATTACHMENT_CAP} bytes.`,
@@ -1295,12 +1319,12 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     }
     const token = who.token;
     if (!token.actor.startsWith("human:") || !token.created_by) {
-      throw new OkfError(403, "human_only", "Library and token management needs a human: token.");
+      throw new StoreError(403, "human_only", "Library and token management needs a human: token.");
     }
     // The person who minted it, never the library's owner as such: on a shared library they
     // are different people (tempra-dev: v2/sharing).
     const account = await d.accounts.account(token.created_by);
-    if (!account) throw new OkfError(401, "no_account", "This token's account no longer exists.");
+    if (!account) throw new StoreError(401, "no_account", "This token's account no longer exists.");
     return { d, user: { id: account.id, handle: account.handle }, session: null };
   };
 
@@ -1308,7 +1332,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   app.get("/api/v1/me", async (c) => {
     const { d, user } = await human(c);
     const account = await d.accounts.account(user.id);
-    if (!account) throw new OkfError(401, "no_account", "This account no longer exists.");
+    if (!account) throw new StoreError(401, "no_account", "This account no longer exists.");
     return c.json({
       email: account.email,
       handle: account.handle,
@@ -1365,7 +1389,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
           ...row,
           last_activity: s.last_activity ?? row.last_activity,
           seq: s.seq,
-          concepts: s.concepts,
+          pages: s.pages,
           attachments: s.attachments,
           open_work: s.open_work,
           health: s.health,
@@ -1390,7 +1414,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       const d = deps(c.env);
       const grant = await connectionGrant(c, oauthToken);
       const account = await d.accounts.account(grant.userId);
-      if (!account) throw new OkfError(401, "suspended", "This account is suspended or deleted.");
+      if (!account) throw new StoreError(401, "suspended", "This account is suspended or deleted.");
       await admit(d, { key: `grant:${grant.id}|${grant.actor}`, account: account.handle }, true);
       const body = await c.req.json<Body>().catch(() => ({}) as Body);
       const made = await createLibraryForGrant(d.accounts, grant, {
@@ -1417,7 +1441,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
           note: "Starter note",
           by: { person: session.id },
         },
-        [{ op: "write", path: "start-here.md", content: STARTER }],
+        [{ op: "write", path: STARTER_PATH, content: STARTER }],
       );
     }
     return c.json(
@@ -1434,13 +1458,13 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 
   registerAccountApi(app, deps, async (c, d) => {
     const who = await principal(c as C, d);
-    if (!("user" in who)) throw new OkfError(403, "session_only", "Sign in to the app.");
+    if (!("user" in who)) throw new StoreError(403, "session_only", "Sign in to the app.");
     return who.user;
   });
 
   registerInboxApi(app, deps, async (c, d) => {
     const who = await principal(c as C, d);
-    if (!("user" in who)) throw new OkfError(403, "session_only", "Sign in to the app.");
+    if (!("user" in who)) throw new StoreError(403, "session_only", "Sign in to the app.");
     return who.user;
   });
 
@@ -1448,7 +1472,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   const invitee = async (c: C) => {
     const d = deps(c.env);
     const who = await principal(c, d);
-    if (!("user" in who)) throw new OkfError(403, "session_only", "Sign in to the app.");
+    if (!("user" in who)) throw new StoreError(403, "session_only", "Sign in to the app.");
     return { d, user: who.user };
   };
 
@@ -1465,7 +1489,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
         user.id,
         answer === "accept",
       );
-      if (!done) throw new OkfError(404, "not_found", "No such open invitation for you.");
+      if (!done) throw new StoreError(404, "not_found", "No such open invitation for you.");
       await d.notifications
         ?.settle(user.id, "invitation", `${done.owner}/${done.slug}`)
         .catch((e) => console.error(JSON.stringify({ notify_failed: "settle", error: String(e) })));
@@ -1498,7 +1522,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
         `${l.owner}/${l.slug}` === body.library ||
         (l.role === "owner" && l.slug === body.library),
     );
-    if (!lib) throw new OkfError(404, "no_library", `There is no library ${body.library ?? ""}.`);
+    if (!lib) throw new StoreError(404, "no_library", `There is no library ${body.library ?? ""}.`);
     // A person signed in to the app may mint a token as themselves (human:); a token may not.
     const fields = checkNewToken(
       {
@@ -1511,7 +1535,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       session ? session.actor : null,
     );
     if (lib.role === "read" && fields.scope === "write") {
-      throw new OkfError(
+      throw new StoreError(
         403,
         "read_only",
         `You have read access to ${lib.owner}/${lib.slug}: mint a read token (it may still comment).`,
@@ -1540,11 +1564,11 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   const recoveryFor = (c: C) => {
     const token = c.var.token;
     if (!token.actor.startsWith("human:")) {
-      throw new OkfError(403, "human_only", "Point-in-time restore needs a human: token.");
+      throw new StoreError(403, "human_only", "Point-in-time restore needs a human: token.");
     }
     const recovery = c.var.deps.recovery;
     requireOwner(token.role, "restore it");
-    if (!recovery) throw new OkfError(501, "unavailable", "Restore is not wired here.");
+    if (!recovery) throw new StoreError(501, "unavailable", "Restore is not wired here.");
     return { recovery, ref: token.library, token };
   };
 
@@ -1561,7 +1585,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // Import & export page. The owner's, and people only, like restore.
   const peopleOnly = (c: C) => {
     if (!c.var.token.actor.startsWith("human:")) {
-      throw new OkfError(403, "human_only", "This needs a human: token, or the app.");
+      throw new StoreError(403, "human_only", "This needs a human: token, or the app.");
     }
     return c.var.token.library;
   };
@@ -1584,7 +1608,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     const ref = peopleOnly(c);
     requireOwner(c.var.token.role, "run its maintainers");
     if (!c.var.deps.maintain)
-      throw new OkfError(501, "unavailable", "Maintenance is not wired here.");
+      throw new StoreError(501, "unavailable", "Maintenance is not wired here.");
     const res = (await c.var.deps.maintain(ref.do_id)) as { export: { key?: string } };
     return c.json({ export: res.export.key ?? null });
   });
@@ -1592,16 +1616,16 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
   // Deleting a library: only from the app's pages, typing its name (v2 spec: Accounts).
   app.post(`${BASE}/delete`, async (c) => {
     if (!c.var.token.id.startsWith("session:")) {
-      throw new OkfError(403, "session_only", "A library is deleted only from the app's pages.");
+      throw new StoreError(403, "session_only", "A library is deleted only from the app's pages.");
     }
     requireOwner(c.var.token.role, "delete it");
     const ref = c.var.token.library;
     const body = await c.req.json<{ confirm?: string }>().catch(() => ({}) as { confirm?: string });
     if (String(body.confirm ?? "").trim() !== ref.slug) {
-      throw new OkfError(400, "not_confirmed", `Type ${ref.slug} to confirm.`);
+      throw new StoreError(400, "not_confirmed", `Type ${ref.slug} to confirm.`);
     }
     const user = await c.var.deps.accounts.account(c.var.token.created_by ?? "");
-    if (!user) throw new OkfError(401, "no_account", "This account no longer exists.");
+    if (!user) throw new StoreError(401, "no_account", "This account no longer exists.");
     await deleteLibrary(c.var.deps, c.env.OAUTH_PROVIDER, user, ref);
     return c.body(null, 204);
   });
@@ -1612,7 +1636,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       .json<{ to?: string; undo?: string }>()
       .catch(() => ({}) as { to?: string; undo?: string });
     if (!body.to === !body.undo) {
-      throw new OkfError(
+      throw new StoreError(
         400,
         "bad_request",
         "Send { to: <ISO 8601 time> } or { undo: <restore id> }.",
@@ -1623,7 +1647,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       body.undo ? { undo: body.undo } : { to: body.to as string },
       token.actor,
     );
-    if (!outcome.ok) throw new OkfError(outcome.status, outcome.code, outcome.message);
+    if (!outcome.ok) throw new StoreError(outcome.status, outcome.code, outcome.message);
     const { bookmark: _b, undo_bookmark: _u, ...record } = outcome.record;
     return c.json(record, 201);
   });
@@ -1643,7 +1667,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
 }
 
 /**
- * A file described in JSON, as the app draws it: a concept with its tree and its images' sizes, a
+ * A file described in JSON, as the app draws it: a page with its tree and its images' sizes, a
  * synthesized file as a tree, an attachment's facts (never its bytes).
  */
 async function fileJson(lib: LibraryClient, blobs: BlobStore, view: FileView) {
@@ -1677,7 +1701,7 @@ async function fileJson(lib: LibraryClient, blobs: BlobStore, view: FileView) {
     };
   }
   if (view.kind === "derived") {
-    // The app draws it like a concept body: as a tree.
+    // The app draws it like a page body: as a tree.
     const doc = parseMarkdown(splitFrontmatter(view.markdown).body);
     return { kind: view.kind, path: view.path, seq: view.seq, doc };
   }
@@ -1703,9 +1727,10 @@ async function principal(
   const access =
     secret && library ? await d.sessions.access(secret, library.owner, library.slug) : null;
   const user = access?.user ?? (secret && !library ? await d.sessions.user(secret) : null);
-  if (!user) throw new OkfError(401, "no_token", "Send Authorization: Bearer <token>, or sign in.");
+  if (!user)
+    throw new StoreError(401, "no_token", "Send Authorization: Bearer <token>, or sign in.");
   if (c.req.method !== "GET" && c.req.method !== "HEAD" && !fromThisSite(c.req.raw)) {
-    throw new OkfError(
+    throw new StoreError(
       403,
       "cross_origin",
       "Changes must be submitted from this site's own pages.",
@@ -1723,14 +1748,14 @@ async function connectionGrant(c: C, token: string): Promise<AccountGrant> {
   const summary = await c.env.OAUTH_PROVIDER.unwrapToken<GrantProps>(token).catch(() => null);
   const resource = `${new URL(c.req.url).origin}/mcp`;
   if (!summary || summary.audience !== resource) {
-    throw new OkfError(401, "invalid_token", "This access token is not valid here.");
+    throw new StoreError(401, "invalid_token", "This access token is not valid here.");
   }
   const grant = summary.grant.props?.grant;
   if (grant && grant.userId !== summary.userId) {
-    throw new OkfError(401, "invalid_token", "This access token is not valid here.");
+    throw new StoreError(401, "invalid_token", "This access token is not valid here.");
   }
   if (!grant) {
-    throw new OkfError(
+    throw new StoreError(
       403,
       "create_not_allowed",
       "This connection reaches one library and cannot create libraries; reconnect the app.",
@@ -1741,13 +1766,13 @@ async function connectionGrant(c: C, token: string): Promise<AccountGrant> {
 
 function bearer(c: C): string {
   const m = /^Bearer\s+(\S+)$/i.exec(c.req.header("Authorization") ?? "");
-  if (!m?.[1]) throw new OkfError(401, "no_token", "Send Authorization: Bearer <token>.");
+  if (!m?.[1]) throw new StoreError(401, "no_token", "Send Authorization: Bearer <token>.");
   return m[1];
 }
 
 /**
  * A conformant bundle as a tar, attachments read from blob storage, with each SVG fence beside its
- * concept as SVG, and each Mermaid fence drawn there when a renderer is there (TEMPRA-168).
+ * page as SVG, and each Mermaid fence drawn there when a renderer is there (TEMPRA-168).
  */
 async function exportTar(
   lib: LibraryClient,
@@ -1755,23 +1780,26 @@ async function exportTar(
   at: number | undefined,
   name: string,
   ctx: RenderContext,
+  format: ExportFormat,
 ) {
   // Streamed: attachments' bytes are piped from blob storage, never all in memory (TEMPRA-83).
   const bundle = await bundleStream(lib, d.blobs, at, {
     // SVG fences are exported without a renderer; Mermaid needs one (TEMPRA-168, TEMPRA-206).
     diagrams: { ...(d.renderDiagram ? { render: d.renderDiagram } : {}), ctx },
+    format,
   });
+  const suffix = format === "okf" ? "-okf" : "";
   return new Response(bundle.body, {
     headers: {
       "Content-Type": "application/x-tar",
-      "Content-Disposition": `attachment; filename="${name}-${bundle.seq}.tar"`,
+      "Content-Disposition": `attachment; filename="${name}-${bundle.seq}${suffix}.tar"`,
       "X-Seq": String(bundle.seq),
     },
   });
 }
 
 const badUpload = () =>
-  new OkfError(403, "bad_upload", "This upload link is invalid or has expired.");
+  new StoreError(403, "bad_upload", "This upload link is invalid or has expired.");
 
 /** An upload link's token, checked against the library it names; not spent. */
 export async function openUploadGrant(
@@ -1842,10 +1870,10 @@ export async function receiveUpload(
  */
 async function uploaderNow(d: Deps, t: TokenInfo): Promise<TokenInfo> {
   const ref = await d.accounts.libraryByDoId(t.library.do_id);
-  if (!ref) throw new OkfError(403, "bad_upload", "This upload link is invalid or has expired.");
+  if (!ref) throw new StoreError(403, "bad_upload", "This upload link is invalid or has expired.");
   // Tokens minted before creators were recorded act for the owner.
   if (!t.created_by) return t;
-  const gone = new OkfError(
+  const gone = new StoreError(
     403,
     "read_only",
     "You no longer have write access to this library; nothing was written.",
@@ -1859,7 +1887,7 @@ async function uploaderNow(d: Deps, t: TokenInfo): Promise<TokenInfo> {
 
 function writeResponse(c: C, res: WriteResult) {
   const r = res.results[res.results.length - 1];
-  if (!r) throw new OkfError(500, "internal", "Write returned no result.");
+  if (!r) throw new StoreError(500, "internal", "Write returned no result.");
   if (r.hash) c.header("ETag", `"${r.hash}"`);
   c.header("X-Seq", String(r.seq));
   return c.json({

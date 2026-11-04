@@ -255,7 +255,7 @@ export function slotAtOrAfter(t: number, libraryId: string): Date {
 /**
  * When the library's next pass should run (TEMPRA-82): its first slot strictly after `now` at or
  * after the earliest moment there is work: an export (the ledger moved), an export or read count
- * to drop, a concept coming within 14 days of `stale_after` or passing it. At most
+ * to drop, a page coming within 14 days of `stale_after` or passing it. At most
  * MAX_SLEEP_DAYS away, so an idle library still wakes now and then. Each slot is a day apart,
  * so anything due is handled within a day of falling due, as with the daily pass.
  */

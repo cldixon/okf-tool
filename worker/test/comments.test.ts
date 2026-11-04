@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { docText } from "@tempra/editor/doc";
-import { OkfError } from "../src/store/errors";
+import { StoreError } from "../src/store/errors";
 import { LibraryStore, type RequestContext } from "../src/store/store";
 import { WRITE_TOOLS } from "../src/usage";
 import { bunSqlHandle } from "./sqlite";
@@ -25,7 +25,7 @@ function newStore() {
 
 /** A file's text, as anchors quote it. */
 const textOf = (v: ReturnType<LibraryStore["read"]>) =>
-  v.kind === "concept" ? docText(v.doc).text : "";
+  v.kind === "page" ? docText(v.doc).text : "";
 
 const doc = (body: string) =>
   `---\ntype: Metric\ntitle: Margin\ndescription: Gross margin.\n---\n${body}`;
@@ -42,14 +42,14 @@ function seeded() {
   return s;
 }
 
-function errorOf(fn: () => unknown): OkfError {
+function errorOf(fn: () => unknown): StoreError {
   try {
     fn();
   } catch (e) {
-    if (e instanceof OkfError) return e;
+    if (e instanceof StoreError) return e;
     throw e;
   }
-  throw new Error("expected an OkfError");
+  throw new Error("expected an StoreError");
 }
 
 describe("comment threads", () => {
@@ -89,9 +89,9 @@ describe("comment threads", () => {
       "resolve",
       "reopen",
     ]);
-    // Comments never change the concept: same hash, same version.
+    // Comments never change the page: same hash, same version.
     const after = s.read("metrics/margin.md");
-    expect(after.kind === "concept" && after.hash).toBe(version.kind === "concept" && version.hash);
+    expect(after.kind === "page" && after.hash).toBe(version.kind === "page" && version.hash);
     expect(after.seq).toBe(version.seq);
     for (const e of events) expect(e.hash).toBe(e.prev_hash);
   });
@@ -171,7 +171,7 @@ describe("comment threads", () => {
   test("an anchor is on its block, and the block keeps its ID through an agent's edit", () => {
     const s = seeded();
     const before = s.read("metrics/margin.md");
-    const para = before.kind === "concept" ? before.doc.children[1] : undefined;
+    const para = before.kind === "page" ? before.doc.children[1] : undefined;
     const block = (para as { id?: string } | undefined)?.id;
     // An agent quotes markdown as `read` shows it; it is matched by the text it reads as.
     const t = s.comment(ctx("agent:a"), {
@@ -189,11 +189,11 @@ describe("comment threads", () => {
         content: doc(
           "# Margin\n\nA new first paragraph.\n\nMargin is revenue minus cost. Margin is reported weekly.\n",
         ),
-        if_match: before.kind === "concept" ? before.hash : "",
+        if_match: before.kind === "page" ? before.hash : "",
       },
     ]);
     const after = s.read("metrics/margin.md");
-    const kept = after.kind === "concept" ? after.doc.children[2] : undefined;
+    const kept = after.kind === "page" ? after.doc.children[2] : undefined;
     expect((kept as { id?: string } | undefined)?.id).toBe(block);
     const moved = s.thread(t.id);
     expect(textOf(after).slice(moved.located?.from, moved.located?.to)).toBe(
@@ -201,13 +201,13 @@ describe("comment threads", () => {
     );
   });
 
-  test("threads follow a move; a concept with open threads is not deleted", () => {
+  test("threads follow a move; a page with open threads is not deleted", () => {
     const s = seeded();
     const t = s.comment(human(), { kind: "open", path: "metrics/margin.md", body: "Hm." }).thread;
     s.apply(ctx(), [{ op: "move", path: "metrics/margin.md", to: "finance/margin.md" }]);
     expect(s.thread(t.id).path).toBe("finance/margin.md");
     const cur = s.read("finance/margin.md");
-    const hash = cur.kind === "concept" ? cur.hash : "";
+    const hash = cur.kind === "page" ? cur.hash : "";
     const head = s.headSeq();
     // Refused while the thread is open, alone or in a batch, and nothing changes.
     const refused = errorOf(() =>
@@ -225,7 +225,7 @@ describe("comment threads", () => {
     expect(inBatch.code).toBe("open_comments");
     expect(inBatch.message).toContain("Op 2 of 2 (delete finance/margin.md)");
     expect(s.headSeq()).toBe(head);
-    // Resolved, it can go; a revert brings the concept and its (resolved) thread back.
+    // Resolved, it can go; a revert brings the page and its (resolved) thread back.
     s.comment(human(), { kind: "resolve", thread: t.id, body: "" });
     const del = s.apply(ctx(), [{ op: "delete", path: "finance/margin.md", if_match: hash }]);
     expect(s.comments({ status: "all" }).threads).toHaveLength(0);
@@ -234,14 +234,14 @@ describe("comment threads", () => {
     expect(s.comments({ status: "all" }).threads.map((x) => x.id)).toEqual([t.id]);
   });
 
-  test("a revert that would delete a concept with open threads is refused", () => {
+  test("a revert that would delete a page with open threads is refused", () => {
     const s = seeded();
     const made = s.apply(ctx(), [{ op: "write", path: "new.md", content: doc("New.\n") }]);
     const t = s.comment(human(), { kind: "open", path: "new.md", body: "Keep this?" }).thread;
     const e = errorOf(() => s.revert(ctx(), { request_id: made.request_id }));
     expect([e.status, e.code]).toEqual([409, "open_comments"]);
     expect(e.message).toContain(t.id);
-    expect(s.read("new.md").kind).toBe("concept");
+    expect(s.read("new.md").kind).toBe("page");
   });
 
   test("comment events do not disturb snapshots, diffs or reverts", () => {
@@ -252,7 +252,7 @@ describe("comment threads", () => {
       path: "metrics/margin.md",
       body: "Hm.",
     });
-    // A past snapshot at the comment's seq still has the concept at its content version.
+    // A past snapshot at the comment's seq still has the page at its content version.
     const atComment = s.read("metrics/margin.md", { at: t.seq });
     expect(atComment.seq).toBe(before);
     expect(s.outline({ at: t.seq }).files[0]?.seq).toBe(before);
@@ -285,7 +285,7 @@ describe("comment threads", () => {
     );
     expect(s.outline().files[0]?.comments).toBe(2);
     const read = s.read("metrics/margin");
-    expect(read.kind === "concept" && read.open_comments).toBe(2);
+    expect(read.kind === "page" && read.open_comments).toBe(2);
 
     s.comment(ctx("agent:a"), { kind: "resolve", thread: a.id, body: "Cited." });
     expect(s.work({ kind: "comment" }).items).toHaveLength(1);

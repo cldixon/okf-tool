@@ -1,5 +1,5 @@
 /**
- * What a concept body draws (tempra-dev: app/reader), worked out from its stored tree before any
+ * What a page body draws (tempra-dev: app/reader), worked out from its stored tree before any
  * of it is drawn: Body.svelte and Blocks.svelte only turn this into elements. No HTML string is
  * made and nothing is parsed. Every block carries its ID as `data-block`, every textblock its
  * offset in the document's text as `data-text`, and inline content draws exactly the text

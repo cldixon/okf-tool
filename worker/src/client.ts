@@ -1,11 +1,11 @@
 import { isDrawnDiagram } from "./diagram-export";
 import type { Caller } from "./feed";
+import type { FigureFact } from "./format/figures";
+import { sha256Hex } from "./format/hash";
+import { normalizePath } from "./format/paths";
 import { checkAttachment, formatOf, imageInfo, videoSizeInRanges } from "./media";
-import type { FigureFact } from "./okf/figures";
-import { sha256Hex } from "./okf/hash";
-import { normalizePath } from "./okf/paths";
 import { recordCost } from "./op-costs";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 import type { Reading } from "./store/reads";
 import type { RowCost, RowTally } from "./store/sql";
 import type { BlobRef, ImageRef, ImportFile, LibraryStore, WriteOp } from "./store/store";
@@ -21,7 +21,7 @@ export const LIBRARY_METHODS = [
   "viewed",
   "tree",
   "outline",
-  "concepts",
+  "pages",
   "search",
   "grep",
   "links",
@@ -98,7 +98,7 @@ export function makeClient(call: CallFn, caller: Caller | null = null): LibraryC
       // Added to the request's cost, when it is measured (costs.ts, TEMPRA-228).
       recordCost(m, args, r.cost, Date.now() - t);
       if (r.ok) return r.value;
-      throw new OkfError(r.status, r.code, r.message, r.extra);
+      throw new StoreError(r.status, r.code, r.message, r.extra);
     };
   }
   return client as unknown as LibraryClient;
@@ -190,10 +190,10 @@ export async function verifyBlobs(
     attachedBlobs(method, args).map(async ({ path, blob }) => {
       const head = await blobs.head(blob.hash);
       if (!head) {
-        throw new OkfError(400, "blob_missing", `No uploaded bytes for ${path} (${blob.hash}).`);
+        throw new StoreError(400, "blob_missing", `No uploaded bytes for ${path} (${blob.hash}).`);
       }
       if (head.size !== blob.size) {
-        throw new OkfError(
+        throw new StoreError(
           400,
           "blob_size",
           `Uploaded size for ${path} is ${head.size}, not ${blob.size}.`,
@@ -203,7 +203,7 @@ export async function verifyBlobs(
   );
 }
 
-/** Runs a store method, turning thrown OkfErrors into data. Shared by the DO and tests. */
+/** Runs a store method, turning thrown StoreErrors into data. Shared by the DO and tests. */
 /**
  * Calls that can add to a library, refused once it is at its storage limit. Deletes and moves
  * always go through, so a full library can be cleared.
@@ -241,11 +241,11 @@ export async function callStore(
     opts.rows && mark ? { ...r, cost: opts.rows.since(mark) } : r;
   try {
     if (!LIBRARY_METHODS.includes(method)) {
-      throw new OkfError(400, "bad_method", `Unknown library method ${method}.`);
+      throw new StoreError(400, "bad_method", `Unknown library method ${method}.`);
     }
     const limit = opts.storageLimitBytes;
     if (limit !== undefined && grows(method, args) && store.storageBytes() >= limit) {
-      throw new OkfError(
+      throw new StoreError(
         507,
         "storage_full",
         `This library is at its storage limit of ${Math.round(limit / 1048576)} MB. Delete or move content to free space.`,
@@ -262,7 +262,7 @@ export async function callStore(
         await opts.references(fresh);
       } catch (e) {
         console.error("blob references not recorded", e);
-        throw new OkfError(
+        throw new StoreError(
           503,
           "unavailable",
           "Could not record the attachment for this library; nothing was written. Try again.",
@@ -274,7 +274,7 @@ export async function callStore(
     const value = store.reading(opts.reading ?? null, () => fn.apply(store, args));
     return costed({ ok: true, value });
   } catch (e) {
-    if (e instanceof OkfError) {
+    if (e instanceof StoreError) {
       return costed({
         ok: false,
         status: e.status,
@@ -304,7 +304,7 @@ export async function putBlob(
   path?: string,
 ): Promise<BlobRef> {
   if (bytes.length > WORKER_ATTACHMENT_CAP) {
-    throw new OkfError(
+    throw new StoreError(
       413,
       "attachment_too_large",
       `Attachments through the Worker are capped at ${WORKER_ATTACHMENT_CAP} bytes.`,
@@ -335,7 +335,7 @@ export async function describeBlob(
   path?: string,
 ): Promise<BlobRef> {
   const bytes = /^[0-9a-f]{64}$/.test(hash) ? await blobBytes(blobs, hash) : null;
-  if (!bytes) throw new OkfError(400, "blob_missing", `No uploaded bytes for ${hash}.`);
+  if (!bytes) throw new StoreError(400, "blob_missing", `No uploaded bytes for ${hash}.`);
   return { hash, size: bytes.length, ...checkAttachment(bytes, declared, path) };
 }
 
@@ -407,11 +407,11 @@ async function workOutDimensions(
   return { width, height };
 }
 
-/** At most this many images a `read` of a concept works out the size of (two at a time). */
+/** At most this many images a `read` of a page works out the size of (two at a time). */
 export const FIGURE_DIMENSIONS_PER_READ = 6;
 
 /**
- * A concept's figures with the width and height of images stored before TEMPRA-152 worked out
+ * A page's figures with the width and height of images stored before TEMPRA-152 worked out
  * (`blob.width` null), as `withDimensions` does for one attachment: each blob once, at most
  * FIGURE_DIMENSIONS_PER_READ a read, two at a time so a page of large images is not all in
  * memory at once; the rest are worked out by later reads.
@@ -448,7 +448,7 @@ export async function figuresWithDimensions(
 }
 
 /**
- * A concept's `images` (FileView) with every image's and video's size worked out, as
+ * A page's `images` (FileView) with every image's and video's size worked out, as
  * `withDimensions` does for one attachment, so the reader can reserve each one's box (TEMPRA-162,
  * TEMPRA-183). Null when it does not decode.
  */
@@ -500,9 +500,9 @@ export function mediaFor(path: string, header?: string | null): string | null {
 }
 
 /**
- * Turns uploaded bundle files into import files: markdown as concepts, everything else stored in
+ * Turns uploaded bundle files into import files: markdown as pages, everything else stored in
  * the blob store first. `strip` drops leading directories; dot-directories (.git, .obsidian) are
- * skipped, and so are drawn diagrams beside a concept (`<concept>.diagrams/<n>.svg`, TEMPRA-168),
+ * skipped, and so are drawn diagrams beside a page (`<page>.diagrams/<n>.svg`, TEMPRA-168),
  * which an export derives and an import never makes attachments of.
  */
 export async function bundleFiles(
@@ -512,14 +512,14 @@ export async function bundleFiles(
 ): Promise<ImportFile[]> {
   const files: ImportFile[] = [];
   const paths = raw.map((f) => normalizePath(f.path.split("/").slice(strip).join("/")));
-  const concepts = new Set(paths.filter((p): p is string => !!p?.endsWith(".md")));
+  const pages = new Set(paths.filter((p): p is string => !!p?.endsWith(".md")));
   for (const [i, f] of raw.entries()) {
     const path = paths[i];
     if (!path || path.split("/").some((s) => s.startsWith("."))) continue;
-    if (isDrawnDiagram(path, concepts)) continue;
+    if (isDrawnDiagram(path, pages)) continue;
     if (path.endsWith(".md")) files.push({ path, markdown: new TextDecoder().decode(f.bytes) });
     else files.push({ path, blob: await putBlob(blobs, f.bytes, mediaFor(path), path) });
   }
-  if (files.length === 0) throw new OkfError(400, "empty_import", "No files found to import.");
+  if (files.length === 0) throw new StoreError(400, "empty_import", "No files found to import.");
   return files;
 }

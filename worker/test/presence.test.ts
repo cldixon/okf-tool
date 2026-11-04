@@ -23,14 +23,14 @@ const agent: Caller = {
   surface: "mcp",
   reader: "agent",
 };
-const concept = (path: string) => ({ kind: "concept", path, hash: "h" });
+const page = (path: string) => ({ kind: "page", path, hash: "h" });
 
 describe("presence messages", () => {
   test("a read and a page name their file; the generated index and a search name none", () => {
-    expect(presencePaths("read", concept("a/b.md"))).toEqual(["a/b.md"]);
+    expect(presencePaths("read", page("a/b.md"))).toEqual(["a/b.md"]);
     expect(presencePaths("read", { kind: "attachment", path: "a/x.png" })).toEqual(["a/x.png"]);
     expect(presencePaths("read", { kind: "derived", path: "index.md" })).toEqual([]);
-    expect(presencePaths("page", { file: concept("c.md"), head: 3 })).toEqual(["c.md"]);
+    expect(presencePaths("page", { file: page("c.md"), head: 3 })).toEqual(["c.md"]);
     expect(presencePaths("search", { seq: 1, results: [{ path: "p.md" }] })).toEqual([]);
     expect(presencePaths("outline", { files: [] })).toEqual([]);
   });
@@ -44,15 +44,15 @@ describe("presence messages", () => {
       surface: "app",
       reader: "person",
     });
-    expect(p.message(person, "read", concept("a.md"))).toBeNull();
+    expect(p.message(person, "read", page("a.md"))).toBeNull();
     expect(
       p.message(
         { actor: "human:owner", by: null, surface: "api", reader: "person" },
         "read",
-        concept("a.md"),
+        page("a.md"),
       ),
     ).toBeNull();
-    expect(p.message(null, "read", concept("a.md"))).toBeNull();
+    expect(p.message(null, "read", page("a.md"))).toBeNull();
     expect(callerOf({ actor: "claude-code/x", created_by: "u", agent: "agt" }, "mcp")).toEqual({
       actor: "claude-code/x",
       by: { person: "u", agent: "agt" },
@@ -63,9 +63,9 @@ describe("presence messages", () => {
 
   test("only reads: a search marks nothing, writes are the events' own", () => {
     const p = new Presence();
-    expect(p.message(agent, "apply", { seq: 2, results: [concept("a.md")] })).toBeNull();
+    expect(p.message(agent, "apply", { seq: 2, results: [page("a.md")] })).toBeNull();
     expect(p.message(agent, "search", { seq: 2, results: [{ path: "b.md" }] })).toBeNull();
-    expect(p.message(agent, "read", concept("a.md"))).toEqual({
+    expect(p.message(agent, "read", page("a.md"))).toEqual({
       type: "presence",
       kind: "reading",
       actor: "claude-code/test",
@@ -77,17 +77,17 @@ describe("presence messages", () => {
   test("throttled per agent and file", () => {
     const p = new Presence();
     const t = 1_000_000;
-    expect(p.message(agent, "read", concept("a.md"), t)?.paths).toEqual(["a.md"]);
+    expect(p.message(agent, "read", page("a.md"), t)?.paths).toEqual(["a.md"]);
     // The same agent on the same file, too soon: nothing, by `read` or `page`.
-    expect(p.message(agent, "read", concept("a.md"), t + 1000)).toBeNull();
-    expect(p.message(agent, "page", { file: concept("a.md") }, t + 1000)).toBeNull();
+    expect(p.message(agent, "read", page("a.md"), t + 1000)).toBeNull();
+    expect(p.message(agent, "page", { file: page("a.md") }, t + 1000)).toBeNull();
     // Another agent or another file goes through.
     expect(
-      p.message({ ...agent, actor: "other/x" }, "read", concept("a.md"), t + 1000),
+      p.message({ ...agent, actor: "other/x" }, "read", page("a.md"), t + 1000),
     ).not.toBeNull();
-    expect(p.message(agent, "read", concept("b.md"), t + 1000)).not.toBeNull();
+    expect(p.message(agent, "read", page("b.md"), t + 1000)).not.toBeNull();
     // Past the throttle, again.
-    expect(p.message(agent, "read", concept("a.md"), t + PRESENCE_THROTTLE_MS)).not.toBeNull();
+    expect(p.message(agent, "read", page("a.md"), t + PRESENCE_THROTTLE_MS)).not.toBeNull();
   });
 
   test("each socket gets the files under its prefix; old or broken sockets are skipped", () => {

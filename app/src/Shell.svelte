@@ -230,7 +230,7 @@
           label="Show sidebar"
           class="show-sidebar"
           onclick={() => props.onHide?.(false)}
-        />{/if}<!-- The page's path, from the page (a concept's folders and title; TEMPRA-145). --><div
+        />{/if}<!-- The page's path, from the page (a page's folders and title; TEMPRA-145). --><div
         class="topbar-path"
         bind:this={pathSlot}
         hidden={here.held}

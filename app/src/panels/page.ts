@@ -17,7 +17,7 @@ import { folderName } from "../urls";
 export interface PagePayload {
   v: 1;
   library: { owner: string; slug: string };
-  concept: {
+  page: {
     path: string;
     seq: number;
     title: string;
@@ -46,7 +46,7 @@ export function bylineName(byline: NonNullable<PagePayload["byline"]>): string {
 /** The page in a tool result, when it holds one this panel can draw. */
 export function pageFrom(result: { structuredContent?: unknown } | null | undefined) {
   const p = (result?.structuredContent as { page?: Partial<PagePayload> } | undefined)?.page;
-  if (p?.v !== 1 || !p.concept || typeof p.concept.path !== "string" || !p.concept.doc) {
+  if (p?.v !== 1 || !p.page || typeof p.page.path !== "string" || !p.page.doc) {
     return null;
   }
   return p as PagePayload;
@@ -70,16 +70,16 @@ export function bodyOptions(page: PagePayload): BodyOptions {
   const numbers = new Map<string, number>(ids.map((id, i) => [id, i + 1]));
   const sourceIds = new Set(ids);
   return {
-    path: page.concept.path,
+    path: page.page.path,
     href: (t: LinkTarget | null, _raw: string, kind: "link" | "image") => {
       if (!t) return null;
       if (t.kind !== "internal") return t.href;
-      if (kind === "image") return page.concept.images[t.path]?.src ?? null;
+      if (kind === "image") return page.page.images[t.path]?.src ?? null;
       // A link within the page (a heading) still scrolls; one to another page is not followed.
-      return t.path === page.concept.path && t.anchor ? t.anchor : null;
+      return t.path === page.page.path && t.anchor ? t.anchor : null;
     },
     image: (path) => {
-      const ref = page.concept.images[path];
+      const ref = page.page.images[path];
       if (!ref?.src) return null;
       const out: ImageSource = { src: ref.src, kind: mediaKind(ref.media) };
       if (ref.width && ref.height) {
@@ -103,6 +103,6 @@ export function bodyOptions(page: PagePayload): BodyOptions {
 
 /** Where the page sits: the library, then its folders by their readable names, as the app has them. */
 export function whereOf(page: PagePayload): string {
-  const dirs = page.concept.path.split("/").slice(0, -1);
+  const dirs = page.page.path.split("/").slice(0, -1);
   return [`${page.library.owner}/${page.library.slug}`, ...dirs.map(folderName)].join(" / ");
 }

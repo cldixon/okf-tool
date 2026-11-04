@@ -14,12 +14,12 @@ export const homeKey = (urls: Urls) => `home ${urls.base}`;
 /** What the home loads first: the head and page count, and the newest requests. */
 export async function loadHome(urls: Urls) {
   const [summary, page] = await Promise.all([
-    api<{ seq: number; concepts: number }>(urls.api("summary")),
+    api<{ seq: number; pages: number }>(urls.api("summary")),
     api<{ requests: LedgerRequest[] }>(urls.api("requests", { limit: READ })),
   ]);
   return {
     head: summary.seq,
-    concepts: summary.concepts,
+    pages: summary.pages,
     requests: page.requests,
     latest: page.requests.find((r) => !byPerson(r)) ?? null,
     // No agent among the newest requests, and no older ones: no agent has written here yet.
@@ -56,7 +56,7 @@ export function recentlyChanged(
   files: OutlineFile[],
   max = RECENT,
 ): Changed[] {
-  const here = new Map(files.filter((f) => f.kind === "concept").map((f) => [f.path, f]));
+  const here = new Map(files.filter((f) => f.kind === "page").map((f) => [f.path, f]));
   const out: Changed[] = [];
   const listed = new Set<string>();
   for (const r of requests) {

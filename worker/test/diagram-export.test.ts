@@ -44,7 +44,7 @@ describe("exports carry drawn diagrams (TEMPRA-168)", () => {
     expect(out.get("notes/a.diagrams/2.svg")).toContain("<title>flowchart LR</title>");
     expect(out.get("notes/a.diagrams/3.svg")).toContain("<title>sequenceDiagram</title>");
     expect(out.get("notes/a.diagrams/2.svg")).toContain('data-theme="light"');
-    // Never written into the concept.
+    // Never written into the page.
     expect(out.get("notes/a.md")).not.toContain(".diagrams/");
     expect(r.calls.every((c) => c.theme === "light" && !c.png && c.width === 680)).toBe(true);
     expect(r.calls).toHaveLength(2);
@@ -152,6 +152,6 @@ describe("exports carry drawn diagrams (TEMPRA-168)", () => {
     });
     const key = (res.export as { key: string }).key;
     const tar = readTar(bucket.objects.get(`${key}bundle.tar`) as Uint8Array);
-    expect(tar.map((f) => f.path).sort()).toEqual(["a.md", "index.md", "log.md"]);
+    expect(tar.map((f) => f.path).sort()).toEqual(["a.md"]);
   });
 });

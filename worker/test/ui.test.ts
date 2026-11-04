@@ -191,9 +191,9 @@ describe("the app's pages (TEMPRA-9)", () => {
       headers: { "Content-Type": "text/markdown", "If-Match": `"${hash}"` },
       body: "---\ntype: Note\ntitle: A\n---\nSecond words.\n",
     });
-    // A concept: frontmatter and the body as a tree, at any sequence.
+    // A page: frontmatter and the body as a tree, at any sequence.
     expect(await get(s, "/files/a.md")).toMatchObject({
-      kind: "concept",
+      kind: "page",
       ...says("Second words."),
     });
     expect(await get(s, `/files/a.md?at=${seq}`)).toMatchObject(says("First words."));
@@ -385,7 +385,7 @@ describe("the first page's data in the shell (TEMPRA-175)", () => {
   };
   const LIB_API = "/api/v1/libraries/owner/demo";
 
-  test("a concept's page carries what its first paint asks for, as the API answers it", async () => {
+  test("a page's view carries what its first paint asks for, as the API answers it", async () => {
     const s = setup();
     await put(s, "notes/a.md", "---\ntype: Note\ntitle: A\n---\nA, with </script> in it.\n");
     const r = await page(s, `${LIB}/notes/a.md`);

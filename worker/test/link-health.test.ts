@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
+import { sha256Hex } from "../src/format/hash";
+import { FOOTNOTE_CODES, sameLint, sameTargets } from "../src/format/link-health";
 import { nextMaintenance, runMaintenance, slotAtOrAfter } from "../src/maintain";
-import { sha256Hex } from "../src/okf/hash";
-import { FOOTNOTE_CODES, sameLint, sameTargets } from "../src/okf/link-health";
 import { type ImportFile, LibraryStore } from "../src/store/store";
 import { BUNDLES, loadBundle, text } from "./fixtures";
 import { memoryBucket } from "./harness";
@@ -35,20 +35,20 @@ const linkWork = (s: LibraryStore) =>
     .map((i) => `${i.kind} ${i.path}: ${i.detail}`)
     .sort();
 
-/** Each concept's stored lint and the flags the link checks own, as the write path left them. */
+/** Each page's stored lint and the flags the link checks own, as the write path left them. */
 const linkState = (db: Database) => ({
   flags: db
     .query(
-      "SELECT concept_id, kind, since_seq, detail FROM flags WHERE kind IN ('broken_link', 'lint') ORDER BY concept_id, kind",
+      "SELECT page_id, kind, since_seq, detail FROM flags WHERE kind IN ('broken_link', 'lint') ORDER BY page_id, kind",
     )
     .all(),
   lint: (
-    db.query("SELECT concept_id, lint FROM concepts ORDER BY concept_id").all() as {
-      concept_id: string;
+    db.query("SELECT page_id, lint FROM pages ORDER BY page_id").all() as {
+      page_id: string;
       lint: string;
     }[]
   ).map((r) => ({
-    id: r.concept_id,
+    id: r.page_id,
     lint: (JSON.parse(r.lint) as { code: string; message: string }[])
       .map((l) => `${l.code}: ${l.message}`)
       .sort(),
@@ -57,7 +57,7 @@ const linkState = (db: Database) => ({
 
 const hashOf = (s: LibraryStore, path: string) => {
   const r = s.read(path);
-  return r.kind === "concept" ? r.hash : "";
+  return r.kind === "page" ? r.hash : "";
 };
 
 describe("link-health checks (TEMPRA-65)", () => {
@@ -82,7 +82,7 @@ describe("the link-health process (TEMPRA-65)", () => {
       const run = s.maintainLinks();
       expect({ b, repaired: run.repaired }).toEqual({ b, repaired: [] });
       expect(run.pending).toBe(false);
-      expect(run.checked).toBe(s.summary().concepts);
+      expect(run.checked).toBe(s.summary().pages);
       expect({ work: linkWork(s), state: linkState(db) }).toEqual(before);
       // Nothing written since: the next run is skipped by its cursor.
       expect(s.maintainLinks()).toMatchObject({ skipped: true, checked: 0, repaired: [] });
@@ -117,8 +117,8 @@ describe("the link-health process (TEMPRA-65)", () => {
       const strip = (json: string) =>
         JSON.stringify((JSON.parse(json) as { code: string }[]).filter((l) => !owned.test(l.code)));
       db.run("DELETE FROM flags WHERE kind = 'broken_link'");
-      for (const t of ["concepts", "flags"]) {
-        const col = t === "concepts" ? "lint" : "detail";
+      for (const t of ["pages", "flags"]) {
+        const col = t === "pages" ? "lint" : "detail";
         const where = t === "flags" ? " WHERE kind = 'lint'" : "";
         for (const r of db.query(`SELECT rowid, ${col} AS v FROM ${t}${where}`).all() as {
           rowid: number;
@@ -134,7 +134,7 @@ describe("the link-health process (TEMPRA-65)", () => {
       // A new version of the checks walks the whole library again.
       db.run("UPDATE meta SET value = '0' WHERE key = 'maint:links_version'");
       const run = s.maintainLinks();
-      expect(run.checked).toBe(s.summary().concepts);
+      expect(run.checked).toBe(s.summary().pages);
       expect(run.repaired.length).toBeGreaterThan(0);
       expect(run.broken_link).toBe(1);
       expect(run.footnote).toBeGreaterThanOrEqual(1);
@@ -156,7 +156,7 @@ describe("the link-health process (TEMPRA-65)", () => {
     }
   });
 
-  test("checks what changed since its cursor and the concepts that link to it", () => {
+  test("checks what changed since its cursor and the pages that link to it", () => {
     const { s, db } = newStore();
     s.apply(ctx(), [
       { op: "write", path: "a.md", content: md("A", "Hi.\n") },
@@ -181,7 +181,7 @@ describe("the link-health process (TEMPRA-65)", () => {
     ]);
     // Lost between the write and the pass: the pass finds it from the stored tree.
     db.run(
-      "DELETE FROM flags WHERE kind = 'broken_link' AND concept_id = (SELECT concept_id FROM paths WHERE path = 'd.md')",
+      "DELETE FROM flags WHERE kind = 'broken_link' AND page_id = (SELECT page_id FROM paths WHERE path = 'd.md')",
     );
     const run = s.maintainLinks();
     expect(run).toMatchObject({ skipped: false, checked: 2, repaired: ["d.md"], broken_link: 2 });
@@ -189,7 +189,7 @@ describe("the link-health process (TEMPRA-65)", () => {
       "broken_link b.md: links to missing /a.md",
       "broken_link d.md: links to missing /a.md",
     ]);
-    // A move: the concept that moved and what links to it are checked.
+    // A move: the page that moved and what links to it are checked.
     s.apply(ctx(), [{ op: "write", path: "a.md", content: md("A", "Back.\n") }]);
     expect(linkWork(s)).toEqual([]);
     s.apply(ctx(), [{ op: "move", path: "a.md", to: "x/a.md" }]);

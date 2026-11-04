@@ -56,7 +56,7 @@ async function shared(role: "read" | "write" = "write") {
   return { s, friend, agent: agent.secret };
 }
 
-/** Writes a concept as the signed-in person of `app`. */
+/** Writes a page as the signed-in person of `app`. */
 async function write(app: App, path: string) {
   const r = await app.request(`${API}/files/${path}`, {
     method: "PUT",
@@ -169,7 +169,7 @@ describe("the inbox (TEMPRA-72)", () => {
     const { s, friend } = await shared();
     await write(s.app, "metrics/margin.md");
     const id = await open(s.app, "metrics/margin.md", "Is this right?");
-    // The owner wrote the concept: a thread they open themselves tells nobody.
+    // The owner wrote the page: a thread they open themselves tells nobody.
     expect((await inbox(s.app)).items).toEqual([]);
     expect((await call(friend.app, `${API}/comments/${id}`, "POST", { body: "Yes." })).status).toBe(
       200,

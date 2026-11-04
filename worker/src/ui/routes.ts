@@ -3,18 +3,18 @@ import type { User } from "../accounts";
 import { agentName } from "../agents";
 import type { Deps, openUploadGrant, receiveUpload } from "../app";
 import { type LibraryClient, WORKER_ATTACHMENT_CAP } from "../client";
-import { nightlyBundle } from "../export-bundle";
+import { exportFormat, nightlyBundle } from "../export-bundle";
+import { basename, dirname } from "../format/paths";
 import { isRouteName } from "../handles";
 import { VARIANT_EDGES } from "../images";
 import { fromSite } from "../legal";
 import { mailKey } from "../mail-queue";
 import { esc, messagePage, type Onward, PAGE_HEADERS, page } from "../oauth/pages";
-import { basename, dirname } from "../okf/paths";
 import { fromThisSite } from "../origin";
 import { byteRange } from "../range";
 import { LINK_MINUTES, readCookie, SESSION_COOKIE } from "../session";
 import { devSignIn, signedIn, signedInTo } from "../signin";
-import { OkfError } from "../store/errors";
+import { StoreError } from "../store/errors";
 import {
   type Authorized,
   authorizeLibrary,
@@ -66,7 +66,7 @@ function atParam(c: C): number | undefined {
   if (v === undefined || v === "") return undefined;
   const n = Number(v);
   if (!Number.isInteger(n) || n < 0) {
-    throw new OkfError(400, "bad_param", "`at` must be a sequence number.");
+    throw new StoreError(400, "bad_param", "`at` must be a sequence number.");
   }
   return n;
 }
@@ -75,7 +75,7 @@ function atParam(c: C): number | undefined {
  * An upload refused, in a person's words where the server's are written for agents (TEMPRA-196):
  * the type is what the agent prepared.
  */
-function forPeople(e: OkfError, grant: UploadGrant, sent: string): string {
+function forPeople(e: StoreError, grant: UploadGrant, sent: string): string {
   const again = "Choose the right file, or ask the agent for a new link.";
   switch (e.code) {
     case "media_mismatch":
@@ -91,7 +91,7 @@ function forPeople(e: OkfError, grant: UploadGrant, sent: string): string {
 /** Session cookies are SameSite=Lax; writes also insist on a same-origin request. */
 function requireSameOrigin(c: C) {
   if (!fromThisSite(c.req.raw)) {
-    throw new OkfError(
+    throw new StoreError(
       403,
       "cross_origin",
       "Changes must be submitted from this site's own pages.",
@@ -106,7 +106,7 @@ function errorPage(status: number, message: string, onward?: Onward): Response {
 }
 
 /**
- * Wraps a page handler: sign-in first, and OKF errors as HTML pages. A library path whose owner is
+ * Wraps a page handler: sign-in first, and store errors as HTML pages. A library path whose owner is
  * one of the service's route names (`/api/...`, `/.well-known/...`) is not a page: plain 404. One
  * whose owner is a handle released by a rename redirects to the account's current handle.
  */
@@ -131,7 +131,7 @@ function ui(
     try {
       return await handler({ c, user, found, deps: d });
     } catch (e) {
-      if (e instanceof OkfError) {
+      if (e instanceof StoreError) {
         if (e.status === 404 && owner !== undefined && c.req.method === "GET") {
           const now = await d.accounts.heldHandle(owner);
           if (now && now !== owner) {
@@ -194,12 +194,12 @@ async function imageResponse(
   w: string | undefined,
 ): Promise<Response> {
   const img = await lib.imageBlob(hash);
-  if (!img) throw new OkfError(404, "not_found", "This library has no such image.");
+  if (!img) throw new StoreError(404, "not_found", "This library has no such image.");
   let edge: number | null = null;
   if (w !== undefined) {
     edge = Number(w);
     if (!(VARIANT_EDGES as readonly number[]).includes(edge)) {
-      throw new OkfError(400, "bad_param", `\`w\` must be one of ${VARIANT_EDGES.join(", ")}.`);
+      throw new StoreError(400, "bad_param", `\`w\` must be one of ${VARIANT_EDGES.join(", ")}.`);
     }
   }
   const headers: Record<string, string> = {
@@ -229,7 +229,7 @@ async function imageResponse(
     }
   }
   const obj = await p.deps.blobs.get(hash);
-  if (!obj) throw new OkfError(404, "not_found", "The image's bytes are missing.");
+  if (!obj) throw new StoreError(404, "not_found", "The image's bytes are missing.");
   if (img.media === "image/svg+xml") {
     headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
   }
@@ -246,7 +246,7 @@ async function imageResponse(
  */
 async function mediaResponse(p: Page, lib: LibraryClient, hash: string): Promise<Response> {
   const blob = await lib.mediaBlob(hash);
-  if (!blob) throw new OkfError(404, "not_found", "This library has no such video or audio.");
+  if (!blob) throw new StoreError(404, "not_found", "This library has no such video or audio.");
   const headers: Record<string, string> = {
     "Cache-Control": "private, max-age=31536000, immutable",
     "Content-Disposition": "inline",
@@ -263,7 +263,7 @@ async function mediaResponse(p: Page, lib: LibraryClient, hash: string): Promise
   }
   const part = range ? { offset: range.start, length: range.end - range.start + 1 } : undefined;
   const obj = await p.deps.blobs.get(hash, part);
-  if (!obj) throw new OkfError(404, "not_found", "The file's bytes are missing.");
+  if (!obj) throw new StoreError(404, "not_found", "The file's bytes are missing.");
   if (!range) {
     return new Response(obj.body as ReadableStream | Uint8Array, {
       headers: { ...headers, "Content-Length": String(blob.size) },
@@ -400,7 +400,7 @@ export function registerUiRoutes<E extends AppEnv>(
   // The design components' catalogue (TEMPRA-252), for local dev only: a 404 everywhere else,
   // before sign-in is asked for.
   app.get("/_dev/design", async (c, next) => {
-    if (!devSignIn(c.req.raw, c.env)) throw new OkfError(404, "no_route", "No such route.");
+    if (!devSignIn(c.req.raw, c.env)) throw new StoreError(404, "no_route", "No such route.");
     await next();
   });
   get("/_dev/design", shell);
@@ -520,7 +520,8 @@ export function registerUiRoutes<E extends AppEnv>(
   get("/:owner/:lib/-/export", async (p) => {
     const { urls, lib, ref } = await openLibrary(p);
     const at = urls.at ?? (await lib.headSeq());
-    const token = await lib.signDownload({ k: "export", at, name: urls.slug });
+    const format = exportFormat(p.c.req.query("format"));
+    const token = await lib.signDownload({ k: "export", at, name: urls.slug, format });
     return p.c.redirect(`/dl/${encodeURIComponent(ref.do_id)}/${token}`, 302);
   });
 
@@ -580,7 +581,7 @@ export function registerUiRoutes<E extends AppEnv>(
         : file === "bundle.tar"
           ? await nightlyBundle(folder, (k) => exports.get(k), p.deps.blobs)
           : ((await exports.get(`${folder}${file}`))?.body ?? null);
-    if (!body || !type) throw new OkfError(404, "not_found", "No such export.");
+    if (!body || !type) throw new StoreError(404, "not_found", "No such export.");
     return new Response(body as BodyInit, {
       headers: {
         "Content-Type": type,
@@ -670,7 +671,7 @@ export function registerUiRoutes<E extends AppEnv>(
     try {
       grant = await uploads.open(lib, raw, ref.do_id);
     } catch (e) {
-      if (e instanceof OkfError && e.status === 403) return gone();
+      if (e instanceof StoreError && e.status === 403) return gone();
       throw e;
     }
     // A blob-first link (REST) has no path for a person to fill.
@@ -732,7 +733,7 @@ export function registerUiRoutes<E extends AppEnv>(
           ...(waitUntil ? { waitUntil } : {}),
         });
       } catch (e) {
-        if (!(e instanceof OkfError)) throw e;
+        if (!(e instanceof StoreError)) throw e;
         if (e.code === "bad_upload" || e.code === "upload_used") return up.gone();
         return refuse(e.status, forPeople(e, up.grant, file.type));
       }

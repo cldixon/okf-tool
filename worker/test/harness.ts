@@ -27,6 +27,7 @@ import {
 } from "../src/client";
 import { routedDb, withD1Session } from "../src/d1session";
 import { callerOf, Presence, type PresenceMessage, readingOf } from "../src/feed";
+import { sha256Hex } from "../src/format/hash";
 import {
   d1SentLog,
   handleMailMessage,
@@ -35,7 +36,6 @@ import {
   queueOutbox,
 } from "../src/mail-queue";
 import { d1Notifications } from "../src/notify";
-import { sha256Hex } from "../src/okf/hash";
 import { Quota, QuotaCounter, quotaBackend, quotaGuarded } from "../src/quota";
 import type { RestoreRecord } from "../src/recovery";
 import { d1Sessions, SESSION_COOKIE } from "../src/session";

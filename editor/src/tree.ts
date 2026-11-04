@@ -1,5 +1,5 @@
 /**
- * The stored form of a concept body (tempra-dev: decisions/structured-documents): an mdast tree
+ * The stored form of a page body (tempra-dev: decisions/structured-documents): an mdast tree
  * (GFM and footnotes) without source positions, with an `id` on every block. Markdown is parsed
  * into it and generated from it here, by the one parser the Worker and the app share. No Wordgard,
  * no DOM.
@@ -13,7 +13,7 @@ import { directive } from "micromark-extension-directive";
 import { gfm } from "micromark-extension-gfm";
 import { canonicalDirective, isDirectiveLabel } from "./figure";
 
-/** A concept body: the root of the tree. Every block in it carries an `id`. */
+/** A page body: the root of the tree. Every block in it carries an `id`. */
 export type Doc = Root;
 
 /** Any node of a document. */
@@ -93,7 +93,7 @@ const OPTIONS = {
 
 /**
  * Parses markdown (a body, without frontmatter) into a document without IDs: positions dropped,
- * and a `[^label]` the parser left as text (no definition in the body; OKF cites `sources[].id`)
+ * and a `[^label]` the parser left as text (no definition in the body; pages cite `sources[].id`)
  * made a footnote reference, so it is written back as written.
  */
 export function parseMarkdown(markdown: string): Doc {

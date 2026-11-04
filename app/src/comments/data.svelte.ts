@@ -4,7 +4,7 @@ import { useLoad } from "../load.svelte.ts";
 import type { Urls } from "../urls";
 import type { Draft, Thread } from "./data";
 
-/** A concept's threads, open and resolved (a concept rarely has more than a page of them). */
+/** A page's threads, open and resolved (a page rarely has more than a page of them). */
 export function useThreads(urls: () => Urls, path: () => string | null) {
   return useLoad(
     () => `comments ${urls().api("comments")} ${path() ?? ""}`,

@@ -3,11 +3,11 @@
   import { actorText } from "../agents";
   import { useActors } from "../agents.svelte.ts";
   import { ApiError, api } from "../api";
-  import type { HistoryEvent } from "../concept/data";
   import { useFrame, useTitleOf } from "../frame.svelte.ts";
   import { useLoad } from "../load.svelte.ts";
   import Moment from "../Moment.svelte";
   import PageColumn from "../PageColumn.svelte";
+  import type { HistoryEvent } from "../page/data";
   import { useTitle } from "../ui.svelte.ts";
   import { dirOf, enc, folderName, type Urls } from "../urls";
   import { fateOf } from "./file";

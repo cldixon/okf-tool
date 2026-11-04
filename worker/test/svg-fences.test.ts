@@ -218,7 +218,7 @@ describe("SVG fences (TEMPRA-206)", () => {
     expect(pageFor(plain, "dark")).toContain(`font-family:${FONT}}`);
   });
 
-  test("exports carry a sanitized SVG beside the concept, with no renderer needed", async () => {
+  test("exports carry a sanitized SVG beside the page, with no renderer needed", async () => {
     const s = setup();
     s.deps.renderDiagram = undefined;
     const body = `![x](/pic.png)\n\n${fence(UNSAFE)}\n\`\`\`mermaid\nflowchart LR\n  A --> B\n\`\`\`\n`;

@@ -543,7 +543,7 @@ describe("which writes touch D1 (TEMPRA-91)", () => {
     });
     expect(calls).toEqual([]);
 
-    const { sha256Hex } = await import("../src/okf/hash");
+    const { sha256Hex } = await import("../src/format/hash");
     const h1 = sha256Hex(new Uint8Array([1]));
     await blobs.put(h1, new Uint8Array([1]), null);
     const attach = (path: string) => ({

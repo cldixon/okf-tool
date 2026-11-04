@@ -1,11 +1,11 @@
 <script lang="ts">
   import { useThreads } from "../comments/data.svelte.ts";
-  import ConceptPage from "../concept/ConceptPage.svelte";
-  import { type FileData, fileKey, isConceptPath, loadFile } from "../concept/data";
-  import LiveChange from "../concept/LiveChange.svelte";
-  import { useLiveFile } from "../concept/live.svelte.ts";
   import { useLoad } from "../load.svelte.ts";
   import PageColumn from "../PageColumn.svelte";
+  import { type FileData, fileKey, isPagePath, loadFile } from "../page/data";
+  import LiveChange from "../page/LiveChange.svelte";
+  import { useLiveFile } from "../page/live.svelte.ts";
+  import PageView from "../page/PageView.svelte";
   import { type Compare, navigate } from "../router";
   import Status from "../Status.svelte";
   import { useScrollToHash } from "../ui.svelte.ts";
@@ -16,7 +16,7 @@
   import NotFound from "./NotFound.svelte";
 
   /**
-   * A file's page: a concept in its own layout (concept/ConceptPage), an attachment (board 28), or
+   * A file's page: a page in its own layout (page/PageView), an attachment (board 28), or
    * a synthesized file (log.md) in a page column; Not found (board 32) for a path with nothing
    * there. A folder's index.md is the folder's page.
    */
@@ -31,11 +31,11 @@
     () => fileKey(props.urls, props.path),
     () => loadFile(props.urls, props.path),
   );
-  // A concept's comment threads load beside it, and reload on their own (comments are not
+  // A page's comment threads load beside it, and reload on their own (comments are not
   // content: a new comment never redraws the body).
   const threads = useThreads(
     () => props.urls,
-    () => (isConceptPath(props.path) ? props.path : null),
+    () => (isPagePath(props.path) ? props.path : null),
   );
   // index.md is the directory's own page.
   $effect(() => {
@@ -53,14 +53,14 @@
     () => loaded.reload(),
     () => threads.reload(),
   );
-  const concept = $derived(shown?.extra);
+  const pageData = $derived(shown?.extra);
   const attachment = $derived(shown?.file.kind === "attachment" ? shown.file : null);
 </script>
 
-{#if shown && concept}
-  <ConceptPage
+{#if shown && pageData}
+  <PageView
     urls={props.urls}
-    data={concept}
+    data={pageData}
     head={shown.head}
     compare={props.compare}
     threads={threads.data?.threads ?? null}

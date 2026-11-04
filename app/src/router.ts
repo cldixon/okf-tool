@@ -23,12 +23,12 @@ export type Route =
       slug: string;
       path: string;
       at?: number;
-      /** A concept's page compares: in review mode, or against a version (`?since=`). */
+      /** A page compares: in review mode, or against a version (`?since=`). */
       compare?: Compare;
     }
   | { page: "diff"; owner: string; slug: string; path: string; from?: number; to?: number };
 
-/** What a concept's page draws its body against: the last verification, or a chosen version. */
+/** What a page draws its body against: the last verification, or a chosen version. */
 export type Compare = { kind: "review" } | { kind: "since"; seq: number };
 
 /** A confirmation from a server form that redirected back here (`?done=`). */
@@ -189,7 +189,7 @@ function compareOf(q: URLSearchParams): Compare | undefined {
 }
 
 /**
- * Which page is on screen: a new key starts the page afresh, with two exceptions. A concept's page
+ * Which page is on screen: a new key starts the page afresh, with two exceptions. A page
  * stays mounted while only how it is shown changes (`?since=`, `?review=`, `?panel=`, `?done=`),
  * so its open panel stays open (tempra-dev: app/reader, The panels); another file or a pinned
  * version (`?at=`) is another page. Activity keeps its page across its own view and filter

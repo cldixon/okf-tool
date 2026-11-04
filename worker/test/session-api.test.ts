@@ -1,16 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { sha256Hex } from "../src/okf/hash";
+import { sha256Hex } from "../src/format/hash";
 import { API, ORIGIN, setup } from "./harness";
 
 // The app's own pages call the REST API with the session cookie (TEMPRA-9).
 
-const concept = "---\ntype: Note\ntitle: A\ndescription: A note.\n---\nBody.\n";
+const page = "---\ntype: Note\ntitle: A\ndescription: A note.\n---\nBody.\n";
 
 function put(origin: Record<string, string>) {
   return {
     method: "PUT",
     headers: { "Content-Type": "text/markdown", "X-Note": "from the app", ...origin },
-    body: concept,
+    body: page,
   };
 }
 

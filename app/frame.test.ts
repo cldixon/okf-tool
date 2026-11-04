@@ -10,12 +10,12 @@ import { draw, settle } from "./test/dom";
 const html = (el: Element) => el.innerHTML.replace(/<!---->/g, "");
 
 const OUTLINE: OutlineFile[] = [
-  { path: "b/z.md", kind: "concept", title: "Zebra", seq: 3 },
-  { path: "b/a.md", kind: "concept", title: "Apple", seq: 4, comments: 2 },
+  { path: "b/z.md", kind: "page", title: "Zebra", seq: 3 },
+  { path: "b/a.md", kind: "page", title: "Apple", seq: 4, comments: 2 },
   { path: "b/pic.png", kind: "attachment", seq: 5 },
-  { path: "b/c/deep.md", kind: "concept", title: "Deep", seq: 6, stale: "stale" },
-  { path: "a/one.md", kind: "concept", title: "One", seq: 7 },
-  { path: "top.md", kind: "concept", title: "Top", seq: 8, stale: "stale_soon" },
+  { path: "b/c/deep.md", kind: "page", title: "Deep", seq: 6, stale: "stale" },
+  { path: "a/one.md", kind: "page", title: "One", seq: 7 },
+  { path: "top.md", kind: "page", title: "Top", seq: 8, stale: "stale_soon" },
 ];
 
 class NoSocket {

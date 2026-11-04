@@ -266,7 +266,7 @@
      schemes, at least 4.5:1 on the colour (design/contrast.test.ts). */
   --tempra-color-on-agent: light-dark(var(--tempra-grey-201), var(--tempra-grey-201));
 
-  /* Color: commented text in a concept's body (TEMPRA-223), greys only: an open thread's quote on
+  /* Color: commented text in a page's body (TEMPRA-223), greys only: an open thread's quote on
      a soft fill over a solid mid-grey underline, the thread in focus on a deeper fill with an ink
      underline. Text keeps at least 4.5:1 on both fills, and the underline 3:1 on the soft fill
      and the page (design/contrast.test.ts). */
@@ -348,15 +348,15 @@
   --tempra-text-ui: 13px; /* controls, panels, the tree, comments */
   --tempra-text-base: 14px; /* the app's base text */
   --tempra-text-name: 15px; /* a library's name, dialog heads, the wordmark */
-  --tempra-text-reader: 17px; /* a concept's body and description, the landing page's lede */
+  --tempra-text-reader: 17px; /* a page's body and description, the landing page's lede */
   --tempra-text-h2: 22px; /* an attachment's name, a compose dialog's name */
-  --tempra-text-page: 28px; /* a view's title (h1); a concept's title on a phone */
-  --tempra-text-title: 36px; /* a concept's title */
+  --tempra-text-page: 28px; /* a view's title (h1); a page's title on a phone */
+  --tempra-text-title: 36px; /* a page's title */
   --tempra-text-code: 0.92em; /* code, a step under the text around it */
 
   /* Weights: three */
   --tempra-weight-regular: 400; /* text */
-  --tempra-weight-medium: 500; /* names in rows, a concept's title, the body's h1 and h2 */
+  --tempra-weight-medium: 500; /* names in rows, a page's title, the body's h1 and h2 */
   --tempra-weight-strong: 600; /* the sans's headings, section labels, the wordmark */
 
   /* Leading: three */
@@ -367,14 +367,14 @@
   /* Tracking */
   --tempra-tracking-label: 0.04em; /* uppercase labels */
   --tempra-tracking-title: -0.02em; /* h1 and a view's title */
-  --tempra-tracking-doc: -0.01em; /* a concept's title */
+  --tempra-tracking-doc: -0.01em; /* a page's title */
 
   /* Lines: a link's underline sits this far under the text (inside .prose, in em) */
   --tempra-line-offset: 2px;
 
   /* Measure */
   --tempra-measure: 680px; /* the reader's column, with its padding: diagrams, captions */
-  --tempra-measure-reader: 34em; /* concept text: about 66 characters at the reading size */
+  --tempra-measure-reader: 34em; /* page text: about 66 characters at the reading size */
 
   /* Space: one scale in rem, so spacing grows with the reader's chosen text size, named by its
      size in px at the default 16px root (take 2 to take 4 used every step below; the palette
@@ -407,12 +407,12 @@
   --tempra-space-chip: 1px 7px;
 
   /* Size: the frame (take 4): a top bar across the window, the sidebar, one panel beside a
-     concept. The breakpoints are 1100px (the panel overlays the page) and 900px (the phone
+     page. The breakpoints are 1100px (the panel overlays the page) and 900px (the phone
      layout); a media query cannot read a token, so they are written where they are used. */
   --tempra-size-topbar: 60px; /* the top bar */
   --tempra-size-topbar-phone: 52px; /* the phone's top bar */
   --tempra-size-sidebar: 264px; /* the sidebar's width */
-  --tempra-size-panel: 360px; /* a concept's panel (Comments, History, Properties) */
+  --tempra-size-panel: 360px; /* a page's panel (Comments, History, Properties) */
   --tempra-size-panel-head: 56px; /* a panel's head; the phone sheet's is taller */
   --tempra-size-panel-head-phone: 64px;
   --tempra-size-drawer: min(82vw, 360px); /* the phone's drawer: about four fifths of the screen */
@@ -420,7 +420,7 @@
   --tempra-size-row: 30px; /* a sidebar row */
   --tempra-size-touch: 44px; /* the least touch target on a phone */
 
-  /* Size: a concept's columns (take 4): the text, centred; on the right its contents, or a panel */
+  /* Size: a page's columns (take 4): the text, centred; on the right its contents, or a panel */
   --tempra-size-column-text: 620px;
   --tempra-size-contents: 200px;
   --tempra-size-figure-wide: 960px; /* a wide figure (`layout=wide`), past the text's measure */
@@ -904,8 +904,8 @@ details > summary {
 }
 
 /*
- * How a rendered concept reads (tempra-dev: app/reader, Reading typography): the body of a
- * concept, in the app and in the page panel MCP `show` draws in a chat. Scoped to .prose. Inter's
+ * How a rendered page reads (tempra-dev: app/reader, Reading typography): the body of a
+ * page, in the app and in the page panel MCP `show` draws in a chat. Scoped to .prose. Inter's
  * text cut at the reading size (17px), about 66 characters to the line, spacing in em so the
  * rhythm scales with the text. Greys, type, spacing and rules only until the palette (TEMPRA-1).
  */
@@ -1393,10 +1393,10 @@ details > summary {
 /*
  * Figure markup (TEMPRA-161; tempra-dev: app/media, Figure markup). Width: `--figure-width`, set on
  * the figure through the CSSOM, caps its images (max-width only, so an image is never drawn wider
- * than its own pixels). Placement, on a concept's page: wide and full reach past the text,
- * within the text's column (the page's width, 100cqi of `page`, less --concept-side; the text is
+ * than its own pixels). Placement, on a page: wide and full reach past the text,
+ * within the text's column (the page's width, 100cqi of `page`, less --page-side; the text is
  * --doc-max wide at most, --doc-pad from the column's start and --doc-end from its end,
- * concept.css), never past its padding: from the text's end edge leftwards when the text sits at
+ * page.css), never past its padding: from the text's end edge leftwards when the text sits at
  * the column's end (--doc-align 1), centred with it when it is centred (0.5); wide stops at
  * --tempra-figure-wide. Elsewhere they keep the text's width.
  */
@@ -1409,7 +1409,7 @@ details > summary {
   max-width: min(100%, var(--figure-width));
 }
 
-.concept .prose figure.figure-wide {
+.page-view .prose figure.figure-wide {
   --figure-reach: min(
     var(--tempra-size-figure-wide),
     var(--figure-column) -
@@ -1418,13 +1418,13 @@ details > summary {
   );
 }
 
-.concept .prose figure.figure-full {
+.page-view .prose figure.figure-full {
   --figure-reach: calc(var(--figure-column) - var(--doc-pad) - var(--doc-end));
 }
 
 @container page (width >= 0px) {
-  .concept .prose figure:is(.figure-wide, .figure-full) {
-    --figure-column: calc(100cqi - var(--concept-side));
+  .page-view .prose figure:is(.figure-wide, .figure-full) {
+    --figure-column: calc(100cqi - var(--page-side));
     --figure-w: max(100%, var(--figure-reach));
     width: var(--figure-w);
     max-width: none;
@@ -1546,7 +1546,7 @@ details > summary {
 }
 
 /* Changes in the text (review mode, a version chosen in History): insertions underlined on a
-   grey ground, deletions struck through in grey; the changed block's rule is concept.css's. */
+   grey ground, deletions struck through in grey; the changed block's rule is page.css's. */
 .prose ins.diff-added {
   background: var(--tempra-color-ground);
   text-decoration: underline;
@@ -1560,10 +1560,10 @@ details > summary {
 }
 
 /*
- * What sits around a concept body in the reader (tempra-dev: app/reader): the hover cards and the
+ * What sits around a page body in the reader (tempra-dev: app/reader): the hover cards and the
  * selection toolbar (popovers in the top layer, placed by the app through --float-x and
  * --float-y), comment highlights (the CSS Custom Highlight API), diagrams and the full-screen
- * view of a figure. The threads are comments.css's, the Markdown view concept.css's. Lines and
+ * view of a figure. The threads are comments.css's, the Markdown view page.css's. Lines and
  * greys only (no colour until TEMPRA-1).
  */
 
@@ -2041,7 +2041,7 @@ details > summary {
  * over the page), a navigation sidebar with a hairline on its right, and the page as a flat
  * column. The sidebar can be hidden; under 900px it is a drawer behind a top bar. A library's
  * Settings is one of its pages; the account's pages use the same frame with a sidebar of their
- * own. A concept's own layout is in concept.css; the person's views (home, Activity, Settings,
+ * own. A page's own layout is in page.css; the person's views (home, Activity, Settings,
  * an attachment, Not found) in views.css.
  */
 body:has(> #root),
@@ -2670,7 +2670,7 @@ a.button.pill-button {
   display: none;
 }
 
-/* A concept's path: its folders, words not links, then its title (TEMPRA-145). */
+/* A page's path: its folders, words not links, then its title (TEMPRA-145). */
 .topbar-crumbs {
   display: flex;
   align-items: center;
@@ -2699,7 +2699,7 @@ a.button.pill-button {
   text-overflow: ellipsis;
 }
 
-/* The page's tools (a concept's Comments, Copy page and ⋯), from the page itself. */
+/* The page's tools (a page's Comments, Copy page and ⋯), from the page itself. */
 .topbar-tools {
   display: flex;
   flex: none;
@@ -3055,8 +3055,8 @@ a.button.pill-button {
   background: var(--tempra-color-muted);
 }
 
-/* The page: the frame's scroller. Its width, not the window's, decides a concept's columns
-   (container queries on `page`, in concept.css), so hiding the
+/* The page: the frame's scroller. Its width, not the window's, decides a page's columns
+   (container queries on `page`, in page.css), so hiding the
    sidebar widens the reading layout. */
 .ws-main {
   grid-area: main;
@@ -3438,7 +3438,7 @@ button.tree-name {
       "main";
   }
 
-  /* The bar: the menu button, the mark and the library's name, then a page's tools (a concept's
+  /* The bar: the menu button, the mark and the library's name, then a page's tools (a page's
      ⋯; its actions float at the bottom right, TEMPRA-172) and the bell; the avatar last. Search
      and the switcher are the drawer's head's, as on the desktop the bar's over the sidebar
      (TEMPRA-145). */
@@ -3719,7 +3719,7 @@ ul.events {
 }
 
 /*
- * A concept's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
+ * A page's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
  * bar): the text (title, description, byline, body, sources) at the end of its column, a gap
  * from the outline as Linear's docs set it (TEMPRA-277), and on the right its contents, or one panel in their place (Comments, History, Properties). The page's
  * width decides what fits (container queries on `page`, the page's scroller): under 1100px the
@@ -3730,24 +3730,24 @@ ul.events {
 
 /* The right column is the panel's width whether it holds the contents or a panel, so opening a
    panel takes the contents' space and never moves the text (C-17). */
-/* --concept-side is the right column's width in each layout below, so a wide or full figure
+/* --page-side is the right column's width in each layout below, so a wide or full figure
    (prose.css, TEMPRA-161) knows the text's column: the page's width (100cqi of `page`) less it. */
-.concept {
-  --concept-side: var(--tempra-size-panel);
+.page-view {
+  --page-side: var(--tempra-size-panel);
 }
 
-.concept-grid {
+.page-grid {
   display: grid;
-  grid-template-columns: [text] minmax(0, 1fr) [side] var(--concept-side);
+  grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   min-height: 100%;
 }
 
 /* The Markdown view has no contents (its headings lead nowhere there): the file takes the room. */
-.concept.markdown-on:not(.panel-open) {
-  --concept-side: 0px;
+.page-view.markdown-on:not(.panel-open) {
+  --page-side: 0px;
 }
 
-.concept.markdown-on:not(.panel-open) .concept-grid {
+.page-view.markdown-on:not(.panel-open) .page-grid {
   grid-template-columns: [text] minmax(0, 1fr);
 }
 
@@ -3756,7 +3756,7 @@ ul.events {
    the column's other edge, and the spare room on the far side. With nothing beside it (the
    rules below) it is centred, --doc-pad each side. A wide or full figure reads them all, and
    --doc-align: 1 at the end, 0.5 centred. */
-.concept .doc {
+.page-view .doc {
   --doc-pad: var(--tempra-space-page);
   --doc-end: var(--tempra-space-56);
   --doc-align: 1;
@@ -3771,14 +3771,14 @@ ul.events {
 }
 
 /* Nothing beside the text: centred. */
-.concept.markdown-on:not(.panel-open) .doc {
+.page-view.markdown-on:not(.panel-open) .doc {
   --doc-end: var(--doc-pad);
   --doc-align: 0.5;
   justify-self: center;
 }
 
 /* The Markdown view is wider than the text: the file's lines are long. */
-.concept.markdown-on .doc {
+.page-view.markdown-on .doc {
   --doc-max: calc(
     var(--tempra-measure) +
     2 *
@@ -3787,7 +3787,7 @@ ul.events {
   );
 }
 
-.concept-side {
+.page-side {
   grid-row: 1;
   grid-column: side;
   min-width: 0;
@@ -3795,7 +3795,7 @@ ul.events {
 
 /* The contents: the page's headings in small grey type, nested, kept in view; the section in
    view marked with a rule. No heading over them. */
-.concept-contents {
+.page-contents {
   position: sticky;
   top: 0;
   max-width: calc(var(--tempra-size-contents) + 2 * var(--tempra-space-page));
@@ -3875,7 +3875,7 @@ ul.events {
 
 /* ---------- A panel: in the contents' column, its title, a count and × ---------- */
 
-.concept-panel {
+.page-aside {
   position: sticky;
   top: 0;
   display: flex;
@@ -4117,7 +4117,7 @@ ul.events {
 
 /* The changes in the text (take 4, board 22): a hairline warm rule left of each changed block,
    insertions underlined on a grey ground, deletions struck through in grey (prose.css). */
-.concept
+.page-view
   .prose
   > :is(p, ul, ol, blockquote, pre, h2, h3, h4, h5, h6, .table):has(
     ins.diff-added,
@@ -4295,21 +4295,21 @@ ul.events {
 
 /* No room beside the text: the contents move under the byline, and a panel overlays the page. */
 @container page (width < 1100px) {
-  .concept {
-    --concept-side: 0px;
+  .page-view {
+    --page-side: 0px;
   }
 
-  .concept-grid,
-  .concept.panel-open .concept-grid {
+  .page-grid,
+  .page-view.panel-open .page-grid {
     grid-template-columns: [text] minmax(0, 1fr);
   }
 
   /* Its column is gone: what it holds is hidden (the contents) or fixed (a panel). */
-  .concept-side {
+  .page-side {
     display: contents;
   }
 
-  .concept-contents {
+  .page-contents {
     display: none;
   }
 
@@ -4317,13 +4317,13 @@ ul.events {
     display: block;
   }
 
-  .concept .doc {
+  .page-view .doc {
     --doc-end: var(--doc-pad);
     --doc-align: 0.5;
     justify-self: center;
   }
 
-  .concept-panel {
+  .page-aside {
     position: fixed;
     top: var(--tempra-size-topbar);
     right: 0;
@@ -4341,35 +4341,35 @@ ul.events {
    open panel still takes the column from 960px and overlays below that (the rules around this),
    and the text moves over for it. */
 @container page (700px <= width < 1100px) {
-  .concept:not(.panel-open):not(.markdown-on) {
-    --concept-side: calc(var(--tempra-size-contents) + var(--tempra-space-24));
+  .page-view:not(.panel-open):not(.markdown-on) {
+    --page-side: calc(var(--tempra-size-contents) + var(--tempra-space-24));
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .concept-grid {
+  .page-view:not(.panel-open):not(.markdown-on) .page-grid {
     grid-template-columns: [text] minmax(0, 1fr) [side] calc(
         var(--tempra-size-contents) +
         var(--tempra-space-24)
       );
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .concept-side {
+  .page-view:not(.panel-open):not(.markdown-on) .page-side {
     display: block;
   }
 
-  .concept:not(.panel-open) .concept-contents {
+  .page-view:not(.panel-open) .page-contents {
     display: block;
     padding-right: var(--tempra-space-24);
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .toc-inline {
+  .page-view:not(.panel-open):not(.markdown-on) .toc-inline {
     display: none;
   }
 
-  .concept .doc {
+  .page-view .doc {
     --doc-pad: var(--tempra-space-32);
   }
 
-  .concept:not(.panel-open):not(.markdown-on) .doc {
+  .page-view:not(.panel-open):not(.markdown-on) .doc {
     --doc-end: var(--tempra-space-56);
     --doc-align: 1;
     justify-self: end;
@@ -4389,25 +4389,25 @@ ul.events {
    sidebar shown): an open panel takes a column again and the text moves over for it, so nothing
    (On this page included) runs under it. Narrower than this, it overlays. */
 @container page (960px <= width < 1100px) {
-  .concept.panel-open {
-    --concept-side: var(--tempra-size-panel);
+  .page-view.panel-open {
+    --page-side: var(--tempra-size-panel);
   }
 
-  .concept.panel-open .concept-grid {
+  .page-view.panel-open .page-grid {
     grid-template-columns: [text] minmax(0, 1fr) [side] var(--tempra-size-panel);
   }
 
-  .concept.panel-open .concept-side {
+  .page-view.panel-open .page-side {
     display: block;
   }
 
-  .concept.panel-open .doc {
+  .page-view.panel-open .doc {
     --doc-end: var(--tempra-space-56);
     --doc-align: 1;
     justify-self: end;
   }
 
-  .concept.panel-open .concept-panel {
+  .page-view.panel-open .page-aside {
     position: sticky;
     top: 0;
     right: auto;
@@ -4437,7 +4437,7 @@ ul.events {
 /* A phone (take 4, boards 33 and 35): one column with a 16px gutter, "On this page" as a closed
    disclosure under the byline, and a panel as a sheet from the bottom, the page dimmed behind. */
 @media (max-width: 900px) {
-  .concept .doc {
+  .page-view .doc {
     --doc-pad: var(--tempra-space-16);
     padding-top: var(--tempra-space-16);
     padding-bottom: var(--tempra-space-96);
@@ -4465,7 +4465,7 @@ ul.events {
     padding-bottom: var(--tempra-space-08);
   }
 
-  .concept-panel {
+  .page-aside {
     top: auto;
     right: 0;
     bottom: 0;
@@ -4605,8 +4605,8 @@ ul.events {
 }
 
 /*
- * Comments on a concept (take 4, TEMPRA-114; tempra-dev: app/comments): the threads in the
- * Comments panel (its frame is concept.css's), Open and Resolved n, a draft at the top while one
+ * Comments on a page (take 4, TEMPRA-114; tempra-dev: app/comments): the threads in the
+ * Comments panel (its frame is page.css's), Open and Resolved n, a draft at the top while one
  * is written, the active thread as a card, the others compact (their quote, then who, the first
  * words, when). Lines and greys only: no colour.
  */
@@ -4894,7 +4894,7 @@ section.thread.open {
   }
 }
 
-/* A mark beside each block of a concept's body that holds open threads (TEMPRA-223): the comment
+/* A mark beside each block of a page's body that holds open threads (TEMPRA-223): the comment
    glyph and the count in muted grey, in the right gutter by the block's first line, or under the
    block's end where there is no gutter (a phone). A layer over the body, outside its text, placed
    by the app through --mark-x and --mark-y. Greys and lines only. */
@@ -5298,7 +5298,7 @@ section.thread.open {
   overflow-wrap: anywhere;
 }
 
-/* The concepts it touched: what happened, the title, the words changed. */
+/* The pages it touched: what happened, the title, the words changed. */
 .entry-touched {
   display: flex;
   flex-direction: column;
@@ -5746,11 +5746,11 @@ a.activity-download {
 }
 
 /* The home's Comments panel (TEMPRA-222): the threads on the library itself, opened from the
-   page's actions. The home has no side column, so where a concept's panel would sit beside the
-   text it overlays the page's right edge instead (narrower, and on a phone, concept.css's rules
+   page's actions. The home has no side column, so where a page's panel would sit beside the
+   text it overlays the page's right edge instead (narrower, and on a phone, page.css's rules
    already make it an overlay and the sheet). */
 @container page (width >= 1100px) {
-  .home-panel .concept-panel {
+  .home-panel .page-aside {
     position: fixed;
     top: var(--tempra-size-topbar);
     right: 0;

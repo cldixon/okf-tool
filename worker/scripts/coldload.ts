@@ -1,5 +1,5 @@
 /**
- * Cold loads of a concept page in Chromium against a fresh `cf dev` (the Svelte port's before
+ * Cold loads of a page in Chromium against a fresh `cf dev` (the Svelte port's before
  * and after numbers, TEMPRA-176): each run a new browser context (empty cache), timed from
  * navigation to the reader's first block in the DOM, with the page's own timings (document,
  * script, DOMContentLoaded, first and largest contentful paint) and the bytes of script fetched.

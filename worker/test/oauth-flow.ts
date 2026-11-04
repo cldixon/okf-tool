@@ -38,7 +38,7 @@ export async function register(app: App, name = "Claude", redirect = REDIRECT) {
 export async function begin(
   app: App,
   clientId: string,
-  scope = "okf:read okf:write",
+  scope = "tempra:read tempra:write",
   redirect = REDIRECT,
 ) {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));

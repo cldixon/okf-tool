@@ -1,7 +1,7 @@
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import type { LibraryRef, MemberRole, User } from "./accounts";
 import { type AuthCache, libraryTag, sessionTag, userTag } from "./authcache";
-import { sha256Hex } from "./okf/hash";
+import { sha256Hex } from "./format/hash";
 
 /**
  * Browser sign-in (v2 spec: Accounts and sign-in): single-use magic links, each with a code to

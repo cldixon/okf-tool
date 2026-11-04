@@ -1,5 +1,5 @@
 /**
- * What the full-screen view of a concept's figures (Lightbox.svelte) is given and says beyond
+ * What the full-screen view of a page's figures (Lightbox.svelte) is given and says beyond
  * the figure: the page's title, an image's facts, its file page and download.
  */
 import { formatSize, relativeTime } from "../ui";
@@ -24,7 +24,7 @@ export interface ImageFacts {
 
 /** What the reader's page gives the full-screen view. Without it the view still works. */
 export interface FigureView {
-  /** The concept's title, shown in the view's header before "Figure n of m". */
+  /** The page's title, shown in the view's header before "Figure n of m". */
   title?: string;
   /** Facts about an image at a library path, loaded when the view shows it. */
   describe?(path: string): Promise<ImageFacts | null>;

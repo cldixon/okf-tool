@@ -15,7 +15,7 @@ import { WRITE_METHODS } from "./feed";
 import { type Limits, limitsFrom } from "./limits";
 import type { Outbox } from "./mail-queue";
 import type { NewItem } from "./notify";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 import type { SqlHandle } from "./store/sql";
 import { tokenAdmission } from "./usage";
 
@@ -372,7 +372,7 @@ export class Quota {
     };
   }
 
-  private reached(kind: QuotaKind, limit: number, used: number, month: string): OkfError {
+  private reached(kind: QuotaKind, limit: number, used: number, month: string): StoreError {
     return quotaReached(kind, limit, used, month, this.origin);
   }
 
@@ -453,7 +453,7 @@ export function quotaReached(
   used: number,
   month: string,
   origin = "",
-): OkfError {
+): StoreError {
   const usage = `${origin}/account#usage`;
   const resets = monthResets(month).toISOString();
   const day = `${resetDay(month)} (UTC)`;
@@ -463,7 +463,7 @@ export function quotaReached(
       : kind === "writes"
         ? `This account has reached its monthly limit of ${limitText(kind, limit)}: ${num(used)} this month. Reads still work; writes start again on ${day}. Usage: ${usage}`
         : `This account has reached its monthly limit of ${limitText(kind, limit)}: ${num(used)} this month. Nothing more is answered for its agents and apps, reads included, until ${day}; the person's own browser keeps working. Usage: ${usage}`;
-  return new OkfError(
+  return new StoreError(
     403,
     "quota_reached",
     message,

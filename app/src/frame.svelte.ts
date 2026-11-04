@@ -12,7 +12,7 @@ export interface Frame {
   readonly index: OutlineFile[] | null;
   /** The top bar's slots a page fills through PageBar: its path, its tools. */
   readonly slots: { tools: HTMLElement | null; path: HTMLElement | null };
-  /** A page's overlay (a concept's panel over the page) is modal: the top bar and sidebar go inert. */
+  /** A page's overlay (a page's panel over the page) is modal: the top bar and sidebar go inert. */
   setModal(on: boolean): void;
   /** Opens search: a library's quick switcher, or the search of the person's libraries. */
   search(): void;

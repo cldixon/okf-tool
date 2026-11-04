@@ -6,7 +6,7 @@ import { changes, DAY, library, md } from "./changes";
 import { bunSqlHandle } from "./sqlite";
 
 /**
- * TEMPRA-87: a write costs what it changes, not a listing of every file; a concept read does not
+ * TEMPRA-87: a write costs what it changes, not a listing of every file; a page read does not
  * write. Checked by the statements the store sends, and against a fresh store's answers.
  */
 
@@ -36,8 +36,7 @@ const listsPaths = (q: string) =>
   /\bFROM paths\b(?![\s\S]*\bWHERE\b)/i.test(q.replace(/\s+/g, " "));
 /** The statement that loads the head snapshot: every file's row. */
 const loadsHead = (q: string) =>
-  q.replace(/\s+/g, " ").trim() ===
-  "SELECT path, concept_id, hash, kind, last_seq AS seq FROM paths";
+  q.replace(/\s+/g, " ").trim() === "SELECT path, page_id, hash, kind, last_seq AS seq FROM paths";
 const ctx = () => ({ actor: "claude-code/test", request_id: crypto.randomUUID() });
 
 describe("a write costs what it changes (TEMPRA-87)", () => {
@@ -62,7 +61,7 @@ describe("a write costs what it changes (TEMPRA-87)", () => {
         op: "write",
         path: "d1/c1.md",
         content: md("T 1", "# C1\n\nSee [two](/d2/c2.md#nope) and [gone](/d2/gone.md).\n"),
-        if_match: cur.kind === "concept" ? cur.hash : null,
+        if_match: cur.kind === "page" ? cur.hash : null,
       },
     ]);
     expect(sent.filter(listsPaths)).toEqual([]);
@@ -72,7 +71,7 @@ describe("a write costs what it changes (TEMPRA-87)", () => {
     store.summary();
     store.work();
     expect(sent.filter(loadsHead)).toEqual([]);
-    const codes = after.kind === "concept" ? after.lint.map((l) => l.code) : [];
+    const codes = after.kind === "page" ? after.lint.map((l) => l.code) : [];
     expect(codes).toContain("broken_link");
     expect(codes).toContain("missing_heading");
   });
@@ -106,21 +105,20 @@ describe("search rows found by rowid (TEMPRA-87)", () => {
         .query("SELECT COUNT(*) AS n FROM fts WHERE rowid NOT IN (SELECT fts_rowid FROM fts_rows)")
         .get() as { n: number }
     ).n,
-    concepts: (
-      db.query("SELECT COUNT(*) AS n FROM paths WHERE kind = 'concept'").get() as { n: number }
-    ).n,
+    pages: (db.query("SELECT COUNT(*) AS n FROM paths WHERE kind = 'page'").get() as { n: number })
+      .n,
   });
 
-  test("one search row per concept, replaced in place, after every kind of change", () => {
+  test("one search row per page, replaced in place, after every kind of change", () => {
     const lib = library();
     for (const step of changes(lib)) {
       const r = rows(lib.db);
       expect({ step, ...r }).toEqual({
         step,
-        fts: r.concepts,
-        mapped: r.concepts,
+        fts: r.pages,
+        mapped: r.pages,
         unmapped: 0,
-        concepts: r.concepts,
+        pages: r.pages,
       });
       for (const q of ["Details", "one", "missing", "Back"]) {
         expect({ step, q, hits: lib.store.search(q) }).toEqual({
@@ -149,16 +147,16 @@ describe("search rows found by rowid (TEMPRA-87)", () => {
         op: "write",
         path: "a/two.md",
         content: md("T two", "# Two\n\nRewritten.\n"),
-        if_match: v.kind === "concept" ? v.hash : null,
+        if_match: v.kind === "page" ? v.hash : null,
       },
     ]);
     const r = rows(lib.db);
-    expect(r).toEqual({ fts: r.concepts, mapped: r.concepts, unmapped: 0, concepts: r.concepts });
+    expect(r).toEqual({ fts: r.pages, mapped: r.pages, unmapped: 0, pages: r.pages });
     expect(reopened.search("Rewritten").results.map((h) => h.path)).toEqual(["a/two.md"]);
   });
 });
 
-describe("a concept read does not write (TEMPRA-87)", () => {
+describe("a page read does not write (TEMPRA-87)", () => {
   test("reads are counted in memory, and usage_count is the same", () => {
     const { db, sql, sent } = recorded();
     const clock = { t: Date.parse("2026-10-01T00:00:00Z") };
@@ -184,7 +182,7 @@ describe("a concept read does not write (TEMPRA-87)", () => {
         ?.usage_count;
     expect(usage()).toBe(5);
     const computed = store.read("p.md", { computed: true });
-    expect(computed.kind === "concept" && computed.markdown).toContain("usage_count: 5");
+    expect(computed.kind === "page" && computed.markdown).toContain("usage_count: 5");
 
     // Flushed by the next write, then counted the same.
     store.apply(ctx(), [{ op: "write", path: "x.md", content: md("T x", "x\n") }]);

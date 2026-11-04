@@ -5,7 +5,7 @@ import type { ItemKind, Notifications } from "./notify";
 import { devOutbox, flushMail, itemLink } from "./notify-mail";
 import { esc } from "./oauth/pages";
 import { devSignIn, html } from "./signin";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /**
  * The person's inbox and mail settings (TEMPRA-72, TEMPRA-74), for a signed-in session only:
@@ -17,7 +17,8 @@ import { OkfError } from "./store/errors";
 type C = Context<any>;
 
 export function notificationsOf(d: Deps): Notifications {
-  if (!d.notifications) throw new OkfError(501, "unavailable", "Notifications are not wired here.");
+  if (!d.notifications)
+    throw new StoreError(501, "unavailable", "Notifications are not wired here.");
   return d.notifications;
 }
 
@@ -44,7 +45,7 @@ export function registerInboxApi(
   const person = async (c: C) => {
     const d = deps(c.env);
     if (c.req.header("Authorization") !== undefined) {
-      throw new OkfError(403, "session_only", "The inbox is read only from the app's pages.");
+      throw new StoreError(403, "session_only", "The inbox is read only from the app's pages.");
     }
     const user = await signedIn(c, d);
     return { d, n: notificationsOf(d), user };
@@ -57,7 +58,7 @@ export function registerInboxApi(
   /** A library by {owner}/{slug}, among those the person reaches; 404 otherwise. */
   const reachableNamed = async (d: Deps, user: User, name: string) => {
     const lib = (await d.accounts.reachable(user.id)).find((l) => `${l.owner}/${l.slug}` === name);
-    if (!lib) throw new OkfError(404, "no_library", `There is no library ${name}.`);
+    if (!lib) throw new StoreError(404, "no_library", `There is no library ${name}.`);
     return lib;
   };
 
@@ -123,7 +124,7 @@ export function registerInboxApi(
     const { n, user } = await person(c);
     const b = await body<{ done: unknown }>(c);
     const ok = await n.markDone(user.id, c.req.param("id"), b.done !== false);
-    if (!ok) throw new OkfError(404, "not_found", "No such item in your inbox.");
+    if (!ok) throw new StoreError(404, "not_found", "No such item in your inbox.");
     return c.json({ done: b.done !== false });
   });
 
@@ -139,7 +140,7 @@ export function registerInboxApi(
     const { n, user } = await person(c);
     const b = await body<{ email: unknown }>(c);
     if (typeof b.email !== "boolean") {
-      throw new OkfError(400, "bad_request", "Send { email: true } or { email: false }.");
+      throw new StoreError(400, "bad_request", "Send { email: true } or { email: false }.");
     }
     await n.setPrefs(user.id, { email: b.email });
     return c.body(null, 204);
@@ -186,7 +187,7 @@ export function registerInboxApi(
   // ------------------------------------------------------------------ local dev outbox
 
   const devOnly = (c: C) => {
-    if (!devSignIn(c.req.raw, c.env)) throw new OkfError(404, "no_route", "No such route.");
+    if (!devSignIn(c.req.raw, c.env)) throw new StoreError(404, "no_route", "No such route.");
   };
 
   app.get("/_dev/mail", (c) => {

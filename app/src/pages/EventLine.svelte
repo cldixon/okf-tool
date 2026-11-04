@@ -46,5 +46,5 @@
     {/if}
   </td>
   <td class="events-kind">{row.kind}</td>
-  <td class="events-path"><a href={href}><code>{e.path}</code></a>{#if row.note}<span class="events-note">{row.note}</span>{/if}{#if DIFFABLE.has(e.op) && e.path.endsWith(".md")}<!-- This version as it was, on the concept's own page (History marks it there). --><a class="events-aside" href={urls.diff(e.path, undefined, e.seq)}>Version</a>{/if}{#if revert}<a class="events-aside" href={urls.revert(row.request.request_id)}>Revert…</a>{/if}</td>
+  <td class="events-path"><a href={href}><code>{e.path}</code></a>{#if row.note}<span class="events-note">{row.note}</span>{/if}{#if DIFFABLE.has(e.op) && e.path.endsWith(".md")}<!-- This version as it was, on the page itself (History marks it there). --><a class="events-aside" href={urls.diff(e.path, undefined, e.seq)}>Version</a>{/if}{#if revert}<a class="events-aside" href={urls.revert(row.request.request_id)}>Revert…</a>{/if}</td>
 </tr>

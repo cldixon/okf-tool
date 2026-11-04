@@ -25,7 +25,7 @@ export interface InboxItem {
   library_title: string | null;
   path: string | null;
   thread: string | null;
-  /** The concept's title, when the item is on one. */
+  /** The page's title, when the item is on one. */
   title: string | null;
   actor: string;
   /** Who did it, as people read it: an agent by its name, a person by their handle. */

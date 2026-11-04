@@ -9,8 +9,8 @@ import {
   tokenTag,
   userTag,
 } from "./authcache";
-import { sha256Hex } from "./okf/hash";
-import { OkfError } from "./store/errors";
+import { sha256Hex } from "./format/hash";
+import { StoreError } from "./store/errors";
 
 /** A bearer token bound to one actor and one library (spec: Auth, identity and actors). */
 export interface TokenInfo {
@@ -43,7 +43,7 @@ export type Authenticate = (secret: string) => Promise<TokenInfo>;
 export const hashToken = (secret: string) => sha256Hex(secret);
 
 export function newTokenSecret(): string {
-  return `okf_${bytesToHex(randomBytes(24))}`;
+  return `tempra_${bytesToHex(randomBytes(24))}`;
 }
 
 interface TokenRow {
@@ -106,18 +106,18 @@ export function d1Authenticate(
       cache.set(hash, hit, cacheMs, tags, since);
     }
     const row = hit.row;
-    if (!row) throw new OkfError(401, "bad_token", "Unknown bearer token.");
-    if (row.revoked) throw new OkfError(401, "token_revoked", "This token has been revoked.");
-    if (row.suspended) throw new OkfError(401, "suspended", "This account is suspended.");
+    if (!row) throw new StoreError(401, "bad_token", "Unknown bearer token.");
+    if (row.revoked) throw new StoreError(401, "token_revoked", "This token has been revoked.");
+    if (row.suspended) throw new StoreError(401, "suspended", "This account is suspended.");
     if (row.expires && Date.parse(row.expires) <= now()) {
-      throw new OkfError(401, "token_expired", "This token has expired.");
+      throw new StoreError(401, "token_expired", "This token has expired.");
     }
     // A token acts for the person who minted it: the owner (or, for tokens minted before
     // creators were recorded, the owner's), else a member, at most at their role now.
     const role: Role | null =
       row.created_by === null || row.created_by === row.owner_id ? "owner" : row.member_role;
     if (!role) {
-      throw new OkfError(401, "no_access", "This token's creator no longer has its library.");
+      throw new StoreError(401, "no_access", "This token's creator no longer has its library.");
     }
     return {
       id: row.id,

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Segmented } from "@tempra/design/components";
-  import { threadElementId } from "../concept/panel";
+  import { threadElementId } from "../page/panel";
   import { usePresence } from "../presence.svelte.ts";
   import type { Urls } from "../urls";
   import { type Draft, type Placed, panelOrder } from "./data";
@@ -11,8 +11,8 @@
    * The Comments panel's list (take 4, TEMPRA-114; tempra-dev: app/comments, In the app): Open and
    * Resolved n, a box to start a comment on the page (TEMPRA-172), or the draft in its place while
    * one is being written, then the threads in document order
-   * (those on the whole concept and outdated ones first), the active one as a card, the others
-   * compact. Its frame (title, count, ×) is the concept's Panel.
+   * (those on the whole page and outdated ones first), the active one as a card, the others
+   * compact. Its frame (title, count, ×) is the page's Panel.
    */
   let props: {
     urls: Urls;

@@ -332,7 +332,7 @@
   overflow-wrap: anywhere;
 }
 
-/* The concepts it touched: what happened, the title, the words changed. */
+/* The pages it touched: what happened, the title, the words changed. */
 .entry-touched {
   display: flex;
   flex-direction: column;
@@ -780,11 +780,11 @@ a.activity-download {
 }
 
 /* The home's Comments panel (TEMPRA-222): the threads on the library itself, opened from the
-   page's actions. The home has no side column, so where a concept's panel would sit beside the
-   text it overlays the page's right edge instead (narrower, and on a phone, concept.css's rules
+   page's actions. The home has no side column, so where a page's panel would sit beside the
+   text it overlays the page's right edge instead (narrower, and on a phone, page.css's rules
    already make it an overlay and the sheet). */
 @container page (width >= 1100px) {
-  .home-panel .concept-panel {
+  .home-panel .page-aside {
     position: fixed;
     top: var(--tempra-size-topbar);
     right: 0;

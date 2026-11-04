@@ -63,7 +63,7 @@ export interface ConsentForm {
 
 /** Whether consent offers "Create libraries": not when the app asked for read access only. */
 export function offersCreate(details: Pick<ConsentDescription, "scope">): boolean {
-  return details.scope.length === 0 || details.scope.includes("okf:write");
+  return details.scope.length === 0 || details.scope.includes("tempra:write");
 }
 
 /**

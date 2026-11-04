@@ -2,7 +2,7 @@ import type { Accounts, LibraryRef, MemberRole, Role, User } from "./accounts";
 import { agentId, type ClientSignals, connectionAgent } from "./agents";
 import type { TokenInfo } from "./auth";
 import { type AuthCache, libraryTag, userTag } from "./authcache";
-import { OkfError } from "./store/errors";
+import { StoreError } from "./store/errors";
 
 /**
  * The one place that decides whether a caller may reach a library (v2 spec: Tenancy and
@@ -18,8 +18,8 @@ export type Caller = { user: User } | { token: TokenInfo };
 /** A library the caller may reach, with what they may do there. */
 export type Authorized = LibraryRef & { role: Role };
 
-export function noLibrary(owner: string, slug: string): OkfError {
-  return new OkfError(404, "no_library", `There is no library ${owner}/${slug}.`);
+export function noLibrary(owner: string, slug: string): StoreError {
+  return new StoreError(404, "no_library", `There is no library ${owner}/${slug}.`);
 }
 
 /**
@@ -74,7 +74,7 @@ export function sessionToken(user: User, { role, ...library }: Authorized): Toke
 /** Refuses anything but the library's owner (or a token acting for them). */
 export function requireOwner(role: Role, what: string): void {
   if (role !== "owner") {
-    throw new OkfError(403, "owner_only", `Only the library's owner can ${what}.`);
+    throw new StoreError(403, "owner_only", `Only the library's owner can ${what}.`);
   }
 }
 
@@ -214,9 +214,9 @@ export async function createLibraryForGrant(
   description: string | null;
 }> {
   const why = cannotCreate(grant);
-  if (why) throw new OkfError(403, "create_not_allowed", why);
+  if (why) throw new StoreError(403, "create_not_allowed", why);
   const user = await accounts.account(grant.userId);
-  if (!user) throw new OkfError(401, "suspended", "This account is suspended or deleted.");
+  if (!user) throw new StoreError(401, "suspended", "This account is suspended or deleted.");
   const { title, description, ...library } = await accounts.createLibrary(input.slug, user, {
     title: input.title,
     description: input.description,

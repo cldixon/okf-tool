@@ -3,7 +3,7 @@
  * recently, by surface and by agent or person, never by whom. Counted in memory and flushed in
  * batches as TEMPRA-87 counts reads (store.ts), so a read never writes. Free of Worker APIs.
  */
-import { sha256Hex } from "../okf/hash";
+import { sha256Hex } from "../format/hash";
 
 /** Where a read came from: MCP, the app (a person's session), or the REST API with a token. */
 export type ReadSurface = "mcp" | "app" | "api";
@@ -27,7 +27,7 @@ export interface Reading {
 
 /**
  * A reader's stored key: a SHA-256 of who it is (`a:<agent>` or `p:<person>`), so the read log
- * keeps no raw person or actor id. Synchronous (okf/hash.ts, not WebCrypto).
+ * keeps no raw person or actor id. Synchronous (format/hash.ts, not WebCrypto).
  */
 export function readerKey(who: string): string {
   return sha256Hex(`tempra-reader:${who}`).slice(0, 32);

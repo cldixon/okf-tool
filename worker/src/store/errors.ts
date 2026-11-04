@@ -1,5 +1,5 @@
 /** An error with an HTTP status, rendered as `{ error, code, detail }` (spec: HTTP API conventions). */
-export class OkfError extends Error {
+export class StoreError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
@@ -14,4 +14,4 @@ export class OkfError extends Error {
   }
 }
 
-export const notFound = (path: string) => new OkfError(404, "not_found", `No file at ${path}.`);
+export const notFound = (path: string) => new StoreError(404, "not_found", `No file at ${path}.`);

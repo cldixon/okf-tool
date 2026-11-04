@@ -17,7 +17,7 @@ export { MAX_CHART_SOURCE, PELE_MESSAGE_FORMAT, PELE_VERSION, peleMessage };
 /** Where renders live in the deployment's blobs bucket; the blob sweep works on blobs/ only. */
 export const RENDERS_PREFIX = "renders/";
 
-/** The largest source drawn, in characters (a concept is under 100 KB). */
+/** The largest source drawn, in characters (a page is under 100 KB). */
 export const MAX_SOURCE = 50_000;
 /** The widest drawing asked for, in CSS pixels. */
 export const MAX_WIDTH = 4_000;

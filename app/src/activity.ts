@@ -7,7 +7,7 @@ import type { ActivityFilters, Urls } from "./urls";
 /*
  * Activity (take 4, TEMPRA-115; tempra-dev: app/activity): what happened, for people. One entry per
  * request, told as a sentence of what it did ("Claude Code changed 3 pages in The app"), with
- * its note and the concepts it touched. The Activity page draws them grouped by day
+ * its note and the pages it touched. The Activity page draws them grouped by day
  * (EntryRow.svelte, LiveEntry.svelte); the hooks are in activity.svelte.ts.
  */
 
@@ -20,7 +20,7 @@ export interface LedgerEvent {
   path: string;
   prev_hash: string | null;
   hash: string | null;
-  concept_id: string;
+  page_id: string;
   meta: Record<string, unknown> | null;
 }
 
@@ -34,7 +34,7 @@ export interface LedgerRequest {
   events: LedgerEvent[];
 }
 
-/** What a request did to one concept or file. */
+/** What a request did to one page or file. */
 type What = "added" | "edited" | "rewrote" | "moved" | "deleted" | "reverted";
 
 /**
@@ -51,7 +51,7 @@ interface Words {
 const rewrote = (w: Words | null) =>
   w !== null && w.before !== undefined && w.before > 0 && w.removed * 2 > w.before;
 
-/** A concept or file a request touched, and what happened to it. */
+/** A page or file a request touched, and what happened to it. */
 export interface Touched {
   path: string;
   title: string;
@@ -63,10 +63,10 @@ export interface Touched {
   seq: number;
 }
 
-/** A piece of an entry's sentence: words, a concept to link, or a folder to link. */
+/** A piece of an entry's sentence: words, a page to link, or a folder to link. */
 export type Part =
   | string
-  | { concept: string; title: string; seq: number; gone: boolean; words: Words | null }
+  | { page: string; title: string; seq: number; gone: boolean; words: Words | null }
   | { folder: string };
 
 /** One request as Activity tells it. */
@@ -116,19 +116,19 @@ const asWords = (v: unknown): Words | null => {
     : { added: w.added, removed: w.removed };
 };
 
-const isConcept = (path: string) => path.endsWith(".md");
+const isPage = (path: string) => path.endsWith(".md");
 
-/** What a request's content events did, one row per concept, in the order it was first touched. */
+/** What a request's content events did, one row per page, in the order it was first touched. */
 export function touchedBy(events: LedgerEvent[], titleOf: TitleOf): Touched[] {
-  const byConcept = new Map<string, LedgerEvent[]>();
+  const byPage = new Map<string, LedgerEvent[]>();
   for (const e of events) {
     if (e.op === "comment" || e.op === "verify") continue;
-    const list = byConcept.get(e.concept_id) ?? [];
+    const list = byPage.get(e.page_id) ?? [];
     list.push(e);
-    byConcept.set(e.concept_id, list);
+    byPage.set(e.page_id, list);
   }
   const out: Touched[] = [];
-  for (const evs of byConcept.values()) {
+  for (const evs of byPage.values()) {
     const last = evs[evs.length - 1] as LedgerEvent;
     const created = evs.some((e) => (e.op === "put" || e.op === "import") && e.prev_hash === null);
     const counted = evs.map((e) => asWords(e.meta?.words)).filter((w) => w !== null);
@@ -167,8 +167,8 @@ export function touchedBy(events: LedgerEvent[], titleOf: TitleOf): Touched[] {
   return out;
 }
 
-const conceptPart = (t: Touched, withWords: boolean): Part => ({
-  concept: t.path,
+const pagePart = (t: Touched, withWords: boolean): Part => ({
+  page: t.path,
   title: t.title,
   seq: t.seq,
   gone: t.what === "deleted",
@@ -192,7 +192,7 @@ function wherePart(paths: string[]): Part[] {
 /** The content clause: "rewrote A and added B", or "changed 3 pages in The app". */
 function contentClauses(touched: Touched[], imported: boolean): Part[][] {
   if (touched.length === 0) return [];
-  const unit = touched.every((t) => isConcept(t.path)) ? "page" : "file";
+  const unit = touched.every((t) => isPage(t.path)) ? "page" : "file";
   const verbs = [...new Set(touched.map((t) => t.what))];
   if (imported) {
     return [[`imported ${plural(touched.length, unit)}`, ...wherePart(touched.map((t) => t.path))]];
@@ -203,7 +203,7 @@ function contentClauses(touched: Touched[], imported: boolean): Part[][] {
   }
   return verbs.map((verb) => [
     `${verb} `,
-    ...joinParts(touched.filter((t) => t.what === verb).map((t) => [conceptPart(t, true)])),
+    ...joinParts(touched.filter((t) => t.what === verb).map((t) => [pagePart(t, true)])),
   ]);
 }
 
@@ -222,7 +222,7 @@ function commentClauses(events: LedgerEvent[], titleOf: TitleOf): Part[][] {
   // A library thread (TEMPRA-222) is on no page.
   const on = (t: { path: string; seq: number }): Part =>
     t.path
-      ? { concept: t.path, title: titleOf(t.path), seq: t.seq, gone: false, words: null }
+      ? { page: t.path, title: titleOf(t.path), seq: t.seq, gone: false, words: null }
       : "the library";
   const list = [...threads.values()];
   if (list.length > 2) {
@@ -248,7 +248,7 @@ function verifyClauses(events: LedgerEvent[], titleOf: TitleOf): Part[][] {
   for (const e of events) if (e.op === "verify") seen.set(e.path, e);
   if (seen.size === 0) return [];
   const items: Part[][] = [...seen.values()].map((e) => [
-    { concept: e.path, title: titleOf(e.path), seq: e.seq, gone: false, words: null },
+    { page: e.path, title: titleOf(e.path), seq: e.seq, gone: false, words: null },
   ]);
   if (items.length > 2)
     return [["verified ", ...(items[0] ?? []), ` and ${items.length - 1} more`]];
@@ -341,7 +341,7 @@ export const KINDS = [
   "import",
 ] as const;
 
-/** An event's kind as the table names it: a new concept is a write, a new version an edit. */
+/** An event's kind as the table names it: a new page is a write, a new version an edit. */
 export function kindOf(e: Pick<LedgerEvent, "op" | "prev_hash">): string {
   if (e.op === "put") return e.prev_hash === null ? "write" : "edit";
   return e.op;

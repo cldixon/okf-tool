@@ -1,6 +1,6 @@
 /**
  * `bun run build` in design/: bundles src/*.css (fonts, tokens, base, prose, reader, workspace,
- * concept, comments, views, public, in that order) into dist/tempra.css for the site, and
+ * page, comments, views, public, in that order) into dist/tempra.css for the site, and
  * dist/tempra.ts for the app: the stylesheet with its fonts (design/fonts/*.woff2) at
  * content-hashed URLs, and which font file each URL names. The app's build writes them, with
  * favicon.svg, into the Worker's static assets (TEMPRA-174); the Worker itself takes only `href`.
@@ -21,7 +21,7 @@ export const SOURCES = [
   "prose.css",
   "reader.css",
   "workspace.css",
-  "concept.css",
+  "page.css",
   "comments.css",
   "views.css",
   "public.css",

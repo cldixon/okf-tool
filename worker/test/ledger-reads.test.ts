@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { type LogRequest, renderLog } from "../src/okf/derived";
-import { normalizeDir, underPrefix } from "../src/okf/paths";
+import { type LogRequest, renderLog } from "../src/format/derived";
+import { normalizeDir, underPrefix } from "../src/format/paths";
 import type { SqlHandle } from "../src/store/sql";
 import { type EventRow, LibraryStore, type RequestContext } from "../src/store/store";
 import { changes, library, md } from "./changes";
@@ -24,17 +24,9 @@ describe("summary and health without the whole ledger (TEMPRA-86)", () => {
           step,
           soon: store.work({ kind: "stale_soon" }).total,
         });
-        // Types and counts, as a walk over every file reads them.
+        // Counts, as a walk over every file reads them.
         const files = store.outline().files;
-        const types: Record<string, number> = {};
-        for (const f of files.filter((f) => f.kind === "concept")) {
-          const v = store.read(f.path);
-          const t = v.kind === "concept" ? String(v.frontmatter.type ?? "") || "(no type)" : "";
-          types[t] = (types[t] ?? 0) + 1;
-        }
-        expect({ step, types: s.types }).toEqual({ step, types });
-        expect(Object.keys(s.types)).toEqual(Object.keys(types));
-        expect(s.concepts).toBe(files.filter((f) => f.kind === "concept").length);
+        expect(s.pages).toBe(files.filter((f) => f.kind === "page").length);
         expect(s.open_comments).toBe(work.counts.comment ?? 0);
         // The health process's counts, worked out now.
         const h = store.maintainHealth();
@@ -190,9 +182,9 @@ describe("log.md (TEMPRA-86)", () => {
       if (e.op === "comment" || !underPrefix(e.path, prefix)) continue;
       byReq.set(e.request_id, [...(byReq.get(e.request_id) ?? []), e]);
     }
-    // Where each concept is as of `at`: its last content event, unless that removed it.
+    // Where each page is as of `at`: its last content event, unless that removed it.
     const last = new Map<string, EventRow>();
-    for (const e of all) if (e.seq <= at && e.op !== "comment") last.set(e.concept_id, e);
+    for (const e of all) if (e.seq <= at && e.op !== "comment") last.set(e.page_id, e);
     const now = new Map([...last].map(([id, e]) => [id, e.hash === null ? null : e.path]));
     const reqs = [...byReq.values()];
     const shown = limit === undefined ? reqs : reqs.slice(0, limit);
@@ -210,7 +202,7 @@ describe("log.md (TEMPRA-86)", () => {
           path: e.path,
           created: e.prev_hash === null,
           fromPath: typeof e.meta?.from_path === "string" ? e.meta.from_path : null,
-          current: now.get(e.concept_id) ?? null,
+          current: now.get(e.page_id) ?? null,
         })),
       };
     });
@@ -258,7 +250,7 @@ describe("log.md (TEMPRA-86)", () => {
             op: "write" as const,
             path: `d/f${k}.md`,
             content: md(`F${k}`, `Revision ${i}.`),
-            if_match: view?.kind === "concept" ? view.hash : undefined,
+            if_match: view?.kind === "page" ? view.hash : undefined,
           };
         }),
       );
@@ -275,9 +267,9 @@ describe("log.md (TEMPRA-86)", () => {
     // The cursor picks up where the file stops.
     expect(store.requests({ before: cursor, limit: 1 }).requests[0]?.note).toBe("change 249");
     expect(store.log({ prefix: "d" })).toContain(`requests?before=${cursor}&prefix=d`);
-    // A short log has no pointer; the export lists every request.
+    // A short log has no pointer; an OKF export lists every request.
     expect(store.log({ at: 30 })).not.toContain("Older ones");
-    const exported = store.exportBundle().files.find((f) => f.path === "log.md");
+    const exported = store.exportBundle(undefined, "okf").files.find((f) => f.path === "log.md");
     const all = [...(exported?.text ?? "").matchAll(/change (\d+)/g)];
     expect(all.length).toBe(450);
     expect(exported?.text).not.toContain("Older ones");

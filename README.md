@@ -1,8 +1,10 @@
 # Tempra
 
-A hosted, agent-first store for Open Knowledge Format (OKF) bundles on Cloudflare.
+A hosted, agent-first store for libraries of markdown pages on Cloudflare, kept by people and their
+agents. Libraries import from and export to Google's Open Knowledge Format (OKF) on request.
 
-The spec lives in Claude Docs, not in this repo:
+The design lives in the Tempra library `cl_dixon/tempra-dev` (see `CLAUDE.md`); the original
+spec is in Claude Docs, not in this repo:
 **OKF Knowledge Service — Spec** — https://claude.ai/artifact/KMuKyyFBSJHzukyEGqvUDn, and the
 managed service built on it, **v2 Spec** — https://claude.ai/code/artifact/cea3e8c6-4161-4f53-aa6d-54093bc7ed75
 
@@ -73,21 +75,22 @@ bun run gate    # gate: round-trip Google's sample bundles and more through cf d
 With the dev server running and a seeded token:
 
 ```sh
-T=okf_...   # from bun run seed
+T=tempra_...   # from bun run seed
 L=http://localhost:8787/api/v1/libraries/dev/dev   # {owner handle}/{library}
 curl -X PUT -H "Authorization: Bearer $T" -H 'If-None-Match: *' -H 'X-Note: first note' \
-  --data-binary $'---\ntype: Note\ntitle: Hello\n---\nHello.\n' $L/files/notes/hello.md
-curl -H "Authorization: Bearer $T" $L/files/notes/hello.md       # rendered OKF markdown, ETag = hash
+  --data-binary $'---\ntitle: Hello\ndescription: A first page.\n---\nHello.\n' $L/files/notes/hello.md
+curl -H "Authorization: Bearer $T" $L/files/notes/hello.md       # the page's markdown, ETag = hash
 curl -H "Authorization: Bearer $T" $L/files/index.md             # synthesized
 curl -H "Authorization: Bearer $T" "$L/grep?pattern=Hello"
 curl -H "Authorization: Bearer $T" $L/requests                   # the ledger, newest first
 curl -X POST -H "Authorization: Bearer $T" -H 'Content-Type: application/x-tar' \
-  --data-binary @bundle.tar "$L/import?strip=1"                  # import a bundle tarball
-curl -H "Authorization: Bearer $T" -o out.tar $L/export          # export a conformant bundle
+  --data-binary @bundle.tar "$L/import?strip=1"                  # import a tarball (an OKF bundle too)
+curl -H "Authorization: Bearer $T" -o out.tar $L/export          # export the files
+curl -H "Authorization: Bearer $T" -o okf.tar "$L/export?format=okf"  # or an OKF bundle
 ```
 
 Routes are listed in the spec's HTTP API section; Phase 1 ships `/files` (GET, PUT, PATCH, DELETE,
-move), `/batch`, `/tree`, `/grep`, `/concepts`, `/search`, `/links`, `/events`, `/requests`,
+move), `/batch`, `/tree`, `/grep`, `/pages`, `/search`, `/links`, `/events`, `/requests`,
 `/history`, `/revert`, `/import` and `/export`; Phase 2 adds `/sources`, `/diff`, `/work`, `/verify`
 and short-lived `/dl/…` download links.
 
@@ -95,22 +98,22 @@ and short-lived `/dl/…` download links.
 
 `https://<your-host>/` is the built-in UI, for the signed-in person (see
 [Deploy your own](#deploy-your-own), step 2). It lists your libraries, each at
-`/<your handle>/<library>/` (library pages such as the ledger sit under `/-/`, e.g. `/<handle>/<library>/-/ledger`); each library page shows its directories and concepts with
-their type, trust tier and staleness. A concept page renders the body, with the frontmatter, the
+`/<your handle>/<library>/` (library pages such as the ledger sit under `/-/`, e.g. `/<handle>/<library>/-/ledger`); each library page shows its directories and pages with
+their trust tier and staleness. A page renders the body, with the frontmatter, the
 sources (footnotes resolved, internal sources with their own trust and staleness), inbound links and
 the history beside it. Every page takes `?at=<seq>` to show the library as it was then, and a
-concept's raw markdown is one click away.
+page's raw markdown is one click away.
 
 The **ledger** lists every change request newest first (who, when, their note, the files touched),
-filtered by directory, actor and date. Each change has a diff, each concept links to "changes since
+filtered by directory, actor and date. Each change has a diff, each page links to "changes since
 human verification", and any request can be **reverted** (or one file restored to an earlier
 version) after a confirmation page; reverts are recorded as your own requests, so they can be undone
 too.
 
-**Verify** on a concept records that you checked its current version: the trust tier becomes
-human-reviewed until the next edit lapses it. The **work queue** lists stale concepts, broken links and
-lint, most linked-to first. **Import & export** downloads a library as a conformant bundle (at any
-sequence) and imports a `.tar` or `.tar.gz` as one revertible request. The **Libraries** page creates
+**Verify** on a page records that you checked its current version: the trust tier becomes
+human-reviewed until the next edit lapses it. The **work queue** lists stale pages, broken links and
+lint, most linked-to first. **Import & export** downloads a library's files, or an OKF bundle (at any
+sequence), and imports a `.tar` or `.tar.gz` as one revertible request. The **Libraries** page creates
 libraries, and **Tokens** mints, lists and revokes bearer tokens. There is no editor, by design: ask an
 agent.
 
@@ -147,7 +150,7 @@ claude mcp add --transport http tempra https://<your-host>/mcp \
 Tier 1 tools mirror file work (`start`, `browse`, `read`, `write`, `edit`, `grep`, `move`,
 `delete`, `batch`, `attach`); tier 2 adds what files lack (`search`, `query`, `links`, `sources`,
 `log`, `history`, `diff`, `revert`, `work`, `export`, and `verify` for `process:` tokens). A
-connection limited to file tools sees tier 1 only. [`skills/okf/SKILL.md`](skills/okf/SKILL.md)
+connection limited to file tools sees tier 1 only. [`skills/tempra/SKILL.md`](skills/tempra/SKILL.md)
 teaches the workflow to agents that load skills.
 
 ## Operations
@@ -170,7 +173,7 @@ teaches the workflow to agents that load skills.
   `POST /api/v1/libraries/<owner>/<lib>/restore` with `{ "to": "<ISO time>" }` or
   `{ "undo": "<id>" }`, and `GET /api/v1/libraries/<owner>/<lib>/restores`; `worker/scripts/restore-smoke.ts` runs a restore and undo
   against a deployed Worker.
-- **Usage.** Reads of a concept's current version are counted per day; internal sources show their
+- **Usage.** Reads of a page's current version are counted per day; internal sources show their
   read count over the last 30 days, and the same run prunes older counts.
 - **Health and stats.** `GET /healthz` checks D1, R2 and the Durable Object namespace (503 with the
   failing one otherwise). `GET /api/v1/libraries/<owner>/<lib>/stats` reports paths, events, requests,

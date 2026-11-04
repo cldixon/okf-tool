@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { OkfError } from "../src/store/errors";
+import { StoreError } from "../src/store/errors";
 import { LibraryStore, type RequestContext } from "../src/store/store";
 import { bunSqlHandle } from "./sqlite";
 
@@ -25,7 +25,7 @@ const doc = (title: string, fm = "", body = "Revenue minus cost.") =>
   `---\ntype: Metric\ntitle: ${title}\ndescription: About ${title}.\n${fm}---\n# ${title}\n\n${body}\n`;
 
 function write(s: LibraryStore, c: RequestContext, path: string, content = doc(path)) {
-  const if_match = s.concepts().items.find((i) => i.path === path)?.hash ?? null;
+  const if_match = s.pages().items.find((i) => i.path === path)?.hash ?? null;
   return s.apply(c, [{ op: "write", path, content, if_match }]);
 }
 
@@ -52,7 +52,7 @@ function seeded() {
 }
 
 describe("an attachment's links", () => {
-  test("the concepts that use it, and none of its own", () => {
+  test("the pages that use it, and none of its own", () => {
     const s = seeded();
     write(s, agent(), "about.md", doc("About", "", "![chart](/metrics/chart.png)"));
     write(s, agent(), "metrics/margin.md", doc("Margin", "", "See [the chart](chart.png)."));
@@ -61,6 +61,6 @@ describe("an attachment's links", () => {
     expect(links.outbound).toEqual([]);
     expect(links.broken).toEqual([]);
     expect(s.links("metrics/img/logo.png").inbound).toEqual([]);
-    expect(() => s.links("metrics/none.png")).toThrow(OkfError);
+    expect(() => s.links("metrics/none.png")).toThrow(StoreError);
   });
 });

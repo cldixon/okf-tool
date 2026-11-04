@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { flushSync } from "svelte";
 import CommentsList from "./src/comments/CommentsList.svelte";
 import { commentParts, type Placed } from "./src/comments/data";
-import PageActions from "./src/concept/PageActions.svelte";
 import { type FeedEvent, feedOf } from "./src/live";
+import PageActions from "./src/page/PageActions.svelte";
 import { type PresenceMessage, PresenceStore } from "./src/presence";
 import { Urls } from "./src/urls";
 import { draw, settle } from "./test/dom";
@@ -31,7 +31,7 @@ const comment = (seq: number, thread: string, actor = AGENT, path = "a.md"): Fee
   request_id: `r${seq}`,
   op: "comment",
   path,
-  concept_id: "c1",
+  page_id: "c1",
   hash: "h",
   note: null,
   from_path: null,

@@ -2,7 +2,7 @@
   import { dirOf, folderName } from "./urls";
 
   /**
-   * A concept's path in the top bar, as Linear's docs have it (TEMPRA-145): its folders, words and
+   * A page's path in the top bar, as Linear's docs have it (TEMPRA-145): its folders, words and
    * not links (folders are not pages), then its title.
    */
   let props: { path: string; title: string } = $props();

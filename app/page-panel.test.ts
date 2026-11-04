@@ -14,7 +14,7 @@ function payload(over: Partial<PagePayload> = {}): PagePayload {
   return {
     v: 1,
     library: { owner: "ann", slug: "notes" },
-    concept: {
+    page: {
       path: "metrics/margin.md",
       seq: 4,
       title: "Margin",
@@ -62,7 +62,7 @@ afterEach(() => {
 
 describe("the page panel", () => {
   test("pageFrom takes a show result's page and nothing else", () => {
-    expect(pageFrom({ structuredContent: { page: payload() } })?.concept.title).toBe("Margin");
+    expect(pageFrom({ structuredContent: { page: payload() } })?.page.title).toBe("Margin");
     expect(pageFrom({ structuredContent: { upload: {} } })).toBeNull();
     expect(pageFrom({ structuredContent: { page: { v: 2 } } })).toBeNull();
     expect(pageFrom(null)).toBeNull();
