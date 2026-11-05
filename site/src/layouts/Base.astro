@@ -1,8 +1,9 @@
 ---
 /**
- * Every page: a skip link, the wordmark and the way into the app over a hairline, the page as a
- * plain column, and the footer's links. Flat like the app (TEMPRA-126), all of it from the shared
- * design package's public pages (`public.css`); the site adds no styles of its own.
+ * Every page: a skip link, the large lockup and the one way into the app (Sign in), the page, and
+ * the footer's links (TEMPRA-286, the site's frame: `.public.site`). Flat like the app
+ * (TEMPRA-126), all of it from the shared design package's public pages (`public.css`); the site
+ * adds no styles of its own. The landing page fills the window (`landing`).
  */
 import "@tempra/design/tempra.css";
 import favicon from "@tempra/design/favicon.svg?url";
@@ -14,9 +15,11 @@ interface Props {
   description: string;
   /** Keep the page out of search results (the 404 page). */
   noindex?: boolean;
+  /** The landing page: one window, its doc in place of the plain column. */
+  landing?: boolean;
 }
 
-const { title, description, noindex = false } = Astro.props;
+const { title, description, noindex = false, landing = false } = Astro.props;
 // The page's one URL, with no trailing slash and no .html (pages build to terms.html; W-9).
 const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.site);
 ---
@@ -41,12 +44,12 @@ const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.sit
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
   </head>
-  <body class="public">
+  <body class:list={["public", "site", { landing }]}>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="public-head">
       <a class="wordmark mark-lockup" href="/"><Fragment set:html={markSvg({ small: true })} />Tempra</a>
       <nav class="public-nav" aria-label="Main">
-        <a class="button primary" href={`${APP}/sign-in`}>Join now</a>
+        <a class="button primary" href={`${APP}/sign-in`}>Sign in</a>
       </nav>
     </header>
     <main id="main" class="public-main">
@@ -55,10 +58,8 @@ const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.sit
     <footer class="public-foot">
       <nav aria-label="Footer">
         <ul role="list">
-          <li><a href="/">Home</a></li>
           <li><a href="/terms">Terms</a></li>
           <li><a href="/privacy">Privacy</a></li>
-          <li><a href={`${APP}/sign-in`}>Join now</a></li>
         </ul>
       </nav>
     </footer>

@@ -113,10 +113,10 @@ describe("each deployment has its own agent queue", () => {
   });
 });
 
-// TEMPRA-284, TEMPRA-287: while production is invite-only, the landing page's one way in is
-// /sign-in, which signs people in or puts them on the list (its words are the site's).
+// TEMPRA-284, TEMPRA-286: while production is invite-only, the landing page's one way in is the
+// Sign in pill in its header, which signs people in or puts them on the list.
 describe("the landing page's calls to action match production's SIGNUP", () => {
-  test("invite in production: /sign-in, never Request access, Sign up or Get started", async () => {
+  test("invite in production: Sign in, never Join now, Request access, Sign up or Get started", async () => {
     const worker = (await (
       await config({ isPreview: false, mode: "production" } as never)
     ).worker) as { env: Record<string, unknown> };
@@ -124,10 +124,10 @@ describe("the landing page's calls to action match production's SIGNUP", () => {
     const site = new URL("../../site/src/", import.meta.url);
     const file = (p: string) => Bun.file(new URL(p, site));
     if (!(await file("pages/index.astro").exists())) return; // worker/ built on its own
+    expect(await file("layouts/Base.astro").text()).toContain("/sign-in`}>Sign in</a>");
     for (const page of ["pages/index.astro", "layouts/Base.astro"]) {
       const text = await file(page).text();
-      expect(text).toContain("/sign-in");
-      expect(text).not.toMatch(/Sign up|Get started|Request access|request-access/);
+      expect(text).not.toMatch(/Join now|Sign up|Get started|Request access|request-access/);
     }
   });
 });
