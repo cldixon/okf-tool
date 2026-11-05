@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import config, { deploymentFor } from "../cloudflare.config";
 import { retryDelayMs, transientCfError } from "./cf-retry";
+import { PROBE_RULE_REF, probeRule } from "./edge-rules";
 
 export const WORKER_DIR = new URL("..", import.meta.url).pathname;
 
@@ -160,6 +161,102 @@ export async function ensureEmailRouting(): Promise<void> {
     const reason = lines.find((l) => /\[\d+\]/.test(l)) ?? lines.find(Boolean) ?? "unknown error";
     console.log(
       `::warning::Email Routing not applied (${reason}). The token needs Email Routing Rules and Addresses permissions; the rules in place keep working.`,
+    );
+  }
+}
+
+/** cf's own reason for a failure (an API error such as "[10000] Authentication error"). */
+function cfReason(e: unknown): string {
+  // The first line of cf's output only names the command; the API's error is a later one.
+  const lines = String((e as Error)?.message ?? e)
+    .split("\n")
+    .map((l) => l.replace(/^[│┌└\s]+/, "").trim());
+  return lines.find((l) => /\[\d+\]/.test(l)) ?? lines.find(Boolean) ?? "unknown error";
+}
+
+interface ZoneRule {
+  id: string;
+  ref?: string;
+  expression?: string;
+  action?: string;
+  enabled?: boolean;
+  description?: string;
+}
+
+/**
+ * Makes the zone's custom WAF rule against scanners' probes match `probeRule()` (TEMPRA-290,
+ * scripts/edge-rules.ts), when `edgeRules` is set for this deployment: the zone's entry point
+ * ruleset for `http_request_firewall_custom` is made with only our rule when it has none, else
+ * our rule (found by its `ref`) is added or corrected; other rules are never touched or reordered.
+ * A failure (a token without Zone WAF Edit, say) is a warning, not a failed deploy: the Worker
+ * answers probes with 404s anyway. Safe to repeat.
+ */
+export async function ensureEdgeRules(): Promise<void> {
+  const edge = deploymentFor(MODE).edgeRules;
+  if (!edge) return;
+  const z = ["-z", edge.zone];
+  const phase = "http_request_firewall_custom";
+  const want = probeRule();
+  try {
+    let ruleset: { id: string; rules?: ZoneRule[] } | null = null;
+    try {
+      ruleset = JSON.parse(
+        await cf(["rulesets", "account-rulesets", "phases", "get", phase, ...z]),
+      ) as { id: string; rules?: ZoneRule[] };
+    } catch (e) {
+      // No entry point yet (10003): it is made below, holding our rule alone.
+      if (!/\[10003\]/.test(String((e as Error)?.message ?? e))) throw e;
+    }
+    if (!ruleset) {
+      console.log(`Edge rules: blocking scanners' probes on ${edge.zone}`);
+      await cf([
+        "rulesets",
+        "account-rulesets",
+        "phases",
+        "update",
+        phase,
+        ...z,
+        "--rules",
+        JSON.stringify([want]),
+      ]);
+      return;
+    }
+    const have = ruleset.rules?.find((r) => r.ref === PROBE_RULE_REF);
+    if (!have) {
+      console.log(`Edge rules: adding the rule against scanners' probes on ${edge.zone}`);
+      await cf([
+        "rulesets",
+        "account-rulesets",
+        "rules",
+        "create",
+        ruleset.id,
+        ...z,
+        "--body",
+        JSON.stringify(want),
+      ]);
+    } else if (
+      have.expression !== want.expression ||
+      have.action !== want.action ||
+      have.enabled !== want.enabled ||
+      have.description !== want.description
+    ) {
+      console.log(`Edge rules: correcting the rule against scanners' probes on ${edge.zone}`);
+      await cf([
+        "rulesets",
+        "account-rulesets",
+        "rules",
+        "update",
+        have.id,
+        "--ruleset-id",
+        ruleset.id,
+        ...z,
+        "--body",
+        JSON.stringify(want),
+      ]);
+    }
+  } catch (e) {
+    console.log(
+      `::warning::Edge rules not applied (${cfReason(e)}). The token needs Zone WAF Edit; the Worker still answers probes itself.`,
     );
   }
 }

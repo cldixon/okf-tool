@@ -61,6 +61,13 @@ export interface Deployment {
    * incoming mail is managed (staging and previews share the production zone's routing).
    */
   inboundMail?: { zone: string; routes: { address: string; to: "operator" }[] };
+  /**
+   * The zone's custom WAF rule against scanners' probes (TEMPRA-290, scripts/edge-rules.ts):
+   * `/.env`, `/.git/…`, `*.php` and the like at one or two path segments, blocked before the
+   * Worker runs. Zone-wide, so it covers staging and previews too. Deploy creates or corrects it
+   * (scripts/cf.ts `ensureEdgeRules`), never touching another rule. Unset: none managed.
+   */
+  edgeRules?: { zone: string };
   /** Analytics Engine dataset for metering; tempra_usage unless set. */
   usage?: string;
   /**
@@ -97,6 +104,7 @@ const PRODUCTION: Deployment = {
   mailFrom: "noreply@mail.tempra.dev",
   // The contact address on the landing page's Terms and Privacy.
   inboundMail: { zone: "tempra.dev", routes: [{ address: "hello@tempra.dev", to: "operator" }] },
+  edgeRules: { zone: "tempra.dev" },
   admin: { name: "tempra-admin", host: "admin.tempra.dev" },
 };
 
