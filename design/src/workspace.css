@@ -141,6 +141,109 @@ body.ground {
   color: var(--tempra-color-text);
 }
 
+/* A page's corner tool (TEMPRA-283; tempra-dev: decisions/page-tools-in-the-corner): the round
+   button outlined, 36px, its glyph in ink; a count beside the glyph makes it a pill; the agent
+   dot on its corner says a newer version waits. Pressed is the selected grey, not ink. */
+.icon-button.outlined {
+  width: var(--tempra-size-control);
+  height: var(--tempra-size-control);
+  border: 1px solid var(--tempra-color-border-strong);
+  border-radius: var(--tempra-radius-pill);
+  color: var(--tempra-color-text);
+}
+
+.icon-button.outlined.has-count {
+  gap: var(--tempra-space-06);
+  width: auto;
+  padding: 0 var(--tempra-space-12);
+}
+
+.icon-button-count {
+  font-size: var(--tempra-text-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.icon-button.outlined:hover:not(:disabled) {
+  background: var(--tempra-color-hover);
+}
+
+.icon-button.outlined[aria-pressed="true"],
+.icon-button.outlined[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: var(--tempra-color-selected);
+  background: var(--tempra-color-selected);
+  color: var(--tempra-color-text);
+}
+
+.icon-button-dot {
+  position: absolute;
+  top: var(--tempra-space-04);
+  right: var(--tempra-space-04);
+  width: var(--tempra-size-dot);
+  height: var(--tempra-size-dot);
+  border-radius: 50%;
+  background: var(--tempra-color-agent);
+  box-shadow: 0 0 0 var(--tempra-space-02) var(--tempra-color-bg);
+}
+
+/* A main action with a ⌄ for the related ones (TEMPRA-283): one outlined pill split by a
+   hairline, each part a button of its own. */
+.split-button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tempra-size-control);
+  border: 1px solid var(--tempra-color-border-strong);
+  border-radius: var(--tempra-radius-pill);
+}
+
+.split-button .menu {
+  display: inline-flex;
+  height: 100%;
+}
+
+.split-main,
+.split-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tempra-color-text);
+}
+
+.split-main {
+  width: var(--tempra-size-control);
+  border-radius: var(--tempra-radius-pill) 0 0 var(--tempra-radius-pill);
+}
+
+.split-more {
+  width: var(--tempra-space-28);
+  border-radius: 0 var(--tempra-radius-pill) var(--tempra-radius-pill) 0;
+}
+
+.split-main:hover:not(:disabled),
+.split-more:hover:not(:disabled) {
+  background: var(--tempra-color-hover);
+}
+
+.split-more[aria-expanded="true"],
+.split-more[aria-expanded="true"]:hover:not(:disabled) {
+  background: var(--tempra-color-selected);
+}
+
+.split-main svg,
+.split-more svg {
+  display: block;
+}
+
+.split-rule {
+  width: 1px;
+  height: var(--tempra-space-20);
+  background: var(--tempra-color-border-strong);
+}
+
 /* The change dot (the one colour): pulsing (.live) for an agent writing now; solid beside an
    empty library's last write. Nothing marks what changed since the person looked (TEMPRA-173). */
 .change-dot {
@@ -1550,6 +1653,22 @@ button.tree-name {
   .icon-button.touch {
     width: var(--tempra-size-touch);
     height: var(--tempra-size-touch);
+  }
+
+  .icon-button.outlined.touch.has-count {
+    width: auto;
+  }
+
+  .split-button.touch {
+    height: var(--tempra-size-touch);
+  }
+
+  .split-button.touch .split-main {
+    width: var(--tempra-size-touch);
+  }
+
+  .split-button.touch .split-more {
+    width: var(--tempra-size-control);
   }
 
   .page-column {

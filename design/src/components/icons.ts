@@ -23,6 +23,7 @@ import Hourglass from "@lucide/svelte/icons/hourglass";
 import House from "@lucide/svelte/icons/house";
 import ImageOff from "@lucide/svelte/icons/image-off";
 import Inbox from "@lucide/svelte/icons/inbox";
+import Info from "@lucide/svelte/icons/info";
 import LayoutGrid from "@lucide/svelte/icons/layout-grid";
 import Link from "@lucide/svelte/icons/link";
 import List from "@lucide/svelte/icons/list";
@@ -53,6 +54,7 @@ export const ICONS = {
   contents: List,
   history: History,
   properties: SlidersHorizontal,
+  info: Info,
   plus: CirclePlus,
   sidebar: PanelLeft,
   chevron: ChevronRight,

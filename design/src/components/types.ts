@@ -43,8 +43,28 @@ export type IconButtonProps = {
   pressed?: boolean;
   /** A 44px area on a phone. */
   touch?: boolean;
+  /** The outlined look of a page's corner tools (TEMPRA-283): a ring, 36px, the glyph in ink. */
+  variant?: "plain" | "outlined";
+  /** A number shown beside the glyph (open comments); the button grows into a pill for it. */
+  count?: number | null;
+  /** The agent dot on its corner (a newer version waits). */
+  dot?: boolean;
   onclick?: (e: MouseEvent) => void;
   title?: string;
+} & Rest;
+
+export type SplitButtonProps = {
+  /** The main part's glyph. */
+  icon: Glyph;
+  /** The main part's accessible name and tooltip ("Copy page", then "Copied" a moment). */
+  label: string;
+  onclick?: (e: MouseEvent) => void;
+  /** The ⌄ part's accessible name ("More copy options"). */
+  menuLabel: string;
+  /** A 44px area on a phone. */
+  touch?: boolean;
+  /** The ⌄ menu's choices; handed a way to close the menu. */
+  children: Snippet<[() => void]>;
 } & Rest;
 
 export type SearchButtonProps = {

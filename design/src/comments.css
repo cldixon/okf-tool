@@ -254,6 +254,31 @@ section.thread.open {
   border-color: var(--tempra-color-text);
 }
 
+/* In the floating card beside the text (TEMPRA-283) the threads are not boxes in a box: the
+   active one (and a draft) is open in place, and a compact one is a row across the card under a
+   hairline. The overlay and the phone's sheet keep the cards above. */
+@container page (width >= 960px) {
+  .page-side .comments-list .thread.open {
+    padding: var(--tempra-space-08) 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .page-side .comments-list .thread.collapsed {
+    width: auto;
+    margin: 0 calc(-1 * var(--tempra-space-16));
+    padding: var(--tempra-space-12) var(--tempra-space-16);
+    border: 0;
+    border-top: 1px solid var(--tempra-color-border);
+    border-radius: 0;
+  }
+
+  /* Edge to edge in a scroller, so its ring sits just inside it. */
+  .page-side .comments-list .thread.collapsed:focus-visible {
+    outline-offset: calc(-1 * var(--tempra-focus-offset));
+  }
+}
+
 /* On a phone, a compact thread is a touch target. */
 @media (max-width: 900px) {
   .thread.collapsed {

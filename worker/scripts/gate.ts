@@ -650,11 +650,11 @@ function greyscalePng(
  * phone width the bar's mark and library, the drawer with the bar's parts at its head, the tree,
  * Activity and Settings, the home stacked, the Settings page's drawer, the library's own), a folder's address revealing it, Not found for a moved
  * path, an attachment's page, every page in the reader (drawn from the stored
- * tree, with no Edit, a footnote card on hover), the page's panels (Comments, History,
- * Properties: opened from the top bar, closed by ×, Escape and the control, the contents back,
- * `?panel=`), Copy page, the byline while an agent edits, History's versions, checking a page
- * (Mark as checked, the Checked line, review mode), comments in the panel, a page on a
- * phone (its top bar with Copy page under ⋯,
+ * tree, with no Edit, a footnote card on hover), the page's corner tools and its panels
+ * (Comments and Page info, TEMPRA-283: opened from the corner row, closed by ×, Escape and the
+ * same button, the contents back, `?panel=`), Copy page and its ⌄, the byline while an agent
+ * edits, Page info's versions, checking a page (Mark as checked, the Checked line, review mode),
+ * comments in the panel, a page on a phone (the corner row under the byline,
  * On this page, every panel as a bottom sheet), the Markdown view,
  * figures in the full-screen view, notifications (a reply waiting in the bell's panel, opened into
  * its thread; nothing for a checked page an agent edited), and
@@ -676,45 +676,63 @@ async function browserRenders(
     const main = page.locator("main.ws-main");
     /** The top bar (take 4): over the page its path (TEMPRA-145) and its tools on the right. */
     const sheetBar = page.locator("header.ws-topbar");
-    /** Someone else's write: the top bar's glyph, then Show new version in its menu. */
-    const newVersion = () => sheetBar.getByRole("button", { name: "New version" });
-    const showNewVersion = async () => {
-      await newVersion().click();
-      await page.getByRole("button", { name: "Show new version" }).click();
-    };
     /**
-     * A page's actions (TEMPRA-172): the + at its bottom right ("Actions", or "Actions, n open
-     * comments"), opening a menu upward with Comment and the page's check.
+     * A page's corner tools (TEMPRA-283): Comments, Page info and Copy page | ⌄, in the right
+     * column's corner or under the byline (whichever is on screen).
      */
-    const actionsFab = () => main.locator(".page-actions .page-fab");
-    const actionsMenu = page.locator(".page-actions-list");
-    /** Comments from the page's actions: + then Comment. */
-    const openComments = async () => {
-      await actionsFab().click();
-      await actionsMenu.getByRole("button", { name: /^Comment/ }).click();
-    };
-    /** From the keyboard: the + focused, Enter opens its menu, Down to Comment, Enter. */
-    const openCommentsByKeys = async () => {
-      await actionsFab().focus();
-      await page.keyboard.press("Enter");
-      await actionsMenu.waitFor({ timeout: 5000 });
-      await page.keyboard.press("ArrowDown");
-      await page.keyboard.press("Enter");
-    };
-    /** The page's panels (take 4): one at a time, in place of the contents. */
+    const tool = (panel: "comments" | "info") =>
+      main.locator(`.page-tools [data-panel="${panel}"]`).filter({ visible: true }).first();
+    const copyButton = () =>
+      main.locator(".page-tools .split-main").filter({ visible: true }).first();
+    const copyMore = () =>
+      main.locator(".page-tools .split-more").filter({ visible: true }).first();
+    /** The page's panels: one at a time, in place of the contents. */
     const comments = page.locator("aside#panel-comments.page-aside");
-    const historyPanel = page.locator("aside#panel-history.page-aside");
-    const properties = () => page.locator("aside#panel-properties.page-aside");
+    /** Page info (TEMPRA-283): History and Properties in one panel. */
+    const infoPanel = page.locator("aside#panel-info.page-aside");
+    const historyPanel = infoPanel;
+    const properties = () => infoPanel;
+    /** Page info, opened from its corner button unless it is open. */
+    const openInfo = async () => {
+      if ((await infoPanel.count()) === 0) await tool("info").click();
+      await infoPanel.waitFor({ timeout: 10_000 });
+    };
+    /** Comments from the corner row. */
+    const openComments = async () => {
+      await tool("comments").click();
+    };
+    /** From the keyboard: Comments focused, Enter. */
+    const openCommentsByKeys = async () => {
+      await tool("comments").focus();
+      await page.keyboard.press("Enter");
+    };
+    /** Someone else's write: the agent dot on Page info; Page info's Show it brings it in. */
+    const newVersion = () => tool("info").locator(".icon-button-dot");
+    const showNewVersion = async () => {
+      const wasComments = (await comments.count()) > 0;
+      await openInfo();
+      const show = infoPanel.getByRole("button", { name: "Show it" });
+      await show.click();
+      await show.waitFor({ state: "detached", timeout: 10_000 });
+      if (wasComments) {
+        await openComments();
+        await comments.waitFor({ timeout: 5000 });
+      } else {
+        await page.keyboard.press("Escape");
+        await infoPanel.waitFor({ state: "detached", timeout: 5000 });
+      }
+    };
     /** The contents on the right, while no panel is open and there is room. */
     const contentsNav = main.locator("nav.page-contents");
-    /** An item of the page's ⋯ menu. */
+    /** An item of the Copy page button's ⌄ (View Markdown); History and Properties are Page info. */
     const more = async (item: string) => {
-      await sheetBar.getByRole("button", { name: "More", exact: true }).click();
+      if (item === "History" || item === "Properties") return openInfo();
+      await copyMore().click();
       await page.locator(".menu-list").getByRole("button", { name: item, exact: true }).click();
     };
     const byline = main.locator(".byline");
-    /** Properties' Check section (TEMPRA-122): Mark as checked, or the changes since a check. */
-    const check = () => properties().getByRole("region", { name: "Check" });
+    /** Page info's top lines (TEMPRA-283): the newer version and the check. */
+    const check = () => infoPanel.locator(".page-info-now");
     /** The quiet line under the byline once a person has checked the page. */
     const checkedLine = main.locator("p.doc-checked");
     /** A width with room for the contents (or a panel) beside the text. */
@@ -909,8 +927,8 @@ async function browserRenders(
       if ((await sidebar.locator(`a[aria-current="page"][data-path="${nested}"]`).count()) !== 1) {
         throw new Error("the open file is not marked in the tree");
       }
-      // ⋯ → History opens the History panel; Escape closes it.
-      await more("History");
+      // Page info (its versions) from the corner row; Escape closes it.
+      await openInfo();
       await historyPanel.locator("a.version").first().waitFor({ timeout: 10_000 });
       await page.keyboard.press("Escape");
       await historyPanel.waitFor({ state: "detached", timeout: 5000 });
@@ -1764,8 +1782,12 @@ async function browserRenders(
             ),
         );
         if (split.length > 0) throw new Error(`a page's view asked ${split.join(", ")}`);
-        await sheetBar.getByRole("button", { name: "More", exact: true }).waitFor();
-        await actionsFab().waitFor();
+        // The page's tools are its corner row (TEMPRA-283): nothing of them in the top bar.
+        await tool("comments").waitFor();
+        if ((await sheetBar.getByRole("button", { name: "More", exact: true }).count()) > 0) {
+          throw new Error("⋯ is still in the top bar");
+        }
+        if ((await main.locator(".page-actions").count()) > 0) throw new Error("the + is back");
         // Read and comment only (TEMPRA-99): nothing in the page edits.
         if ((await page.locator("[contenteditable]").count()) > 0) throw new Error("editable");
         if ((await page.getByRole("button", { name: "Edit", exact: true }).count()) > 0) {
@@ -2600,30 +2622,34 @@ async function browserRenders(
       await markStay();
       const started = Date.now();
       await agentAppends("A sentence written while the page was open.");
-      // A newer version shows as the sheet bar's glyph, saying who and why.
+      // A newer version shows as the agent dot on Page info (TEMPRA-283).
       await newVersion().waitFor({ timeout: 10_000 });
       const ms = Date.now() - started;
       console.log(`  (the change reached the page in ${ms} ms)`);
-      if (ms > 3000) throw new Error(`the new-version glyph took ${ms} ms`);
+      if (ms > 3000) throw new Error(`the new-version dot took ${ms} ms`);
       if (shots) await page.screenshot({ path: `${shots}/live.png` });
       // The open file prefetched again (a hover on its own row) must not hide the new version.
       await page.locator(`.ws-sidebar a[data-path="${pagePath}"]`).hover();
       await page.waitForTimeout(500);
-      await newVersion().click();
-      await page
-        .locator(".new-version")
-        .getByText(/changed this/)
+      await newVersion().waitFor({ timeout: 5000 });
+      await openInfo();
+      await infoPanel
+        .locator(".page-info-newer")
+        .getByText(/^A newer version/)
         .waitFor();
       // Said once to a screen reader too, in the page's polite live region (C-27).
       await main
         .getByRole("status")
         .filter({ hasText: /^New version: .*changed this/ })
         .waitFor();
-      await page.getByRole("button", { name: "Show new version" }).click();
+      await infoPanel.getByRole("button", { name: "Show it" }).click();
       await page
         .locator(".body")
         .getByText("A sentence written while the page was open.")
         .waitFor();
+      await newVersion().waitFor({ state: "detached", timeout: 5000 });
+      await page.keyboard.press("Escape");
+      await infoPanel.waitFor({ state: "detached", timeout: 5000 });
       if (!(await stayed())) throw new Error("the page reloaded");
     });
 
@@ -2635,61 +2661,58 @@ async function browserRenders(
         await agentAppends("A sentence before the check.");
         await page.goto(url);
         // A page nobody checked says nothing about it (TEMPRA-122): no line under the byline,
-        // and Properties offers only Mark as checked (no "not yet verified", no Show changes).
+        // and Page info's check line offers only Mark as checked (TEMPRA-283).
         await byline.waitFor({ timeout: 15_000 });
         if ((await byline.getByText(/verif|review|check/i).count()) > 0) {
           throw new Error("the byline shows verification");
         }
         if ((await checkedLine.count()) > 0) throw new Error("a never-checked page says checked");
-        await more("Properties");
+        await openInfo();
         const mark = check().getByRole("button", { name: "Mark as checked" });
         await mark.waitFor({ timeout: 10_000 });
-        const said = (await check().innerText()).trim();
-        if ((await check().getByRole("link").count()) > 0 || said !== "Mark as checked") {
-          throw new Error(`a never-checked page's Check says: ${said}`);
+        const said = (await check().innerText()).replace(/\s+/g, " ").trim();
+        if (
+          (await check().getByRole("link").count()) > 0 ||
+          !/^Nobody has checked this page ?Mark as checked$/.test(said)
+        ) {
+          throw new Error(`a never-checked page's check line says: ${said}`);
         }
-        if ((await properties().getByText(/verif/i).count()) > 0) {
-          throw new Error("Properties says verify");
+        if ((await infoPanel.getByText(/verif/i).count()) > 0) {
+          throw new Error("Page info says verify");
         }
-        // Checked from the page's actions (TEMPRA-172), the + aside until Properties closes.
-        await page.keyboard.press("Escape");
-        await properties().waitFor({ state: "detached", timeout: 5000 });
-        await actionsFab().click();
-        await actionsMenu.getByRole("button", { name: "Mark as checked" }).click();
+        // Checked from Page info (the floating + is retired, TEMPRA-283).
+        await mark.click();
         await page.waitForURL(`${url}?done=verify`, { timeout: 10_000 });
         await page
           .getByText("Checked. It stays checked until the next edit.")
           .waitFor({ timeout: 10_000 });
-        // Checked: the line under the byline, and nothing to do in Properties.
+        // Checked: the line under the byline, and Page info says who, with nothing to do.
         await checkedLine.getByText(/^Checked by you, /).waitFor({ timeout: 10_000 });
         if ((await checkedLine.getByText("changed since").count()) > 0) {
           throw new Error("a page checked just now says changed since");
         }
-        if (!(await properties().isVisible())) await more("Properties");
-        await properties().getByText("Linked from").waitFor({ timeout: 10_000 });
-        await check().waitFor({ state: "detached", timeout: 10_000 });
-        await page.keyboard.press("Escape");
-        await properties().waitFor({ state: "detached", timeout: 5000 });
-        // The page's actions say who checked it, with nothing to do there.
-        await actionsFab().click();
-        await actionsMenu.getByText(/^Checked by you, /).waitFor({ timeout: 5000 });
-        if ((await actionsMenu.getByRole("button", { name: "Mark as checked" }).count()) > 0) {
+        await openInfo();
+        await infoPanel.getByText("Linked from").waitFor({ timeout: 10_000 });
+        await check()
+          .getByText(/^Checked by you, /)
+          .waitFor({ timeout: 10_000 });
+        if ((await check().getByRole("button", { name: "Mark as checked" }).count()) > 0) {
           throw new Error("a checked page still offers Mark as checked");
         }
         await page.keyboard.press("Escape");
-        await actionsMenu.waitFor({ state: "detached", timeout: 5000 });
-        // An agent edits it: "· changed since", which opens review mode; the page's actions
-        // offer the same, Review changes with how many.
+        await infoPanel.waitFor({ state: "detached", timeout: 5000 });
+        // An agent edits it: "· changed since", which opens review mode; Page info offers the
+        // same, how many changes with Show changes.
         await agentAppends("A sentence the gate added.");
         await page.goto(url);
-        await actionsFab().click();
-        const reviewChanges = actionsMenu.getByRole("link", { name: /^Review changes/ });
-        await reviewChanges.waitFor({ timeout: 10_000 });
-        if (!(await reviewChanges.innerText()).includes("1 change")) {
-          throw new Error(`the page's actions say ${await reviewChanges.innerText()}`);
+        await openInfo();
+        const showChanges = check().getByRole("link", { name: "Show changes" });
+        await showChanges.waitFor({ timeout: 10_000 });
+        if (!(await check().innerText()).includes("1 change since you checked")) {
+          throw new Error(`Page info's check says ${await check().innerText()}`);
         }
         await page.keyboard.press("Escape");
-        await actionsMenu.waitFor({ state: "detached", timeout: 5000 });
+        await infoPanel.waitFor({ state: "detached", timeout: 5000 });
         await checkedLine.getByRole("link", { name: "changed since" }).click();
         await page.waitForURL(`${url}?review=1`);
         const bar = page.getByRole("region", { name: "Review" });
@@ -2701,13 +2724,13 @@ async function browserRenders(
           throw new Error(`added: ${await added.innerText()}`);
         }
         if (shots) await page.screenshot({ path: `${shots}/changes.png`, fullPage: true });
-        // Properties says how much changed, with no second way out (Done is the bar's).
-        await more("Properties");
+        // Page info says how much changed, with no second way out (Done is the bar's).
+        await openInfo();
         await check()
           .getByText(/^1 change since you checked$/)
           .waitFor({ timeout: 10_000 });
         if ((await check().getByRole("link").count()) > 0) {
-          throw new Error("Properties offers a second way out of review mode");
+          throw new Error("Page info offers a second way out of review mode");
         }
         if ((await page.getByRole("button", { name: "Mark as checked" }).count()) !== 1) {
           throw new Error("Mark as checked is offered twice in review mode");
@@ -2730,8 +2753,10 @@ async function browserRenders(
         if ((await page.locator(".body ins.diff-added").count()) > 0) {
           throw new Error("the changes are still drawn after Done");
         }
-        await page.getByRole("button", { name: "Close properties" }).click();
-        await properties().waitFor({ state: "detached", timeout: 5000 });
+        if ((await infoPanel.count()) > 0) {
+          await page.getByRole("button", { name: "Close page info" }).click();
+        }
+        await infoPanel.waitFor({ state: "detached", timeout: 5000 });
       },
     );
     // An agent edited a page the person checked: the page says so ("changed since"), and
@@ -2783,75 +2808,78 @@ async function browserRenders(
         await byline.waitFor({ timeout: 15_000 });
       },
     );
-    await step("History: a version's changes in the text, and back to the latest", async () => {
-      await page.locator(".body .prose").waitFor({ timeout: 15_000 });
-      await more("History");
-      // A version opens as it was, with what it changed from the one before (TEMPRA-128, C-1):
-      // an earlier one at ?at=<it>&since=<the one before>, the latest at ?since=<the one before>.
-      const changed = historyPanel.locator('a.version[href*="since="]');
-      await changed.first().waitFor({ timeout: 10_000 });
-      if ((await historyPanel.getByText(/verif/i).count()) > 0) {
-        throw new Error("History shows verification");
-      }
-      if (shots) await page.screenshot({ path: `${shots}/history.png` });
-      const older = historyPanel.locator('a.version[href*="at="][href*="since="]');
-      const pick = (await older.count()) > 0 ? older.first() : changed.first();
-      const label = (await pick.locator(".version-n").textContent())?.trim() ?? "";
-      const href = (await pick.getAttribute("href")) ?? "";
-      const asked = new URL(href, base).searchParams;
-      await pick.click();
-      await page.waitForURL((u) => u.search.includes(`since=${asked.get("since")}`));
-      // The slim bar names the version on screen, the one chosen; History stays open on it.
-      const bar = page.getByRole("region", { name: "Changes" });
-      await bar
-        .locator(".review-lead")
-        .filter({ hasText: new RegExp(`^Changes in ${label}$`) })
-        .waitFor({ timeout: 15_000 });
-      await page
-        .locator(".body ins.diff-added, .body del.diff-removed")
-        .first()
-        .waitFor({ timeout: 10_000 });
-      await historyPanel
-        .locator('a.version[aria-current="true"] .version-n')
-        .filter({ hasText: label })
-        .waitFor({ timeout: 10_000 });
-      // No sequence numbers for people on the way (the old "Viewing as of sequence …").
-      if ((await page.getByText(/as of sequence/).count()) > 0) {
-        throw new Error("a version shows its sequence number");
-      }
-      if (shots) await page.screenshot({ path: `${shots}/version.png` });
-      // An earlier version: "v3 as it was" shows it alone, its byline its own (never "editing
-      // now"), History marking it, and "Changes in v3" draws them again (TEMPRA-134, C-14).
-      if (asked.has("at")) {
-        await bar.getByRole("link", { name: `${label} as it was` }).click();
-        await page.waitForURL((u) => u.searchParams.has("at") && !u.searchParams.has("since"));
-        const alone = page.getByRole("region", { name: "Version" });
-        await alone
+    await step(
+      "Page info's versions: a version's changes in the text, and back to the latest",
+      async () => {
+        await page.locator(".body .prose").waitFor({ timeout: 15_000 });
+        await openInfo();
+        // A version opens as it was, with what it changed from the one before (TEMPRA-128, C-1):
+        // an earlier one at ?at=<it>&since=<the one before>, the latest at ?since=<the one before>.
+        const changed = historyPanel.locator('a.version[href*="since="]');
+        await changed.first().waitFor({ timeout: 10_000 });
+        if ((await historyPanel.getByText(/verif/i).count()) > 0) {
+          throw new Error("Page info's versions show verification");
+        }
+        if (shots) await page.screenshot({ path: `${shots}/history.png` });
+        const older = historyPanel.locator('a.version[href*="at="][href*="since="]');
+        const pick = (await older.count()) > 0 ? older.first() : changed.first();
+        const label = (await pick.locator(".version-n").textContent())?.trim() ?? "";
+        const href = (await pick.getAttribute("href")) ?? "";
+        const asked = new URL(href, base).searchParams;
+        await pick.click();
+        await page.waitForURL((u) => u.search.includes(`since=${asked.get("since")}`));
+        // The slim bar names the version on screen, the one chosen; History stays open on it.
+        const bar = page.getByRole("region", { name: "Changes" });
+        await bar
           .locator(".review-lead")
-          .filter({ hasText: new RegExp(`^${label} as it was$`) })
+          .filter({ hasText: new RegExp(`^Changes in ${label}$`) })
           .waitFor({ timeout: 15_000 });
-        if ((await page.locator(".body ins.diff-added, .body del.diff-removed").count()) > 0) {
-          throw new Error("a version as it was draws changes");
-        }
-        if ((await byline.getByText(/editing now/).count()) > 0) {
-          throw new Error("an earlier version's byline says editing now");
-        }
+        await page
+          .locator(".body ins.diff-added, .body del.diff-removed")
+          .first()
+          .waitFor({ timeout: 10_000 });
         await historyPanel
           .locator('a.version[aria-current="true"] .version-n')
           .filter({ hasText: label })
           .waitFor({ timeout: 10_000 });
-        await alone.getByRole("link", { name: `Changes in ${label}` }).click();
-        await page.waitForURL((u) => u.search.includes(`since=${asked.get("since")}`));
-        await bar.waitFor({ timeout: 15_000 });
-      }
-      await bar.getByRole("link", { name: "Back to latest" }).click();
-      await page.waitForURL(url);
-      await bar.waitFor({ state: "detached", timeout: 5000 });
-      if ((await historyPanel.count()) > 0) {
-        await page.getByRole("button", { name: "Close history" }).click();
-      }
-      await historyPanel.waitFor({ state: "detached", timeout: 5000 });
-    });
+        // No sequence numbers for people on the way (the old "Viewing as of sequence …").
+        if ((await page.getByText(/as of sequence/).count()) > 0) {
+          throw new Error("a version shows its sequence number");
+        }
+        if (shots) await page.screenshot({ path: `${shots}/version.png` });
+        // An earlier version: "v3 as it was" shows it alone, its byline its own (never "editing
+        // now"), History marking it, and "Changes in v3" draws them again (TEMPRA-134, C-14).
+        if (asked.has("at")) {
+          await bar.getByRole("link", { name: `${label} as it was` }).click();
+          await page.waitForURL((u) => u.searchParams.has("at") && !u.searchParams.has("since"));
+          const alone = page.getByRole("region", { name: "Version" });
+          await alone
+            .locator(".review-lead")
+            .filter({ hasText: new RegExp(`^${label} as it was$`) })
+            .waitFor({ timeout: 15_000 });
+          if ((await page.locator(".body ins.diff-added, .body del.diff-removed").count()) > 0) {
+            throw new Error("a version as it was draws changes");
+          }
+          if ((await byline.getByText(/editing now/).count()) > 0) {
+            throw new Error("an earlier version's byline says editing now");
+          }
+          await historyPanel
+            .locator('a.version[aria-current="true"] .version-n')
+            .filter({ hasText: label })
+            .waitFor({ timeout: 10_000 });
+          await alone.getByRole("link", { name: `Changes in ${label}` }).click();
+          await page.waitForURL((u) => u.search.includes(`since=${asked.get("since")}`));
+          await bar.waitFor({ timeout: 15_000 });
+        }
+        await bar.getByRole("link", { name: "Back to latest" }).click();
+        await page.waitForURL(url);
+        await bar.waitFor({ state: "detached", timeout: 5000 });
+        if ((await historyPanel.count()) > 0) {
+          await page.getByRole("button", { name: "Close page info" }).click();
+        }
+        await historyPanel.waitFor({ state: "detached", timeout: 5000 });
+      },
+    );
     await step("an internal link's tooltip", async () => {
       await page.goto(url);
       await page.locator(".body .prose").waitFor({ timeout: 15_000 });
@@ -3057,8 +3085,8 @@ async function browserRenders(
           await page.screenshot({ path: `${shots}/comment-active-dark.png` });
           await page.emulateMedia({ colorScheme: "light" });
         }
-        // The mark opens the panel on its block's first thread, from the keyboard too; Comments
-        // in ⋯ opens it as well (TEMPRA-223).
+        // The mark opens the panel on its block's first thread, from the keyboard too; the corner
+        // row's Comments opens it as well, its open count in its name (TEMPRA-283).
         await page.getByRole("button", { name: "Close comments" }).click();
         await comments.waitFor({ state: "detached", timeout: 5000 });
         await blockMark.focus();
@@ -3068,12 +3096,15 @@ async function browserRenders(
         });
         await page.getByRole("button", { name: "Close comments" }).click();
         await comments.waitFor({ state: "detached", timeout: 5000 });
-        await sheetBar.getByRole("button", { name: "More", exact: true }).click();
-        const moreComments = page.locator(".menu-list").getByRole("button", { name: /^Comments/ });
-        if (!/1 open/.test(await moreComments.innerText())) {
-          throw new Error(`⋯'s Comments reads ${JSON.stringify(await moreComments.innerText())}`);
+        const cornerComments = tool("comments");
+        const named = (await cornerComments.getAttribute("aria-label")) ?? "";
+        if (named !== "Comments, 1 open") {
+          throw new Error(`the corner's Comments is named ${JSON.stringify(named)}`);
         }
-        await moreComments.click();
+        if ((await cornerComments.locator(".icon-button-count").innerText()) !== "1") {
+          throw new Error("the corner's Comments shows no count");
+        }
+        await cornerComments.click();
         await comments.waitFor({ timeout: 5000 });
         await comments.locator(`[id="panel-thread-${thread}"]`).waitFor({ timeout: 5000 });
         await markStay();
@@ -3167,9 +3198,9 @@ async function browserRenders(
         await comments.getByRole("button", { name: "Resolved 1" }).waitFor({ timeout: 10_000 });
         await highlight("tempra-comment", true);
         await highlight("tempra-comment-active", true);
-        if ((await actionsFab().getAttribute("aria-label")) !== "Actions") {
+        if ((await tool("comments").getAttribute("aria-label")) !== "Comments") {
           throw new Error(
-            `the actions still count open threads: ${await actionsFab().getAttribute("aria-label")}`,
+            `Comments still counts open threads: ${await tool("comments").getAttribute("aria-label")}`,
           );
         }
         // Under Resolved it is there, with Reopen.
@@ -3258,10 +3289,10 @@ async function browserRenders(
       });
       if (!resolved.ok) throw new Error(`agent resolve: ${resolved.status}`);
     });
-    // A page at phone width (take 4, TEMPRA-118, boards 33 and 35): the top bar with Tempra,
-    // Comments n and ⋯ (Copy page under ⋯), the folders above the title, "On this page" closed
-    // until opened; Comments, History and Properties are one bottom sheet, opened only when
-    // asked, closed by × or Escape.
+    // A page at phone width (take 4, TEMPRA-118, boards 33 and 35; TEMPRA-283): the top bar with
+    // Tempra, the bell and the avatar (no ⋯), the folders above the title, the corner row under
+    // the byline (Comments, Page info, Copy page), "On this page" closed until opened; Comments
+    // and Page info are one bottom sheet, opened only when asked, closed by × or Escape.
     await step(
       "a page at phone width: its top bar, On this page, the panels as a bottom sheet",
       async () => {
@@ -3271,21 +3302,22 @@ async function browserRenders(
           await page.locator(".body .prose").waitFor({ timeout: 15_000 });
           const title = (await main.locator("h1.doc-title").innerText()).trim();
           await phoneNamed(title);
-          // The page's actions float at the bottom right (TEMPRA-172); the bar has ⋯ and, with
-          // Comments gone from it, the bell again.
-          await actionsFab().waitFor({ timeout: 5000 });
-          const fabBox = await actionsFab().boundingBox();
-          if (
-            !fabBox ||
-            fabBox.x + fabBox.width < 390 - 40 ||
-            fabBox.y + fabBox.height < 844 - 48
-          ) {
-            throw new Error(
-              `the page's actions are not at the bottom right: ${JSON.stringify(fabBox)}`,
-            );
+          // The page's tools sit under the byline (TEMPRA-283), 44px targets; the bar has the
+          // bell and no ⋯.
+          const headRow = main.locator(".page-tools-head");
+          await headRow.waitFor({ state: "visible", timeout: 5000 });
+          const rowBox = await headRow.boundingBox();
+          const bylineBox = await byline.boundingBox();
+          if (!rowBox || !bylineBox || rowBox.y < bylineBox.y + bylineBox.height - 1) {
+            throw new Error(`the page's tools are not under the byline: ${JSON.stringify(rowBox)}`);
           }
-          const moreButton = sheetBar.getByRole("button", { name: "More", exact: true });
-          if (!(await moreButton.isVisible())) throw new Error("no ⋯ in the phone's top bar");
+          const target = await tool("comments").boundingBox();
+          if (!target || target.height < 43) {
+            throw new Error(`Comments is not a 44px target: ${JSON.stringify(target)}`);
+          }
+          if (await sheetBar.getByRole("button", { name: "More", exact: true }).isVisible()) {
+            throw new Error("⋯ is still in the phone's top bar");
+          }
           if (!(await sheetBar.getByRole("button", { name: /^Notifications/ }).isVisible())) {
             throw new Error("no bell in the page's phone bar");
           }
@@ -3328,15 +3360,13 @@ async function browserRenders(
             .locator("html")
             .evaluate((el) => el.scrollWidth > el.clientWidth);
           if (sideways) throw new Error("the page scrolls sideways at phone width");
-          // Copy page heads ⋯, on a phone as everywhere (TEMPRA-145).
+          // Copy page, the row's own button, on a phone as everywhere (TEMPRA-283).
           await b.context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
-          await moreButton.click();
-          await page.locator(".menu-list").getByRole("button", { name: "Copy page" }).click();
-          await page.locator(".menu-list").getByRole("button", { name: "Copied" }).waitFor();
+          await copyButton().click();
+          await headRow.getByRole("button", { name: "Copied" }).waitFor({ timeout: 5000 });
           const copied = await page.evaluate<string>("navigator.clipboard.readText()");
           if (!copied.startsWith("---\n"))
             throw new Error(`Copy page copied: ${copied.slice(0, 60)}`);
-          await page.keyboard.press("Escape");
           // A sheet from the bottom: as wide as the screen, its foot at the screen's, about two
           // thirds of it high, with a drag handle.
           const isSheet = async (sheet: typeof comments, what: string) => {
@@ -3362,22 +3392,18 @@ async function browserRenders(
           if (shots) await page.screenshot({ path: `${shots}/comments-phone.png` });
           await comments.getByRole("button", { name: "Close comments" }).click();
           await comments.waitFor({ state: "detached", timeout: 5000 });
-          await more("History");
-          await isSheet(historyPanel, "History");
-          if (shots) await page.screenshot({ path: `${shots}/history-phone.png` });
-          await page.keyboard.press("Escape");
-          await historyPanel.waitFor({ state: "detached", timeout: 5000 });
-          await more("Properties");
-          await isSheet(properties(), "Properties");
-          await properties().getByRole("button", { name: "Close properties" }).click();
-          await properties().waitFor({ state: "detached", timeout: 5000 });
+          await openInfo();
+          await isSheet(infoPanel, "Page info");
+          if (shots) await page.screenshot({ path: `${shots}/page-info-phone.png` });
+          await infoPanel.getByRole("button", { name: "Close page info" }).click();
+          await infoPanel.waitFor({ state: "detached", timeout: 5000 });
         } finally {
           await wide();
         }
       },
     );
     // Keyboard only (TEMPRA-133): a panel opened from its control takes the focus to its heading
-    // and gives it back on close (⋯ for History); the menus move by arrow keys and close when the
+    // and gives it back on close (its corner button, TEMPRA-283); the menus move by arrow keys and close when the
     // focus leaves; a footnote's card describes its marker and closes on Escape; selected text is
     // commented on with Ctrl+Alt+M and posted from the keyboard. At phone width the drawer and a
     // panel's sheet are modal (what they dim is inert), and a tap on the dimmed page closes the
@@ -3412,42 +3438,42 @@ async function browserRenders(
           await page.waitForTimeout(50);
         }
       };
-      // Comments from the page's actions (TEMPRA-172): the focus to the panel's heading, and back
-      // to the + on Escape, once it is back from stepping aside.
+      // Comments from the corner row (TEMPRA-283): the focus to the panel's heading, and back to
+      // its button, pressed while open, on Escape.
       await openCommentsByKeys();
       await comments.waitFor({ timeout: 5000 });
       await expectFocus("aside#panel-comments h2", "opening Comments");
+      if ((await tool("comments").getAttribute("aria-pressed")) !== "true") {
+        throw new Error("Comments is not pressed while its panel is open");
+      }
       await page.keyboard.press("Escape");
       await comments.waitFor({ state: "detached", timeout: 5000 });
-      await expectFocus(".page-actions .page-fab", "closing Comments");
-      // ⋯ by its keys: Down opens it at Copy page (its head, TEMPRA-145), Down, End, Home move;
-      // Enter on History opens it, whose heading takes the focus; Escape gives it back to ⋯.
-      const moreButton = sheetBar.getByRole("button", { name: "More", exact: true });
+      await expectFocus('.page-tools-side [data-panel="comments"]', "closing Comments");
+      // Page info from the keyboard: Tab to it, Enter; its heading takes the focus; Escape gives
+      // it back to its button.
+      await page.keyboard.press("Tab");
+      await expectFocus('.page-tools-side [data-panel="info"]', "Tab to Page info");
+      await page.keyboard.press("Enter");
+      await infoPanel.waitFor({ timeout: 5000 });
+      await expectFocus("aside#panel-info h2", "opening Page info");
+      await page.keyboard.press("Escape");
+      await infoPanel.waitFor({ state: "detached", timeout: 5000 });
+      await expectFocus('.page-tools-side [data-panel="info"]', "closing Page info");
+      // Copy page's ⌄ by its keys: Down opens it at View Markdown, End, Home move; Escape gives
+      // the focus back to the ⌄.
       const list = page.locator(".menu-list");
-      await moreButton.focus();
+      await copyMore().focus();
       await page.keyboard.press("ArrowDown");
       await list.waitFor({ timeout: 5000 });
-      await expectFocus(".menu-list button.menu-item:first-of-type", "Down on ⋯");
-      if (!(await focused()).includes("Copy page")) throw new Error(`Down: ${await focused()}`);
-      await page.keyboard.press("ArrowDown");
-      if (!(await focused()).includes("Comments")) throw new Error(`Down: ${await focused()}`);
-      await page.keyboard.press("ArrowDown");
-      if (!(await focused()).includes("History")) throw new Error(`Down: ${await focused()}`);
-      await page.keyboard.press("ArrowDown");
-      if (!(await focused()).includes("Properties")) throw new Error(`Down: ${await focused()}`);
+      if (!(await focused()).includes("View Markdown")) throw new Error(`Down: ${await focused()}`);
       await page.keyboard.press("End");
       if (!(await focused()).includes("Download")) throw new Error(`End: ${await focused()}`);
       await page.keyboard.press("Home");
-      if (!(await focused()).includes("Copy page")) throw new Error(`Home: ${await focused()}`);
-      await page.keyboard.press("ArrowDown");
-      await page.keyboard.press("ArrowDown");
-      if (!(await focused()).includes("History")) throw new Error(`Down: ${await focused()}`);
-      await page.keyboard.press("Enter");
-      await historyPanel.waitFor({ timeout: 5000 });
-      await expectFocus("aside#panel-history h2", "opening History from ⋯");
+      if (!(await focused()).includes("View Markdown")) throw new Error(`Home: ${await focused()}`);
+      if ((await list.getByText("Copy link").count()) > 0) throw new Error("Copy link is back");
       await page.keyboard.press("Escape");
-      await historyPanel.waitFor({ state: "detached", timeout: 5000 });
-      await expectFocus('[aria-label="More"]', "closing History");
+      await list.waitFor({ state: "detached", timeout: 5000 });
+      await expectFocus('.page-tools-side [aria-label="More copy options"]', "closing the ⌄");
       // A menu closes when the focus leaves it.
       await page.keyboard.press("Enter");
       await list.waitFor({ timeout: 5000 });
@@ -3957,9 +3983,8 @@ async function browserRenders(
           if (again.week.total !== got.week.total) {
             throw new Error(`opening it again counted: ${got.week.total} then ${again.week.total}`);
           }
-          // Properties, in people's words.
-          await more("Properties");
-          await properties().waitFor({ timeout: 5000 });
+          // Page info's About this page, in people's words.
+          await openInfo();
           const fact = (name: string) =>
             properties()
               .locator(".fact")
@@ -3972,17 +3997,17 @@ async function browserRenders(
             .filter({ hasText: new RegExp(`^${times}${by}$`) })
             .waitFor({ timeout: 5000 })
             .catch(async () => {
-              throw new Error(`Properties' Read says "${await fact("Read").innerText()}"`);
+              throw new Error(`Page info's Read says "${await fact("Read").innerText()}"`);
             });
           const last = await fact("Last read").innerText();
-          if (last !== "just now") throw new Error(`Properties' Last read says "${last}"`);
+          if (last !== "just now") throw new Error(`Page info's Last read says "${last}"`);
           // The reads name no reader and no surface (Last changed still names the writer).
           const said = `${await fact("Read").innerText()} ${last}`;
           if (/\bmcp\b|\bapi\b|claude|@dev|human:/i.test(said)) {
-            throw new Error(`Properties' reads name readers or surfaces: ${said}`);
+            throw new Error(`Page info's reads name readers or surfaces: ${said}`);
           }
           if (shots) await properties().screenshot({ path: `${shots}/properties-reads.png` });
-          await page.getByRole("button", { name: "Close properties" }).click();
+          await page.getByRole("button", { name: "Close page info" }).click();
           // MCP read reports both, by surface and by kind; the agent reading again that day adds
           // nothing.
           const line = await mcpRead();
@@ -4050,10 +4075,11 @@ async function browserRenders(
       if (new URL(page.url()).searchParams.has("view"))
         throw new Error("the view stayed in the URL");
     });
-    // The panels (take 4, tempra-dev: decisions/one-panel-from-the-top-bar): one at a time in
-    // place of the contents, opened from the top bar, closed by ×, Escape or the same control,
-    // the contents back; a link with ?panel= opens one; none is remembered. Under 1100px a panel
-    // takes the contents' column, and under 960px overlays the page. Copy page copies the stored file; the byline says an agent is editing.
+    // The panels (tempra-dev: decisions/page-tools-in-the-corner, TEMPRA-283): one at a time in
+    // place of the contents, opened from the page's corner row, closed by ×, Escape or the same
+    // button, the contents back; a link with ?panel= opens one (history and properties open Page
+    // info); none is remembered. Under 1100px a panel takes the contents' column, and under 960px
+    // overlays the page. Copy page copies the stored file; the byline says an agent is editing.
     await step("panels: open and close, the contents come back, ?panel=, Copy page", async () => {
       const path = "gate-panels.md";
       const put = await fetch(`${libApi}/files/${path}`, {
@@ -4083,44 +4109,43 @@ async function browserRenders(
           throw new Error(`a panel is still open after ${what}`);
         }
       };
-      // The page's actions (TEMPRA-172): no Comments in the top bar; the + at the bottom right
-      // opens its menu upward (Comment, then the check: Mark as checked on a page nobody
-      // checked), and Comment opens the panel; the text stays where it was (the panel takes the
-      // contents' space, C-17), and the + steps aside while the panel is open.
+      // The page's tools (TEMPRA-283): nothing in the top bar; a row in the right column's top
+      // corner, right-aligned with the page, the contents below it; no floating +.
       if ((await sheetBar.getByRole("button", { name: /^Comments/ }).count()) > 0) {
         throw new Error("Comments is still in the top bar");
       }
-      const fab = actionsFab();
-      if ((await fab.getAttribute("aria-label")) !== "Actions") {
-        throw new Error(`the page's actions are named "${await fab.getAttribute("aria-label")}"`);
-      }
-      const fabAt = await fab.boundingBox();
+      if ((await main.locator(".page-actions").count()) > 0) throw new Error("the + is back");
+      const sideRow = main.locator(".page-tools-side");
+      await sideRow.waitFor({ state: "visible", timeout: 5000 });
+      const rowAt = await sideRow.boundingBox();
+      const tocAt = await contentsNav.boundingBox();
       const viewport = page.viewportSize();
+      if (!rowAt || !tocAt || !viewport || rowAt.x + rowAt.width < viewport.width - 24) {
+        throw new Error(`the page's tools are not in the corner: ${JSON.stringify(rowAt)}`);
+      }
+      const named = await sideRow
+        .getByRole("button")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
       if (
-        !fabAt ||
-        !viewport ||
-        fabAt.x + fabAt.width < viewport.width - 48 ||
-        fabAt.y + fabAt.height < viewport.height - 48
+        JSON.stringify(named) !==
+        JSON.stringify(["Comments", "Page info", "Copy page", "More copy options"])
       ) {
-        throw new Error(`the page's actions are not at the bottom right: ${JSON.stringify(fabAt)}`);
+        throw new Error(`the page's tools are ${JSON.stringify(named)}`);
       }
-      await fab.click();
-      await actionsMenu.waitFor({ timeout: 5000 });
-      const offered = (await actionsMenu.locator(".menu-item").allInnerTexts()).map((t) =>
-        t.replace(/\s+/g, " ").trim(),
-      );
-      if (JSON.stringify(offered) !== JSON.stringify(["Comment", "Mark as checked"])) {
-        throw new Error(`the page's actions offer ${JSON.stringify(offered)}`);
-      }
-      if (shots) await page.screenshot({ path: `${shots}/actions.png` });
-      await page.keyboard.press("Escape");
-      await actionsMenu.waitFor({ state: "detached", timeout: 5000 });
+      if (shots) await page.screenshot({ path: `${shots}/page-tools.png` });
       const textX = async () => (await main.locator("article.doc").boundingBox())?.x ?? -1;
       const before = await textX();
       await openComments();
       await comments.waitFor({ timeout: 5000 });
-      if (await fab.isVisible()) throw new Error("the page's actions stay over an open panel");
+      if ((await tool("comments").getAttribute("aria-pressed")) !== "true") {
+        throw new Error("Comments is not pressed while its panel is open");
+      }
       if ((await contentsNav.count()) > 0) throw new Error("the contents show beside a panel");
+      // The card starts below the row: the row never overlaps it.
+      const cardAt = await comments.boundingBox();
+      if (!cardAt || cardAt.y < rowAt.y + rowAt.height) {
+        throw new Error(`the card runs under the page's tools: ${JSON.stringify(cardAt)}`);
+      }
       const after = await textX();
       if (Math.abs(after - before) > 1) {
         throw new Error(`opening a panel moved the text from ${before} to ${after}`);
@@ -4131,43 +4156,50 @@ async function browserRenders(
       await comments.getByText("No open threads.", { exact: true }).waitFor();
       await page.getByRole("button", { name: "Close comments" }).click();
       await back("×");
-      await fab.waitFor({ timeout: 5000 });
-      // ⋯ → History, closed by ×; ⋯ → Properties, closed by Escape; one at a time.
-      await more("History");
-      await historyPanel.waitFor({ timeout: 5000 });
-      await more("Properties");
-      await properties().waitFor({ timeout: 5000 });
+      // Page info, closed by ×, by Escape and by its own button; one panel at a time.
+      await openInfo();
+      await openComments();
+      await comments.waitFor({ timeout: 5000 });
       if ((await page.locator("aside.page-aside").count()) !== 1) {
         throw new Error("two panels at once");
       }
-      // Properties in people's words (TEMPRA-134, C-12, C-13): Status "not set", no lint codes,
-      // suggested actions or path, and no For agents section (TEMPRA-144).
-      await properties()
+      await openInfo();
+      // About this page in people's words (TEMPRA-134, C-12, C-13): Status "not set", no lint
+      // codes, suggested actions or path, and no For agents section (TEMPRA-144).
+      await infoPanel
         .locator("dd", { hasText: /^not set$/ })
         .first()
         .waitFor();
-      const said = await properties().innerText();
-      if (/\b[a-z]+_[a-z_]+\b|→|suggested|trust|human-reviewed|unverified/.test(said)) {
-        throw new Error(`Properties shows agents' words: ${said}`);
+      const heads = await infoPanel.locator(".page-info-section > h3").allInnerTexts();
+      if (JSON.stringify(heads) !== JSON.stringify(["About this page", "Versions"])) {
+        throw new Error(`Page info's sections: ${JSON.stringify(heads)}`);
       }
-      if ((await properties().getByText(path, { exact: true }).count()) > 0) {
-        throw new Error("Properties shows the page's path");
+      const said = await infoPanel.innerText();
+      if (/\b[a-z]+_[a-z_]+\b|→|suggested|trust|human-reviewed|unverified/.test(said)) {
+        throw new Error(`Page info shows agents' words: ${said}`);
+      }
+      if ((await infoPanel.getByText(path, { exact: true }).count()) > 0) {
+        throw new Error("Page info shows the page's path");
       }
       if (/for agents|nothing for agents/i.test(said)) {
-        throw new Error("Properties has a For agents section");
+        throw new Error("Page info has a For agents section");
       }
-      if (shots) await page.screenshot({ path: `${shots}/properties.png` });
-      await page.getByRole("button", { name: "Close properties" }).click();
+      if (shots) await page.screenshot({ path: `${shots}/page-info.png` });
+      await page.getByRole("button", { name: "Close page info" }).click();
       await back("×");
-      await more("History");
-      await historyPanel.waitFor({ timeout: 5000 });
+      await openInfo();
       await page.keyboard.press("Escape");
       await back("Escape");
+      await openInfo();
+      await tool("info").click();
+      await back("its own button");
       // A link asks for a panel; a page opened plainly has none (nothing is remembered).
       await openComments();
       await comments.waitFor({ timeout: 5000 });
       await page.goto(`${here}?panel=history`);
-      await historyPanel.waitFor({ timeout: 15_000 });
+      await infoPanel.waitFor({ timeout: 15_000 });
+      await page.goto(`${here}?panel=properties`);
+      await infoPanel.waitFor({ timeout: 15_000 });
       await page.goto(here);
       await contentsNav.waitFor({ timeout: 15_000 });
       await page.waitForTimeout(300);
@@ -4227,33 +4259,31 @@ async function browserRenders(
       } finally {
         await wide();
       }
-      // Copy page heads ⋯ (TEMPRA-145): the stored file, frontmatter and body, on the clipboard;
-      // the bar has no Copy page of its own.
+      // Copy page, the corner row's split button (TEMPRA-283): the stored file, frontmatter and
+      // body, on the clipboard; the top bar has no Copy page; its ⌄ holds View Markdown and
+      // Download .md, and no Copy link.
       if ((await sheetBar.getByRole("button", { name: /^Copy page$/ }).count()) > 0) {
         throw new Error("Copy page is still in the top bar");
       }
       await b.context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
-      await sheetBar.getByRole("button", { name: "More", exact: true }).click();
-      const items = page.locator(".menu-list");
-      const firstItem = (await items.locator(".menu-item").first().innerText()).trim();
-      if (firstItem !== "Copy page") throw new Error(`⋯ starts with "${firstItem}"`);
-      await items.getByRole("button", { name: "Copy page" }).click();
-      await items.getByRole("button", { name: "Copied" }).waitFor({ timeout: 5000 });
+      await copyButton().click();
+      await main.locator('.page-tools-side button[aria-label="Copied"]').waitFor({ timeout: 5000 });
       const copied = await page.evaluate<string>("navigator.clipboard.readText()");
       if (!copied.startsWith("---\ntype: Note\ntitle: Gate panels")) {
         throw new Error(`Copy page copied: ${copied.slice(0, 80)}`);
       }
-      // ⋯ holds Copy link and Download .md too.
-      const download = page.locator(".menu-list").getByRole("link", { name: "Download .md" });
-      if ((await download.getAttribute("download")) !== path) throw new Error("no Download .md");
-      await page.locator(".menu-list").getByRole("button", { name: "Copy link" }).click();
-      // The copy lands a moment after the click.
-      let link = "";
-      for (const until = Date.now() + 5000; link !== here && Date.now() < until; ) {
-        await page.waitForTimeout(100);
-        link = await page.evaluate<string>("navigator.clipboard.readText()");
+      await copyMore().click();
+      const items = page.locator(".menu-list");
+      const offered = (await items.locator(".menu-item").allInnerTexts()).map((t) =>
+        t.replace(/\s+/g, " ").trim(),
+      );
+      if (JSON.stringify(offered) !== JSON.stringify(["View Markdown", "Download .md"])) {
+        throw new Error(`Copy page's ⌄ offers ${JSON.stringify(offered)}`);
       }
-      if (link !== here) throw new Error(`Copy link copied: ${link.slice(0, 80)}`);
+      const download = items.getByRole("link", { name: "Download .md" });
+      if ((await download.getAttribute("download")) !== path) throw new Error("no Download .md");
+      await page.keyboard.press("Escape");
+      await items.waitFor({ state: "detached", timeout: 5000 });
       await agentDeletes(path);
     });
     await step(
@@ -4482,9 +4512,9 @@ async function browserRenders(
           ready: () => comments.getByText("Gate: from the keyboard.").waitFor({ timeout: 15_000 }),
         },
         {
-          name: "page, Properties",
-          url: `${lib}/gate-keys.md?panel=properties`,
-          ready: () => properties().waitFor({ timeout: 15_000 }),
+          name: "page, Page info",
+          url: `${lib}/gate-keys.md?panel=info`,
+          ready: () => infoPanel.waitFor({ timeout: 15_000 }),
         },
         {
           name: "Activity",
@@ -4731,15 +4761,17 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
   const { page, step, problems } = b;
   const comments = page.locator("#panel-comments");
   /**
-   * Comment from the page's actions: the +, Comment, the box at the panel's top, the text, sent
-   * by the Comment button or by Enter (TEMPRA-223).
+   * Comment from the corner's Comments (TEMPRA-283; on the home, its own corner): the box at the
+   * panel's top, the text, sent by the Comment button or by Enter (TEMPRA-223).
    */
   const comment = async (box: string, text: string, send: "click" | "enter") => {
-    await page.locator(".page-actions .page-fab").click();
-    await page
-      .locator(".page-actions-list")
-      .getByRole("button", { name: /^Comment/ })
-      .click();
+    if ((await comments.count()) === 0) {
+      await page
+        .locator('.page-tools [data-panel="comments"]')
+        .filter({ visible: true })
+        .first()
+        .click();
+    }
     await comments.getByRole("button", { name: box }).click();
     const field = comments.locator(".comment-form textarea");
     await field.fill(text);
@@ -4823,28 +4855,33 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
         throw new Error("the agent's thread is not open");
       }
     });
-    await step("a library thread from the home's +: answered and marked a request", async () => {
-      await page.goto(`${base}/${owner}/${slug}/`);
-      await page.locator(".home-head .view-title").waitFor({ timeout: 15_000 });
-      // The home's actions hold Comment alone.
-      await page.locator(".page-actions .page-fab").click();
-      const items = await page.locator(".page-actions-list .menu-item").allInnerTexts();
-      if (items.length !== 1 || !/^Comment/.test(items[0] ?? "")) {
-        throw new Error(`the home's actions read ${JSON.stringify(items)}`);
-      }
-      await page.keyboard.press("Escape");
-      await comment(
-        "Comment on the library…",
-        "@tempra request: a new page on onboarding",
-        "enter",
-      );
-      await comments
-        .locator(".thread-replying", { hasText: "Tempra is replying…" })
-        .first()
-        .waitFor({ timeout: 15_000 });
-      await comments.getByText("marked this thread a request").waitFor({ timeout: 30_000 });
-      await comments.locator(".thread-request", { hasText: "Request" }).first().waitFor();
-    });
+    await step(
+      "a library thread from the home's corner: answered and marked a request",
+      async () => {
+        await page.goto(`${base}/${owner}/${slug}/`);
+        await page.locator(".home-head .view-title").waitFor({ timeout: 15_000 });
+        // The home's corner holds Comments alone (TEMPRA-283), and no +.
+        const tools = await page
+          .locator(".home-head .page-tools button")
+          .evaluateAll((els) => els.map((e) => e.getAttribute("data-panel")));
+        if (JSON.stringify(tools) !== JSON.stringify(["comments"])) {
+          throw new Error(`the home's corner holds ${JSON.stringify(tools)}`);
+        }
+        if ((await page.locator(".page-actions").count()) > 0)
+          throw new Error("the home's + is back");
+        await comment(
+          "Comment on the library…",
+          "@tempra request: a new page on onboarding",
+          "enter",
+        );
+        await comments
+          .locator(".thread-replying", { hasText: "Tempra is replying…" })
+          .first()
+          .waitFor({ timeout: 15_000 });
+        await comments.getByText("marked this thread a request").waitFor({ timeout: 30_000 });
+        await comments.locator(".thread-request", { hasText: "Request" }).first().waitFor();
+      },
+    );
     await step("the request is listed by MCP work", async () => {
       const client = new Client({ name: "gate-agent", version: "1.0.0" });
       await client.connect(
@@ -5639,13 +5676,16 @@ async function freshAccountConnects(): Promise<string[]> {
       );
       if (put.status !== 200) throw new Error(`PUT shared.md: ${put.status}`);
     });
-    /** Opens the open page's Properties (TEMPRA-122: a page nobody checked shows only Mark
-     * as checked there, to a write member). */
+    /** Opens the open page's Page info (TEMPRA-283: a page nobody checked offers Mark as checked
+     * there, to a write member only). */
     const properties = async () => {
       await page.locator(".byline").waitFor({ timeout: 15_000 });
-      await page.getByRole("button", { name: "More", exact: true }).click();
-      await page.locator(".menu-list").getByRole("button", { name: "Properties" }).click();
-      const panel = page.locator("aside#panel-properties.page-aside");
+      await page
+        .locator('.page-tools [data-panel="info"]')
+        .filter({ visible: true })
+        .first()
+        .click();
+      const panel = page.locator("aside#panel-info.page-aside");
       await panel.waitFor({ timeout: 15_000 });
       return panel;
     };
@@ -5656,11 +5696,10 @@ async function freshAccountConnects(): Promise<string[]> {
       await panel.getByText("Linked from").waitFor({ timeout: 15_000 });
       // The role loads with the library list; give it the moment it takes.
       await page.waitForTimeout(500);
-      if ((await panel.getByRole("region", { name: "Check" }).count()) !== 0) {
+      if ((await panel.getByRole("button", { name: "Mark as checked" }).count()) !== 0) {
         throw new Error("a read member is offered a check");
       }
-      if ((await panel.getByText(/verif/i).count()) !== 0)
-        throw new Error("Properties says verify");
+      if ((await panel.getByText(/verif/i).count()) !== 0) throw new Error("Page info says verify");
       // Review mode says nobody has checked it, and offers a reader nothing but Done.
       await page.goto(`${lib}/shared.md?review=1`);
       await page
@@ -5683,10 +5722,7 @@ async function freshAccountConnects(): Promise<string[]> {
       await switchTo(asInvitee);
       await page.goto(`${lib}/shared.md`);
       const panel = await properties();
-      await panel
-        .getByRole("region", { name: "Check" })
-        .getByRole("button", { name: "Mark as checked" })
-        .waitFor({ timeout: 15_000 });
+      await panel.getByRole("button", { name: "Mark as checked" }).waitFor({ timeout: 15_000 });
     });
     // Deleting the library wipes its Durable Object and ends the connection.
     await step("delete the library from its Settings section", async () => {

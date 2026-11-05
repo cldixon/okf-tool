@@ -20,6 +20,7 @@
     SearchButton,
     SearchField,
     Segmented,
+    SplitButton,
     TextInput,
     Tile,
     ToolPill,
@@ -86,8 +87,22 @@
     <IconButton icon="sidebar" label="Pressed" pressed />
     <IconButton icon="close" label="Touch" touch />
     <IconButton icon="copy" label="Disabled" disabled />
+    <IconButton variant="outlined" icon="info" label="Outlined" />
+    <IconButton variant="outlined" icon="info" label="Outlined, pressed" pressed />
+    <IconButton variant="outlined" icon="comments" label="Outlined, with a count" count={2} />
+    <IconButton variant="outlined" icon="info" label="Outlined, with the dot" dot />
   {/snippet}
   {@render item("IconButton", iconButtons)}
+
+  {#snippet splitButtons()}
+    <SplitButton icon="copy" label="Copy page" menuLabel="More copy options">
+      {#snippet children()}
+        <a class="menu-item" href="#m"><Icon name="markdown" />View Markdown</a>
+        <a class="menu-item" href="#d"><Icon name="download" />Download .md</a>
+      {/snippet}
+    </SplitButton>
+  {/snippet}
+  {@render item("SplitButton", splitButtons)}
 
   {#snippet search()}<SearchButton shortcut="Ctrl K" />{/snippet}
   {@render item("SearchButton", search)}
@@ -160,9 +175,9 @@
       {#snippet label()}<Icon name="more" />{/snippet}
       {#snippet children()}
         <a class="menu-item" href="#a"><Icon name="copy" />Copy page</a>
-        <a class="menu-item" href="#b"><Icon name="history" />History</a>
+        <a class="menu-item" href="#b"><Icon name="markdown" />View Markdown</a>
         <hr />
-        <a class="menu-item" href="#c"><Icon name="link" />Copy link</a>
+        <a class="menu-item" href="#c"><Icon name="download" />Download .md</a>
       {/snippet}
     </Menu>
   {/snippet}

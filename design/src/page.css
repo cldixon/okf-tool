@@ -200,6 +200,36 @@
   border-bottom: 1px solid var(--tempra-color-border);
 }
 
+/* Beside the text (960px of page and up), a panel floats in its column as a card (TEMPRA-283;
+   tempra-dev: app/workspace, A panel floats): as tall as what it holds, up to the window, where
+   it scrolls inside; kept near the top, a hairline and the soft shadow round it, no rule down the
+   page and none under its head. The column keeps its width, so the text never moves. Narrower,
+   it overlays the page and on a phone it is the sheet, as before (the rules further down). */
+@container page (width >= 960px) {
+  .page-side > .page-aside {
+    top: var(--tempra-space-16);
+    height: auto;
+    max-height: calc(100dvh - var(--tempra-size-topbar) - 2 * var(--tempra-space-16));
+    /* A panel's width less the inset, at the page's right edge however wide the column is. */
+    width: calc(var(--tempra-size-panel) - var(--tempra-space-16));
+    margin: var(--tempra-space-16) var(--tempra-space-16) 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--tempra-color-border);
+    border-radius: var(--tempra-radius-card);
+    box-shadow: var(--tempra-shadow);
+  }
+
+  .page-side > .page-aside .panel-head {
+    padding: 0 var(--tempra-space-08) 0 var(--tempra-space-16);
+    border-bottom: 0;
+  }
+
+  /* A little room at its top, so a focus ring there is not cut by the scroller. */
+  .page-side > .page-aside .panel-body {
+    padding: var(--tempra-space-04) var(--tempra-space-16) var(--tempra-space-16);
+  }
+}
+
 .panel-head h2 {
   margin: 0;
   font-size: var(--tempra-text-ui);
@@ -711,15 +741,13 @@
     justify-self: end;
   }
 
+  /* Back in the column: the floating card above (TEMPRA-283) takes its top, height and shadow. */
   .page-view.panel-open .page-aside {
     position: sticky;
-    top: 0;
     right: auto;
     bottom: auto;
     z-index: auto;
     width: auto;
-    height: calc(100dvh - var(--tempra-size-topbar));
-    box-shadow: none;
   }
 }
 
@@ -824,66 +852,135 @@
   }
 }
 
-/* ---------- A page's actions (TEMPRA-172; tempra-dev: decisions/a-pages-actions-float) ---------- */
+/* ---------- A page's tools (TEMPRA-283; tempra-dev: decisions/page-tools-in-the-corner) ---------- */
 
-/* One round + at the page's bottom right, in ink, the one raised thing on a flat page; its menu
-   opens upward (Comment, Check). Aside while a panel is open (the app sets `hidden`). In the
-   page, so an overlaid panel or the phone's drawer dims it with the rest; under their scrims. */
-.page-actions {
-  position: fixed;
-  right: max(var(--tempra-space-28), env(safe-area-inset-right));
-  bottom: max(var(--tempra-space-28), env(safe-area-inset-bottom));
-  z-index: 3;
+/* One row of round outlined buttons: Comments with its count, Page info, Copy page | ⌄. Beside
+   the text it sits in the right column's top corner, sticky, right-aligned with the floating
+   card's edge, and the outline or the open card starts below it; where there is no column (under
+   960px of page, the Markdown view, a phone) the row under the byline takes its place. */
+.page-view {
+  --page-tools-h: calc(var(--tempra-size-control) + 2 * var(--tempra-space-16));
 }
 
-.page-actions[hidden] {
+.page-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--tempra-space-08);
+}
+
+.page-side > .page-tools {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  justify-content: flex-end;
+  padding: var(--tempra-space-16) var(--tempra-space-16) 0 0;
+}
+
+.doc-head > .page-tools {
   display: none;
+  margin-top: var(--tempra-space-16);
 }
 
-.page-fab {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: var(--tempra-size-fab);
-  height: var(--tempra-size-fab);
+@container page (width >= 960px) {
+  .page-side > .page-aside {
+    top: var(--page-tools-h);
+    max-height: calc(
+      100dvh -
+      var(--tempra-size-topbar) -
+      var(--page-tools-h) -
+      var(--tempra-space-16)
+    );
+  }
+
+  .page-side > .page-contents {
+    top: var(--page-tools-h);
+    max-height: calc(100dvh - var(--tempra-size-topbar) - var(--page-tools-h));
+    padding-top: var(--tempra-space-16);
+  }
+
+  /* The Markdown view has no column: its row is the head's. */
+  .page-view.markdown-on:not(.panel-open) .page-side > .page-tools {
+    display: none;
+  }
+
+  .page-view.markdown-on:not(.panel-open) .doc-head > .page-tools {
+    display: flex;
+  }
+}
+
+@container page (width < 960px) {
+  .page-side > .page-tools {
+    display: none;
+  }
+
+  .doc-head > .page-tools {
+    display: flex;
+  }
+}
+
+/* The home's corner (TEMPRA-283): its library threads' Comments, at the head's end. */
+.home-head .page-tools {
+  flex: none;
+  align-self: flex-start;
+}
+
+/* Page info (TEMPRA-283): the newer version and the check on top, then About this page and
+   Versions, each under a quiet label; plain rows, no fills. */
+.page-info-now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tempra-space-08);
+  margin: 0 0 var(--tempra-space-16);
   padding: 0;
-  border: 0;
+  list-style: none;
+}
+
+.page-info-now li {
+  display: flex;
+  align-items: center;
+  gap: var(--tempra-space-08);
+  line-height: var(--tempra-leading-base);
+}
+
+.page-info-now .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.page-info-now .agent-dot {
+  flex: none;
+  width: var(--tempra-size-dot);
+  height: var(--tempra-size-dot);
   border-radius: 50%;
-  background: var(--tempra-color-text);
-  color: var(--tempra-color-bg);
-  box-shadow: var(--tempra-shadow);
+  background: var(--tempra-color-agent);
 }
 
-.page-fab:hover:not(:disabled) {
-  background: var(--tempra-color-text);
-  color: var(--tempra-color-bg);
+.page-info-now button,
+.page-info-now a.button {
+  padding: var(--tempra-space-04) var(--tempra-space-12);
+  font-size: var(--tempra-text-meta);
 }
 
-.page-fab svg {
-  transition: transform var(--tempra-motion-quick) ease;
+.page-info-section {
+  padding-top: var(--tempra-space-14);
+  border-top: 1px solid var(--tempra-color-border);
 }
 
-/* Open, the + turns into × over its menu. */
-.page-fab[aria-expanded="true"] svg {
-  transform: rotate(45deg);
+/* Nothing to do now (a reader, or a checked page with no news): no rule under the head. */
+.page-info-section:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
-/* Something waits in the menu (open comments, changes since the check): a small ringed dot on
-   the button's corner. Greys only. */
-.page-fab-dot {
-  position: absolute;
-  top: var(--tempra-space-02);
-  right: var(--tempra-space-02);
-  width: 12px; /* one-off: the ringed dot */
-  height: 12px;
-  box-sizing: border-box;
-  border: 2px solid var(--tempra-color-text);
-  border-radius: 50%;
-  background: var(--tempra-color-bg);
+.page-info-section + .page-info-section {
+  margin-top: var(--tempra-space-16);
 }
 
-.page-actions-list {
-  min-width: 240px; /* one-off: Review changes and its count on one line */
+.page-info-section > h3 {
+  margin: 0 0 var(--tempra-space-08);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-regular);
 }
 
 .menu-list .menu-count {
@@ -891,19 +988,4 @@
   padding-left: var(--tempra-space-12);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
-}
-
-/* Who checked the page, when there is nothing to do about it. */
-.menu-list .menu-line {
-  margin: 0;
-  padding: var(--tempra-space-06) var(--tempra-space-10);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-}
-
-@media (max-width: 900px) {
-  .page-actions {
-    right: max(var(--tempra-space-16), env(safe-area-inset-right));
-    bottom: max(var(--tempra-space-24), env(safe-area-inset-bottom));
-  }
 }

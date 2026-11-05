@@ -26,6 +26,7 @@ import PillButtonC from "./PillButton.svelte";
 import SearchButtonC from "./SearchButton.svelte";
 import SearchFieldC from "./SearchField.svelte";
 import SegmentedC from "./Segmented.svelte";
+import SplitButtonC from "./SplitButton.svelte";
 import TextInputC from "./TextInput.svelte";
 import TileC from "./Tile.svelte";
 import ToolPillC from "./ToolPill.svelte";
@@ -48,6 +49,7 @@ import type {
   SearchButtonProps,
   SearchFieldProps,
   SegmentedProps,
+  SplitButtonProps,
   TextInputProps,
   TileProps,
   ToolPillProps,
@@ -78,6 +80,7 @@ export const PanelHead = PanelHeadC as Component<PanelHeadProps>;
 export const PillButton = PillButtonC as Component<PillButtonProps>;
 export const SearchButton = SearchButtonC as Component<SearchButtonProps>;
 export const SearchField = SearchFieldC as Component<SearchFieldProps, NoExports, "value">;
+export const SplitButton = SplitButtonC as Component<SplitButtonProps>;
 export const TextInput = TextInputC as Component<TextInputProps, NoExports, "value">;
 export const Tile = TileC as Component<TileProps>;
 export const ToolPill = ToolPillC as Component<ToolPillProps>;
