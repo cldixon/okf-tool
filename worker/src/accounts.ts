@@ -71,13 +71,25 @@ export const INVITATION_DAYS = 14;
 /** Invitations a library may send a day: enough for a team, too few to spam with. */
 export const INVITATIONS_PER_DAY = 20;
 
-/** A person's theme (take 4): light or dark, or null for the system's. */
-export type Theme = "light" | "dark";
+/**
+ * A person's theme (take 4): system, light or dark, as they chose it. `users.theme` is NULL until
+ * they choose, and a NULL is the default, dark (TEMPRA-285); System is stored as `system`.
+ */
+export type Theme = "system" | "light" | "dark";
 
+/** The theme of an account that never chose one (TEMPRA-285). */
+export const DEFAULT_THEME: Theme = "dark";
+
+/** A theme from the API: one of the three, or null to go back to the default. */
 export function checkTheme(v: unknown): Theme | null {
-  if (v === null || v === undefined || v === "system" || v === "") return null;
-  if (v === "light" || v === "dark") return v;
+  if (v === null) return null;
+  if (v === "system" || v === "light" || v === "dark") return v;
   throw new StoreError(400, "bad_theme", "The theme is system, light or dark.");
+}
+
+/** The theme a stored value means: the choice, or the default when there is none. */
+export function themeOf(stored: unknown): Theme {
+  return stored === "system" || stored === "light" || stored === "dark" ? stored : DEFAULT_THEME;
 }
 
 /** The longest name an account may have, in characters (TEMPRA-54). */
@@ -110,7 +122,7 @@ export interface User {
   email: string;
   actor: string;
   handle: string;
-  /** The person's theme, or null for the system's (not every load carries it). */
+  /** The person's theme as stored, null when never chosen (not every load carries it). */
   theme?: Theme | null;
   /** The person's name, or null when they gave none (TEMPRA-54; not every load carries it). */
   name?: string | null;
@@ -291,7 +303,7 @@ export interface Accounts {
    * may assign a reserved handle (`reserved: "allow"`).
    */
   setHandle(userId: string, handle: string, opts?: { reserved?: "allow" }): Promise<User>;
-  /** The person's theme: light, dark, or null for the system's (take 4). */
+  /** The person's theme: system, light or dark, or null for the default (take 4, TEMPRA-285). */
   setTheme(userId: string, theme: Theme | null): Promise<void>;
   /** The person's name, checked by `checkName`, or null to clear it (TEMPRA-54). */
   setName(userId: string, name: string | null): Promise<void>;

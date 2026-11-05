@@ -1,5 +1,6 @@
 import { href } from "@tempra/app";
 import { href as designHref } from "@tempra/design";
+import { themeOf } from "../accounts";
 
 /** The app's client bundle: a static asset at a content-hashed URL (TEMPRA-174). */
 export const appHref = href;
@@ -17,9 +18,9 @@ export function spaShell(
 ): Response {
   const url = new URL(request.url);
   // The account's theme on the root (take 4): the tokens' light-dark() values follow it from the
-  // first paint; absent, the system decides.
-  const theme =
-    opts.theme === "light" || opts.theme === "dark" ? ` data-theme="${opts.theme}"` : "";
+  // first paint. Never chosen is dark (TEMPRA-285); System leaves it off, so the system decides.
+  const chosen = themeOf(opts.theme);
+  const theme = chosen === "system" ? "" : ` data-theme="${chosen}"`;
   // The change feed's WebSocket, on this host (wss:, or ws: for local http).
   const socket = `${url.protocol === "https:" ? "wss" : "ws"}://${url.host}`;
   const html = `<!doctype html>

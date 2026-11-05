@@ -471,6 +471,8 @@ describe("errors as pages (V-1)", () => {
       // The public pages' flat frame (TEMPRA-126): a skip link to the main content, the
       // wordmark linking to tempra.dev, no sheet, and the foot's links as a list.
       expect(r.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
+      // Dark, with no account to choose otherwise (TEMPRA-285).
+      expect(html).toContain('<html lang="en" data-theme="dark"><head>');
       expect(html).toContain('<a class="skip-link" href="#main">');
       expect(html).toContain('<main id="main" class="public-main">');
       expect(html).toContain('<a class="wordmark mark-lockup" href="https://tempra.dev/">');
