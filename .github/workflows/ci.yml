@@ -238,7 +238,7 @@ jobs:
         run: |
           curl -fsS --retry 10 --retry-delay 6 --retry-all-errors https://staging.tempra.dev/healthz
           # Signed out, the root is the landing page (TEMPRA-276).
-          curl -fsS https://staging.tempra.dev/ | grep -q '/request-access"'
+          curl -fsS https://staging.tempra.dev/ | grep -q '/sign-in"'
           if [ -n "$SMOKE_TOKEN" ]; then
             bun scripts/mcp-smoke.ts --url https://staging.tempra.dev --token "$SMOKE_TOKEN"
           fi
@@ -300,7 +300,7 @@ jobs:
           # root is the landing page to someone signed out.
           curl -fsS --retry 10 --retry-delay 6 --retry-all-errors https://app.tempra.dev/healthz
           test "$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' https://www.tempra.dev/)" = "301 https://tempra.dev/"
-          curl -fsS https://tempra.dev/ | grep -q '/request-access"'
+          curl -fsS https://tempra.dev/ | grep -q '/sign-in"'
           if [ -n "$SMOKE_TOKEN" ]; then
             bun scripts/mcp-smoke.ts --url https://tempra.dev --token "$SMOKE_TOKEN" --read-only
             bun scripts/mcp-smoke.ts --url https://app.tempra.dev --token "$SMOKE_TOKEN" --read-only

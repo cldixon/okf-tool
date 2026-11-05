@@ -11,9 +11,9 @@ function beta() {
   return s;
 }
 
-/** Request access (TEMPRA-125): the one way onto the waitlist. */
-const ask = (s: S, email: string) =>
-  s.anon.request("/request-access", {
+/** Join now (TEMPRA-284): `/sign-in`, the one way in, and so onto the waitlist. */
+const ask = (s: S, email: string, path = "/sign-in") =>
+  s.anon.request(path, {
     method: "POST",
     headers: { Origin: ORIGIN },
     body: new URLSearchParams({ email }),
@@ -37,39 +37,62 @@ const decide = async (client: S["app"], email: string, decision: string, origin 
 };
 
 describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
-  test("sign-in and Request access say the right thing in each mode", async () => {
+  test("one way in, Join now, says the right thing in each mode", async () => {
     const s = beta();
     const page = async (path: string) => {
       const r = await s.anon.request(path, { redirect: "manual" });
       return { status: r.status, location: r.headers.get("Location"), text: await r.text() };
     };
-    // invite: sign-in is for accounts, with a way to ask; Request access is its own page.
+    // invite: one page for both, with no second path.
     let signIn = await page("/sign-in");
-    expect(signIn.text).toContain("We'll email you a link and a code.");
-    expect(signIn.text).toContain('href="/request-access"');
+    expect(signIn.text).toContain("<title>Join Tempra");
+    expect(signIn.text).toContain("<h1>Join Tempra</h1>");
+    expect(signIn.text).toContain("Already in? We'll email you a sign-in link.");
+    expect(signIn.text).toContain(">Join now</button>");
+    expect(signIn.text).not.toContain("request-access");
     expect(signIn.text).not.toContain("creates your account");
-    const request = await page("/request-access");
-    expect(request.status).toBe(200);
-    expect(request.text).toContain("private beta");
-    expect(request.text).toContain("<title>Request access");
-    // open: the link creates the account; Request access goes to sign-in.
+    // open: the link creates the account.
     Object.assign(s.env, { SIGNUP: "open" });
     signIn = await page("/sign-in");
     expect(signIn.text).toContain("The same link creates your account.");
-    expect(signIn.text).not.toContain("/request-access");
-    expect(await page("/request-access")).toMatchObject({ status: 302, location: "/sign-in" });
-    // closed: no new accounts, and no form to ask with.
+    expect(signIn.text).toContain(">Join now</button>");
+    // closed: no new accounts; sign-in only.
     Object.assign(s.env, { SIGNUP: "closed" });
     signIn = await page("/sign-in");
+    expect(signIn.text).toContain("<h1>Sign in</h1>");
     expect(signIn.text).toContain("not taking new accounts");
-    expect(signIn.text).not.toContain("creates your account");
-    expect(signIn.text).not.toContain("/request-access");
-    const closed = await page("/request-access");
-    expect(closed.text).toContain("Not taking new accounts");
-    expect(closed.text).not.toContain("<form");
+    expect(signIn.text).not.toContain("Join now");
     const posted = await ask(s, "friend@example.com");
-    expect(await posted.text()).toContain("Not taking new accounts");
+    expect(await posted.text()).toContain("Check your email");
+    await settle();
+    expect(s.outbox).toHaveLength(0);
     expect(await s.accounts.waitlist()).toHaveLength(0);
+  });
+
+  test("/request-access keeps working: a GET goes to Join now, a POST is its post", async () => {
+    const s = beta();
+    for (const mode of ["invite", "open", "closed"]) {
+      Object.assign(s.env, { SIGNUP: mode });
+      const r = await s.anon.request("/request-access", { redirect: "manual" });
+      expect([r.status, r.headers.get("Location")]).toEqual([302, "/sign-in"]);
+    }
+    Object.assign(s.env, { SIGNUP: "invite" });
+    const kept = await s.anon.request("/request-access?next=%2Fdev%2Fdev", { redirect: "manual" });
+    expect(kept.headers.get("Location")).toBe("/sign-in?next=%2Fdev%2Fdev");
+    const unsafe = await s.anon.request("/request-access?next=https%3A%2F%2Fevil.example", {
+      redirect: "manual",
+    });
+    expect(unsafe.headers.get("Location")).toBe("/sign-in?next=%2F");
+    const old = await ask(s, "friend@example.com", "/request-access");
+    const viaSignIn = await ask(s, "other@example.com");
+    expect((await old.text()).replaceAll("friend@example.com", "EMAIL")).toBe(
+      (await viaSignIn.text()).replaceAll("other@example.com", "EMAIL"),
+    );
+    await settle();
+    expect((await s.accounts.waitlist()).map((w) => w.email).sort()).toEqual([
+      "friend@example.com",
+      "other@example.com",
+    ]);
   });
 
   test("a new email is told once it is on the list, and the operator once", async () => {
@@ -77,7 +100,9 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
     const r = await ask(s, "friend@example.com");
     expect(r.status).toBe(200);
     const text = await r.text();
-    expect(text).toContain("Request received");
+    expect(text).toContain("Check your email");
+    expect(text).toContain("a note that it's on the list");
+    expect(text).toContain('name="code"');
     expect(text).toContain("If you asked several times, wait an hour");
     await ask(s, "friend@example.com");
     await settle();
@@ -89,53 +114,40 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
     expect(s.outbox[1]?.text).toContain(`${ORIGIN}/waitlist`);
   });
 
-  test("the page says the same whoever asks; an account is sent a sign-in link", async () => {
+  test("the page says the same whoever asks; an account or an invite is sent a sign-in link", async () => {
     const s = beta();
     s.db.run("INSERT INTO invites (email, created) VALUES ('friend@example.com', 'now')");
     const answers = new Set<string>();
     for (const email of ["owner@example.com", "friend@example.com", "new@example.com"]) {
-      answers.add((await (await ask(s, email)).text()).replace(email, "EMAIL"));
+      answers.add((await (await ask(s, email)).text()).replaceAll(email, "EMAIL"));
     }
     expect(answers.size).toBe(1);
     await settle();
-    expect(s.outbox.map((m) => [m.to, m.subject])).toEqual([
-      ["owner@example.com", "Your Tempra sign-in link"],
-      ["friend@example.com", "Your Tempra sign-in link"],
+    expect(s.outbox.map((m) => [m.to, m.subject.replace(/[0-9A-Z]{8}$/, "CODE")])).toEqual([
+      ["owner@example.com", "Tempra sign-in code: CODE"],
+      ["friend@example.com", "Tempra sign-in code: CODE"],
       ["new@example.com", "You're on the list: Tempra"],
       ["owner@example.com", "Tempra waitlist: new@example.com"],
     ]);
-    expect(s.outbox[0]?.text).toContain("You can already sign in");
     expect(await s.accounts.waitlist()).toEqual([
       { email: "new@example.com", created: expect.any(String) },
     ]);
   });
 
-  test("Request access is a same-site post, and checks the email", async () => {
+  test("joining is a same-site post, and checks the email", async () => {
     const s = beta();
-    const evil = await s.anon.request("/request-access", {
-      method: "POST",
-      headers: { Origin: "https://evil.example" },
-      body: new URLSearchParams({ email: "friend@example.com" }),
-    });
-    expect(evil.status).toBe(403);
-    const bad = await ask(s, "not an email");
-    expect(bad.status).toBe(400);
-    expect(await bad.text()).toContain('role="alert"');
-    expect(await s.accounts.waitlist()).toHaveLength(0);
-  });
-
-  test("sign-in no longer adds anyone to the waitlist", async () => {
-    const s = beta();
-    const r = await s.anon.request("/sign-in", {
-      method: "POST",
-      headers: { Origin: ORIGIN },
-      body: new URLSearchParams({ email: "stranger@example.com", next: "/" }),
-    });
-    const text = await r.text();
-    expect(text).toContain("can sign in here");
-    expect(text).toContain('href="/request-access"');
+    for (const path of ["/sign-in", "/request-access"]) {
+      const evil = await s.anon.request(path, {
+        method: "POST",
+        headers: { Origin: "https://evil.example" },
+        body: new URLSearchParams({ email: "friend@example.com" }),
+      });
+      expect(evil.status).toBe(403);
+      const bad = await ask(s, "not an email", path);
+      expect(bad.status).toBe(400);
+      expect(await bad.text()).toContain('role="alert"');
+    }
     await settle();
-    expect(s.outbox).toHaveLength(0);
     expect(await s.accounts.waitlist()).toHaveLength(0);
   });
 
@@ -160,6 +172,7 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
   test("only the operator sees /waitlist; others get 404, no session goes to sign-in", async () => {
     const s = beta();
     await ask(s, "friend@example.com");
+    await settle();
     const page = await s.app.request("/waitlist");
     expect(page.status).toBe(200);
     const html = await page.text();
@@ -201,7 +214,7 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
     );
     expect(s.outbox).toHaveLength(1);
     await ask(s, "friend@example.com");
-    expect(s.outbox.at(-1)?.subject).toBe("Your Tempra sign-in link");
+    expect(s.outbox.at(-1)?.subject).toStartWith("Tempra sign-in code: ");
   });
 
   test("dismiss sends nothing, and asking again does not renotify", async () => {
@@ -223,6 +236,7 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
   test("an email invited another way leaves the review list", async () => {
     const s = beta();
     await ask(s, "friend@example.com");
+    await settle();
     s.db.run("INSERT INTO invites (email, created) VALUES ('friend@example.com', 'now')");
     expect(await s.accounts.waitlist()).toHaveLength(0);
   });

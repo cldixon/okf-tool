@@ -499,7 +499,7 @@ async function openBrowser() {
   const signInAs = async (email: string, next: string, byCode = false) => {
     await page.goto(`${base}/sign-in?next=${encodeURIComponent(next)}`);
     await page.locator('input[name="email"]').fill(email);
-    await page.getByRole("button", { name: "Email me a link" }).click();
+    await page.getByRole("button", { name: "Join now" }).click();
     if (byCode) {
       const code = (await page.locator("#dev-code").innerText()).trim();
       if (!/^[0-9A-Z]{8}$/.test(code)) throw new Error(`the dev code reads "${code}"`);
