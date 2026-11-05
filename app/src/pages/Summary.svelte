@@ -2,8 +2,8 @@
   import {
     byPerson,
     continuesRun,
-    entryTime,
     type Entry,
+    entryTime,
     groupByDay,
     type LedgerRequest,
     type LiveWrite,
