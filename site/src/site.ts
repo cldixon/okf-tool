@@ -1,7 +1,7 @@
 /** What every page of the site shares: where the app is, the name, and who to write to. */
 
 /**
- * The app, where people sign in and request access: the same host since TEMPRA-276 (the app's
+ * The app, where people join and sign in (one way in, Join now): the same host since TEMPRA-276 (the app's
  * Worker serves tempra.dev and shows this site at `/` to people signed out), so links are paths.
  */
 export const APP = "";

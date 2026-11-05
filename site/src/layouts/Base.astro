@@ -22,7 +22,7 @@ const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.sit
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -46,8 +46,7 @@ const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.sit
     <header class="public-head">
       <a class="wordmark mark-lockup" href="/"><Fragment set:html={markSvg({ small: true })} />Tempra</a>
       <nav class="public-nav" aria-label="Main">
-        <a href={`${APP}/sign-in`}>Sign in</a>
-        <a class="button primary" href={`${APP}/request-access`}>Request access</a>
+        <a class="button primary" href={`${APP}/sign-in`}>Join now</a>
       </nav>
     </header>
     <main id="main" class="public-main">
@@ -59,7 +58,7 @@ const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.sit
           <li><a href="/">Home</a></li>
           <li><a href="/terms">Terms</a></li>
           <li><a href="/privacy">Privacy</a></li>
-          <li><a href={`${APP}/sign-in`}>Sign in</a></li>
+          <li><a href={`${APP}/sign-in`}>Join now</a></li>
         </ul>
       </nav>
     </footer>

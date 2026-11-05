@@ -499,7 +499,7 @@ async function openBrowser() {
   const signInAs = async (email: string, next: string, byCode = false) => {
     await page.goto(`${base}/sign-in?next=${encodeURIComponent(next)}`);
     await page.locator('input[name="email"]').fill(email);
-    await page.getByRole("button", { name: "Email me a link" }).click();
+    await page.getByRole("button", { name: "Join now" }).click();
     if (byCode) {
       const code = (await page.locator("#dev-code").innerText()).trim();
       if (!/^[0-9A-Z]{8}$/.test(code)) throw new Error(`the dev code reads "${code}"`);
@@ -1479,22 +1479,33 @@ async function browserRenders(
       if (page.url() !== `${lib}/`) throw new Error(`the bell left the page: ${page.url()}`);
       await page.keyboard.press("Escape");
       await bellPop.waitFor({ state: "detached", timeout: 5000 });
-      // The theme: applied at once, kept on the account across a reload, back to the system's.
+      // The theme: dark until the person chooses (TEMPRA-285), whatever the system says; a
+      // choice applied at once and kept on the account across a reload; then the system's, which
+      // the rest of the gate needs, since its light and dark passes emulate the system's scheme.
       const account = page.locator(".menu-list.account");
-      await page.getByRole("button", { name: "Account menu" }).click();
-      await account.getByRole("button", { name: "Dark", exact: true }).click();
+      await page.emulateMedia({ colorScheme: "light" });
       await page.locator('html[data-theme="dark"]').waitFor({ timeout: 5000 });
+      if (shots) await page.screenshot({ path: `${shots}/home-dark.png` });
+      await page.getByRole("button", { name: "Account menu" }).click();
+      await account
+        .locator('button[aria-pressed="true"]', { hasText: "Dark" })
+        .waitFor({ timeout: 5000 });
+      await account.getByRole("button", { name: "Light", exact: true }).click();
+      await page.locator('html[data-theme="light"]').waitFor({ timeout: 5000 });
       await page.keyboard.press("Escape");
       await account.waitFor({ state: "detached", timeout: 5000 });
       await page.reload();
-      await page.locator('html[data-theme="dark"]').waitFor({ timeout: 15_000 });
+      await page.locator('html[data-theme="light"]').waitFor({ timeout: 15_000 });
       await home();
-      if (shots) await page.screenshot({ path: `${shots}/home-dark.png` });
       await page.getByRole("button", { name: "Account menu" }).click();
       await account.getByRole("button", { name: "System", exact: true }).click();
       await page.locator("html:not([data-theme])").waitFor({ timeout: 5000 });
       await page.keyboard.press("Escape");
       await account.waitFor({ state: "detached", timeout: 5000 });
+      await page.reload();
+      await page.locator("html:not([data-theme])").waitFor({ timeout: 15_000 });
+      await home();
+      await page.emulateMedia({ colorScheme: null });
     });
     // The phone (take 4, TEMPRA-118, boards 34 and 36): a top bar with Tempra (TEMPRA-140), the
     // sidebar as a drawer over it with Tempra at its head (TEMPRA-141), the home stacked.
@@ -4579,6 +4590,27 @@ async function browserRenders(
   return problems;
 }
 
+/**
+ * Sets the signed-in account's theme to System and reloads, so the page follows the scheme the
+ * gate emulates: an account that never chose is dark (TEMPRA-285).
+ */
+async function followSystem(page: import("playwright-core").Page) {
+  if ((await page.locator("html:not([data-theme])").count()) > 0) return;
+  // As a person does, from the avatar's menu; the choice is saved on the account.
+  const account = page.locator(".menu-list.account");
+  await page.getByRole("button", { name: "Account menu" }).click();
+  const saved = page.waitForResponse(
+    (r) => r.url().endsWith("/api/v1/account") && r.request().method() === "PATCH",
+    { timeout: 15_000 },
+  );
+  await account.getByRole("button", { name: "System", exact: true }).click();
+  if ((await saved).status() !== 200) throw new Error("setting the theme to System failed");
+  await page.keyboard.press("Escape");
+  await account.waitFor({ state: "detached", timeout: 5000 });
+  await page.reload();
+  await page.locator("html:not([data-theme])").waitFor({ timeout: 15_000 });
+}
+
 /** A page for axe: where it is, what shows it is ready, and how it is seen. */
 interface AxePage {
   name: string;
@@ -4659,12 +4691,13 @@ async function uploadLink(owner: string, slug: string, token: string): Promise<s
       await heading("Upload a file");
       await page.getByText("gate-upload/photo.png").waitFor({ timeout: 5000 });
     });
-    await step("the page passes axe, light and dark", async () => {
-      const ready = () => heading("Upload a file");
-      const found = await axePages(page, [
-        { name: "upload page", url: link, ready },
-        { name: "upload page (dark)", url: link, ready, dark: true },
-      ]);
+    await step("the page is dark with the system light, and passes axe", async () => {
+      // A server page has no account to choose by: dark, whatever the system (TEMPRA-285).
+      const ready = async () => {
+        await heading("Upload a file");
+        await page.locator('html[data-theme="dark"]').waitFor({ timeout: 5000 });
+      };
+      const found = await axePages(page, [{ name: "upload page", url: link, ready }]);
       if (found.length > 0) throw new Error(found.join("; "));
     });
     await step("the person chooses the file and uploads it", async () => {
@@ -4748,6 +4781,10 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
   try {
     await step("a mention on a page: Tempra is replying…, then its reply", async () => {
       await b.signInAs("dev@localhost", `/${owner}/${slug}/${pagePath}`);
+      await page.locator(".doc-title").waitFor({ timeout: 15_000 });
+      // The system's theme (dark is the default, TEMPRA-285), so the light and dark screenshots
+      // and axe passes below see the scheme they emulate.
+      await followSystem(page);
       await page.locator(".doc-title").waitFor({ timeout: 15_000 });
       await comment("Comment on the page…", "@tempra what does this page say?", "click");
       await comments

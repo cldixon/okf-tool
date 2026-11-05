@@ -23,7 +23,7 @@ const features = [
 ];
 
 const steps = [
-  "Request access with your email.",
+  "Join with your email.",
   "Connect Claude, Claude Code or any MCP client with one URL.",
   "Ask it to write down what you know.",
 ];
@@ -40,8 +40,7 @@ const steps = [
       comment, and mark what you have checked. Every change is kept.
     </p>
     <p class="public-actions">
-      <a class="button primary" href={`${APP}/request-access`}>Request access</a>
-      <a class="button" href={`${APP}/sign-in`}>Sign in</a>
+      <a class="button primary" href={`${APP}/sign-in`}>Join now</a>
     </p>
     <p class="muted">Tempra is in private beta.</p>
   </section>
@@ -66,8 +65,7 @@ const steps = [
       {steps.map((s) => <li>{s}</li>)}
     </ol>
     <p class="public-actions">
-      <a class="button primary" href={`${APP}/request-access`}>Request access</a>
-      <a class="button" href={`${APP}/sign-in`}>Sign in</a>
+      <a class="button primary" href={`${APP}/sign-in`}>Join now</a>
     </p>
   </section>
 </Base>

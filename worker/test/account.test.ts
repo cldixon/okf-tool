@@ -482,22 +482,36 @@ describe("terms and privacy (v2 spec: A3)", () => {
 describe("the account's theme (take 4, TEMPRA-113)", () => {
   test("set on the account, read back with /me, and put on the shell's root", async () => {
     const s = setup();
-    const before = await s.app.request("/owner/demo/");
-    expect(await before.text()).toContain('<html lang="en"><head>');
-    const dark = await call(s.app, "/api/v1/account", "PATCH", { theme: "dark" });
-    expect(dark.status).toBe(200);
-    expect((await dark.json()) as unknown).toEqual({ theme: "dark" });
-    const me = (await (await s.app.request("/api/v1/me")).json()) as { theme: string | null };
-    expect(me.theme).toBe("dark");
+    const theme = async () =>
+      ((await (await s.app.request("/api/v1/me")).json()) as { theme: string | null }).theme;
+    const root = async (path = "/owner/demo/") =>
+      /<html[^>]*>/.exec(await (await s.app.request(path, { redirect: "manual" })).text())?.[0];
+    // Never chosen is dark (TEMPRA-285): on the root, and in /me and /account.
+    expect(await root()).toBe('<html lang="en" data-theme="dark">');
+    expect(await theme()).toBe("dark");
+    const account = (await (await s.app.request("/api/v1/account")).json()) as { theme: string };
+    expect(account.theme).toBe("dark");
+    const light = await call(s.app, "/api/v1/account", "PATCH", { theme: "light" });
+    expect(light.status).toBe(200);
+    expect((await light.json()) as unknown).toEqual({ theme: "light" });
+    expect(await theme()).toBe("light");
     for (const path of ["/", "/owner/demo/", "/owner/demo/a.md", "/agents"]) {
-      const r = await s.app.request(path, { redirect: "manual" });
-      expect(r.status).toBe(200);
-      expect(await r.text()).toContain('<html lang="en" data-theme="dark"><head>');
+      expect(await root(path)).toBe('<html lang="en" data-theme="light">');
     }
-    // Back to the system's: no attribute. A theme that is not one is refused.
-    expect((await call(s.app, "/api/v1/account", "PATCH", { theme: "system" })).status).toBe(200);
-    expect(await (await s.app.request("/owner/demo/")).text()).toContain('<html lang="en"><head>');
+    // System is a choice of its own, kept as such: no attribute, so the system decides.
+    const system = await call(s.app, "/api/v1/account", "PATCH", { theme: "system" });
+    expect((await system.json()) as unknown).toEqual({ theme: "system" });
+    expect(await theme()).toBe("system");
+    expect(await root()).toBe('<html lang="en">');
+    // Dark as chosen, and null back to the default, which is dark too.
+    await call(s.app, "/api/v1/account", "PATCH", { theme: "dark" });
+    expect(await root()).toBe('<html lang="en" data-theme="dark">');
+    const reset = await call(s.app, "/api/v1/account", "PATCH", { theme: null });
+    expect((await reset.json()) as unknown).toEqual({ theme: "dark" });
+    expect(await theme()).toBe("dark");
+    // A theme that is not one is refused.
     expect((await call(s.app, "/api/v1/account", "PATCH", { theme: "sepia" })).status).toBe(400);
+    expect((await call(s.app, "/api/v1/account", "PATCH", { theme: "" })).status).toBe(400);
     expect((await call(s.app, "/api/v1/account", "PATCH", {})).status).toBe(400);
     // Only from the app's pages, as the rest of the account.
     const token = await s.app.request("/api/v1/account", {

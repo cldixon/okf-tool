@@ -17,8 +17,9 @@ export const esc = (value: string) => value.replace(/[&<>"']/g, (c) => `&#${c.ch
 const WORDMARK = markSvg({ small: true });
 
 export function page(title: string, body: string): string {
+  // Dark, whatever the system (TEMPRA-285): there is no account here to choose otherwise.
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en" data-theme="dark"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(title)} · Tempra</title>
