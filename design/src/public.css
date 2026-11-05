@@ -3,7 +3,8 @@
  * the app's server pages (sign-in, app consent, the email-change link, error pages). Flat like the
  * app's take 4 (tempra-dev decisions/take4-review-answers.md, answer 9): a bar with the wordmark
  * over a hairline, the page as a plain column on the page's background (no sheet on a ground),
- * and a quiet foot over a hairline. Nothing here needs a script.
+ * and a quiet foot over a hairline; the site (tempra.dev) has its own frame and the landing page
+ * as a Tempra page (`.public.site`, `.landing-doc`, TEMPRA-286). Nothing here needs a script.
  *
  * Markup: body.public (.narrow for a form or a message) > a.skip-link, header.public-head,
  * main#main.public-main, footer.public-foot > nav > ul.
@@ -128,80 +129,210 @@
   color: var(--tempra-color-text);
 }
 
-/* ---------- The landing page ---------- */
-
-.public-main section + section {
-  margin-top: var(--tempra-space-56);
-}
-
-.lede {
-  max-width: 34em;
-  margin: var(--tempra-space-12) 0 var(--tempra-space-24);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-reader);
-  line-height: var(--tempra-leading-base);
-}
-
 .public-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--tempra-space-08);
 }
 
-/* What Tempra does: a list between hairlines, two to a row where there is room. */
-.features {
+/* ---------- The site (tempra.dev): its frame and the landing page ---------- */
+
+/* The site's frame (TEMPRA-286): the large lockup at the left and one control, the light Sign in
+   pill, at the right, the header and the foot at the window's edges with no hairlines. Terms,
+   Privacy and Not found keep the plain column between them. The sizes no token names (the
+   lockup's 26px, the landing page's display type) are the Paper board's, set once here. */
+.public.site {
+  --site-inline: 64px; /* one-off: the site's margin at the window's edge */
+  --site-head: 88px; /* one-off: the site's header */
+}
+
+.public.site .public-head {
+  min-height: var(--site-head);
+  padding: 0 var(--site-inline);
+  border-bottom: 0;
+}
+
+/* The large lockup: the name at 26px, the mark --tempra-size-mark of it (about 23px). */
+.public.site .wordmark {
+  font-family: var(--tempra-font-display);
+  font-variation-settings: var(--tempra-font-display-settings);
+  font-size: 26px; /* one-off: the large lockup's name */
+  letter-spacing: -0.015em; /* one-off: the lockup's name */
+  line-height: var(--tempra-leading-tight);
+}
+
+.public.site .public-nav .button.primary {
+  padding: var(--tempra-space-12) 22px; /* one-off: the site's pill */
+  font-size: var(--tempra-text-name);
+}
+
+.public.site .public-foot {
+  padding: var(--tempra-space-24) var(--site-inline) var(--tempra-space-28);
+  border-top: 0;
+  font-size: var(--tempra-text-ui);
+}
+
+.public.site .public-foot ul {
+  column-gap: var(--tempra-space-24);
+}
+
+/* The landing page fits one window (the header, the doc, the foot at the window's bottom, as
+   .public's min-height puts it), and grows only if a small screen or the open contents need it. */
+.public.site.landing .public-main {
+  display: flex;
+  justify-content: center;
+  padding: var(--site-head) var(--site-inline) 0;
+}
+
+/* The landing page drawn as a Tempra page (candidate C, "the page is a doc"): the title, the
+   description, a byline by Tempra's own agent over a hairline, three short sections, and the
+   contents beside them as the app draws them (.toc). */
+.landing-doc {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
-  gap: 0 var(--tempra-space-32);
-  margin: var(--tempra-space-16) 0 0;
-  padding: 0;
-  border-bottom: 1px solid var(--tempra-color-border);
-  list-style: none;
+  grid-template-columns: minmax(0, var(--tempra-size-page)) var(--tempra-size-contents);
+  column-gap: min(120px, 8vw); /* one-off: the gutter between the text and the contents */
+  align-items: start;
 }
 
-.features li {
-  padding: var(--tempra-space-16) 0;
-  border-top: 1px solid var(--tempra-color-border);
-}
-
-.features h3 {
-  margin: 0 0 var(--tempra-space-04);
-  font-size: var(--tempra-text-ui);
-  font-weight: var(--tempra-weight-strong);
-}
-
-.features p {
+.landing-doc h1 {
   margin: 0;
+  font-size: 60px; /* one-off: the landing page's title */
+  font-weight: var(--tempra-weight-strong);
+  line-height: 1.133; /* one-off: 68px on 60px */
+  letter-spacing: -0.03em; /* one-off: the landing page's title */
+  text-wrap: balance;
+}
+
+.landing-description {
+  margin: var(--tempra-space-14) 0 0;
   color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-ui);
+  font-size: 20px; /* one-off: the landing page's description */
   line-height: var(--tempra-leading-base);
 }
 
-/* Steps: numbered in the muted grey, one to a line. */
-.steps {
-  margin: var(--tempra-space-16) 0 var(--tempra-space-24);
-  padding: 0;
-  list-style: none;
-  counter-reset: step;
-}
-
-.steps li {
+.landing-byline {
   display: flex;
-  gap: var(--tempra-space-12);
-  padding: var(--tempra-space-10) 0;
-  border-top: 1px solid var(--tempra-color-border);
-  counter-increment: step;
-}
-
-.steps li:last-child {
+  align-items: center;
+  gap: var(--tempra-space-08);
+  margin: 0;
+  padding: 22px 0 var(--tempra-space-28); /* one-off: the board's byline */
   border-bottom: 1px solid var(--tempra-color-border);
+  font-size: var(--tempra-text-ui);
 }
 
-.steps li::before {
-  content: counter(step);
-  min-width: 1.25rem;
-  color: var(--tempra-color-muted);
-  font-variant-numeric: tabular-nums;
+.landing-text section {
+  max-width: var(--tempra-measure);
+}
+
+.landing-text section:first-of-type {
+  padding-top: var(--tempra-space-28);
+}
+
+.landing-text section + section {
+  padding-top: var(--tempra-space-24);
+}
+
+.landing-text h2 {
+  margin: 0 0 var(--tempra-space-06);
+  font-family: var(--tempra-font-display);
+  font-variation-settings: var(--tempra-font-display-settings);
+  font-size: var(--tempra-text-h2);
+  font-weight: var(--tempra-weight-medium);
+  line-height: var(--tempra-leading-tight);
+}
+
+.landing-text section p {
+  margin: 0;
+  font-size: var(--tempra-text-reader);
+  line-height: var(--tempra-leading-reader);
+}
+
+.landing-text code {
+  font-size: var(--tempra-text-name);
+}
+
+/* The contents: level with the sections, the first heading marked. */
+.landing-contents {
+  padding-top: 218px; /* one-off: level with the sections, as the board has them */
+}
+
+/* A phone: one column, the contents a closed "On this page" between hairlines, as the app's. */
+@media (max-width: 900px) {
+  .public.site {
+    --site-inline: var(--tempra-space-20);
+    --site-head: 72px; /* one-off: the site's header on a phone */
+  }
+
+  .public.site .public-nav .button.primary {
+    padding: 11px var(--tempra-space-18); /* one-off: the site's pill on a phone */
+    font-size: var(--tempra-text-base);
+  }
+
+  .public.site .public-foot {
+    padding-top: var(--tempra-space-20);
+  }
+
+  .public.site.landing .public-main {
+    display: block;
+    padding-top: var(--tempra-space-28);
+  }
+
+  .landing-doc {
+    display: block;
+  }
+
+  .landing-doc h1 {
+    font-size: 40px; /* one-off: the landing page's title on a phone */
+    line-height: 1.1; /* one-off: 44px on 40px */
+  }
+
+  .landing-description {
+    margin-top: var(--tempra-space-10);
+    font-size: var(--tempra-text-reader);
+  }
+
+  .landing-byline {
+    padding: var(--tempra-space-16) 0 0;
+    border-bottom: 0;
+  }
+
+  .landing-doc .toc-inline {
+    display: block;
+    margin-top: var(--tempra-space-18);
+    border-width: 1px 0;
+    border-radius: 0;
+  }
+
+  .landing-doc .toc-inline summary {
+    min-height: var(--tempra-size-touch);
+    padding: 0;
+    color: var(--tempra-color-muted);
+  }
+
+  .landing-doc .toc-inline .toc {
+    margin: 0 0 var(--tempra-space-12);
+  }
+
+  .landing-text section:first-of-type {
+    padding-top: var(--tempra-space-20);
+  }
+
+  .landing-text section + section {
+    padding-top: var(--tempra-space-18);
+  }
+
+  .landing-text h2 {
+    margin-bottom: var(--tempra-space-04);
+    font-size: 20px; /* one-off: a section's heading on a phone */
+  }
+
+  .landing-text section p {
+    line-height: 1.53; /* one-off: 26px on 17px */
+  }
+
+  .landing-contents {
+    display: none;
+  }
 }
 
 /* Terms and privacy: plain text at a comfortable measure, dated, in numbered sections. */
