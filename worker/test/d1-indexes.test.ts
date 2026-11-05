@@ -38,14 +38,15 @@ describe("D1 indexes (TEMPRA-78)", () => {
       JOIN users o ON o.id = l.owner LEFT JOIN users u ON u.id = t.created_by
       WHERE t.rowid IN (SELECT t2.rowid FROM tokens t2 JOIN libraries l2 ON l2.id = t2.library WHERE l2.owner = ?1
         UNION SELECT rowid FROM tokens WHERE created_by = ?1) ORDER BY t.rowid DESC`,
-    "sign-in rate limit": `SELECT (SELECT COUNT(*) FROM sign_in_links WHERE email = ?1 AND created > ?2) AS by_email,
+    "sign-in rate limit": `SELECT (SELECT COUNT(*) FROM sign_in_links
+      WHERE email = ?1 AND created > ?2 AND purpose <> 'invitation') AS by_email,
       (SELECT COUNT(*) FROM sign_in_links WHERE ip = ?3 AND created > ?2) AS by_ip`,
     "sign-in code": `UPDATE sign_in_links SET used = ?1 WHERE email = ?2 AND purpose = 'sign-in'
       AND used IS NULL AND expires > ?1 AND code_hash IS NOT NULL AND tries < ?3 AND code_hash = ?4`,
     "sign-in code tries": `UPDATE sign_in_links SET tries = tries + 1 WHERE email = ?2
       AND purpose = 'sign-in' AND used IS NULL AND expires > ?1 AND code_hash IS NOT NULL`,
     "prune links":
-      "DELETE FROM sign_in_links WHERE rowid IN (SELECT rowid FROM sign_in_links WHERE created < ?1 LIMIT 1000)",
+      "DELETE FROM sign_in_links WHERE rowid IN (SELECT rowid FROM sign_in_links WHERE created < ?1 AND (purpose <> 'invitation' OR expires < ?2) LIMIT 1000)",
     "prune sessions":
       "DELETE FROM sessions WHERE rowid IN (SELECT rowid FROM sessions WHERE idle_expires <= ?1 LIMIT 1000)",
     "delete a library (foreign keys)": "DELETE FROM libraries WHERE id = ?",
@@ -179,6 +180,14 @@ describe("daily account prune (TEMPRA-79)", () => {
       );
     link("fresh", -3_600_000);
     link("stale", -DAY - 60_000);
+    // Invitation links (TEMPRA-287) are kept until 30 days past their 7-day expiry.
+    const invitationLink = (hash: string, created: number) =>
+      db.run(
+        "INSERT INTO sign_in_links (hash, email, created, expires, purpose) VALUES (?, 'a@x', ?, ?, 'invitation')",
+        [hash, iso(created), iso(created + 7 * DAY)],
+      );
+    invitationLink("invited-lately", -20 * DAY);
+    invitationLink("invited-long-ago", -40 * DAY);
     const invitation = (
       id: string,
       status: string,
@@ -205,10 +214,10 @@ describe("daily account prune (TEMPRA-79)", () => {
   test("deletes expired sessions, links older than a day and old finished invitations", async () => {
     const { d1, db } = seeded();
     const r = await pruneAccounts(d1, NOW);
-    expect(r).toEqual({ sessions: 2, sign_in_links: 1, invitations: 3, mail_sent: 0 });
+    expect(r).toEqual({ sessions: 2, sign_in_links: 2, invitations: 3, mail_sent: 0 });
     const col = (sql: string) => (db.query(sql).all() as { k: string }[]).map((x) => x.k).sort();
     expect(col("SELECT hash AS k FROM sessions")).toEqual(["live"]);
-    expect(col("SELECT hash AS k FROM sign_in_links")).toEqual(["fresh"]);
+    expect(col("SELECT hash AS k FROM sign_in_links")).toEqual(["fresh", "invited-lately"]);
     expect(col("SELECT id AS k FROM library_invitations")).toEqual([
       "accepted-long-ago",
       "declined-lately",
@@ -240,7 +249,7 @@ describe("daily account prune (TEMPRA-79)", () => {
     const { d1, db } = seeded();
     const sessions = d1Sessions(d1, () => NOW.getTime());
     expect(await sessions.createLink("c@x", "1.2.3.4")).toBeString();
-    expect(db.query("SELECT COUNT(*) AS n FROM sign_in_links").get()).toEqual({ n: 3 });
+    expect(db.query("SELECT COUNT(*) AS n FROM sign_in_links").get()).toEqual({ n: 5 });
   });
 
   test("the sweep runs it and the digest reports its counts", async () => {
@@ -254,9 +263,9 @@ describe("daily account prune (TEMPRA-79)", () => {
       prune: () => pruneAccounts(d1, NOW),
       now: NOW,
     });
-    expect(r.pruned).toEqual({ sessions: 2, sign_in_links: 1, invitations: 3, mail_sent: 0 });
+    expect(r.pruned).toEqual({ sessions: 2, sign_in_links: 2, invitations: 3, mail_sent: 0 });
     expect(digestText(r)).toContain(
-      "Pruned sessions 2, sign-in links 1, invitations 3, sent mail keys 0.",
+      "Pruned sessions 2, sign-in links 2, invitations 3, sent mail keys 0.",
     );
   });
 

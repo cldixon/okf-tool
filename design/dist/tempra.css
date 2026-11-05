@@ -352,6 +352,7 @@
   --tempra-text-h2: 22px; /* an attachment's name, a compose dialog's name */
   --tempra-text-page: 28px; /* a view's title (h1); a page's title on a phone */
   --tempra-text-title: 36px; /* a page's title */
+  --tempra-text-lockup: 26px; /* the server pages' large lockup: the mark and Tempra at the left gutter */
   --tempra-text-code: 0.92em; /* code, a step under the text around it */
 
   /* Weights: three */
@@ -395,6 +396,7 @@
   --tempra-space-40: 2.5rem;
   --tempra-space-48: 3rem;
   --tempra-space-56: 3.5rem;
+  --tempra-space-64: 4rem;
   --tempra-space-72: 4.5rem;
   --tempra-space-96: 6rem;
   --tempra-space-gutter: var(--tempra-space-08); /* the frame's gutter */
@@ -6084,7 +6086,7 @@ a.activity-download {
  * over a hairline, the page as a plain column on the page's background (no sheet on a ground),
  * and a quiet foot over a hairline. Nothing here needs a script.
  *
- * Markup: body.public (.narrow for a form or a message) > a.skip-link, header.public-head,
+ * Markup: body.public (.narrow for a form or a message, .narrow.wide for consent) > a.skip-link, header.public-head,
  * main#main.public-main, footer.public-foot > nav > ul.
  */
 
@@ -6117,9 +6119,17 @@ a.activity-download {
   background: var(--tempra-color-bg);
 }
 
-/* A form or a message (the server pages): a narrower column. */
+/* A form or a message (the server pages, TEMPRA-287): the lockup at the window's left gutter, as
+   the app's top bar and the landing page have it, the page in one centred column a field wide
+   (.wide: a dialog wide, for consent's choices), the foot at the window's foot at the same gutter.
+   No hairlines: the page is one form. Its rules are under "The server pages" below. */
 .public.narrow {
-  --public-width: 560px; /* one-off: the public pages' reading column */
+  --public-width: var(--tempra-size-field);
+  --public-gutter: var(--tempra-space-64);
+}
+
+.public.narrow.wide {
+  --public-width: var(--tempra-size-dialog-wide);
 }
 
 /* Skip to the page's content: out of sight until the keyboard reaches it. */
@@ -6205,6 +6215,93 @@ a.activity-download {
 
 .public-foot a:hover {
   color: var(--tempra-color-text);
+}
+
+/* ---------- The server pages (TEMPRA-287) ---------- */
+
+/* The bar: the large lockup (the mark and Tempra) at the gutter, no hairline. */
+.public.narrow .public-head {
+  min-height: 0;
+  padding: var(--tempra-space-28) var(--public-gutter);
+  border-bottom: 0;
+}
+
+.public.narrow .wordmark {
+  font-family: var(--tempra-font-display);
+  font-variation-settings: var(--tempra-font-display-settings);
+  font-size: var(--tempra-text-lockup);
+  letter-spacing: var(--tempra-tracking-doc);
+  line-height: var(--tempra-leading-tight);
+}
+
+/* The column sits about a sixth of the window down, never closer than the page's padding. */
+.public.narrow .public-main {
+  padding-top: max(var(--tempra-space-40), 15vh);
+  padding-bottom: var(--tempra-space-48);
+}
+
+.public.narrow .public-foot {
+  padding: var(--tempra-space-16) var(--public-gutter) var(--tempra-space-28);
+  border-top: 0;
+  font-size: var(--tempra-text-ui);
+}
+
+.public.narrow .public-foot ul {
+  gap: var(--tempra-space-04) var(--tempra-space-24);
+}
+
+.public.narrow h1 {
+  margin-bottom: var(--tempra-space-12);
+}
+
+/* What the page is for, under its title: muted, a line or two. */
+.public-lead {
+  margin: 0 0 var(--tempra-space-28);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-base);
+  line-height: var(--tempra-leading-base);
+}
+
+.public-lead strong {
+  color: var(--tempra-color-text);
+  font-weight: var(--tempra-weight-medium);
+}
+
+/* The small print after the form: muted, a step down. */
+.public-aside {
+  margin: var(--tempra-space-28) 0 0;
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-ui);
+}
+
+.public-aside a {
+  color: var(--tempra-color-text);
+}
+
+/* A label over its field, the field the column's width, controls at the control height. */
+.public.narrow .field {
+  margin: 0 0 var(--tempra-space-16);
+  color: var(--tempra-color-text);
+  font-weight: var(--tempra-weight-medium);
+}
+
+.public.narrow .field input:not([type="checkbox"], [type="radio"], [type="file"]) {
+  height: var(--tempra-size-control);
+  max-width: none;
+  margin-top: var(--tempra-space-06);
+  padding: 0 var(--tempra-space-12);
+  font-weight: var(--tempra-weight-regular);
+}
+
+.public.narrow button.primary,
+.public.narrow .actions button {
+  min-height: var(--tempra-size-control);
+  padding: 0 var(--tempra-space-18);
+  font-size: var(--tempra-text-base);
+}
+
+.public.narrow form p {
+  margin: 0;
 }
 
 /* ---------- The landing page ---------- */
@@ -6293,6 +6390,18 @@ a.activity-download {
 }
 
 @media (max-width: 640px) {
+  .public.narrow {
+    --public-gutter: var(--tempra-space-16);
+  }
+
+  .public.narrow .public-head {
+    padding-block: var(--tempra-space-16);
+  }
+
+  .public.narrow .public-main {
+    padding-top: var(--tempra-space-40);
+  }
+
   .public-main {
     padding-top: var(--tempra-space-28);
     padding-bottom: var(--tempra-space-40);

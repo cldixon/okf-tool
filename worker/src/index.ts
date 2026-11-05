@@ -14,6 +14,7 @@ import type { SiteService } from "./legal";
 import { type Library, refuseFeed } from "./library";
 import { healthDigest } from "./library-health";
 import { d1SentLog, handleMailMessage, type MailJob, type Outbox, queueOutbox } from "./mail-queue";
+import { bindingMailer, type MailBinding } from "./mail-template";
 import { exportsPrefix, listExports } from "./maintain";
 import type { AgentJob, ManagedDeps } from "./managed/agent";
 import { d1AgentBudget } from "./managed/budget";
@@ -55,28 +56,14 @@ function libraryStub(env: Env, name: string): DurableObjectStub<Library> {
 
 /**
  * Cloudflare Email Service (v2 spec: A3). The EMAIL binding exists only once a sending domain is
- * set in cloudflare.config.ts (mailFrom); without it there is no mailer.
+ * set in cloudflare.config.ts (mailFrom); without it there is no mailer. From "Tempra"
+ * (TEMPRA-287, `bindingMailer`).
  */
-type MailBinding = {
-  send(m: {
-    from: string;
-    to: string;
-    subject: string;
-    text: string;
-    html?: string;
-    headers?: Record<string, string>;
-  }): Promise<unknown>;
-};
-
 function mailerFor(env: Env): Mailer | null {
   const binding = (env as unknown as { EMAIL?: MailBinding }).EMAIL;
   const from = env.MAIL_FROM;
   if (!binding || !from) return null;
-  return {
-    async send(m) {
-      await binding.send({ from, ...m });
-    },
-  };
+  return bindingMailer(binding, from);
 }
 
 /**

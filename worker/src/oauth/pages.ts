@@ -9,14 +9,15 @@ export const esc = (value: string) => value.replace(/[&<>"']/g, (c) => `&#${c.ch
 
 /**
  * The server pages' shell (sign-in, consent, errors, the email-change link): the public pages'
- * flat frame (TEMPRA-110, TEMPRA-126), as the landing page has it: a skip link, the wordmark
- * linking to tempra.dev over a hairline, the page as a narrow column, and terms and privacy at
- * the foot. From the design stylesheet alone, with no script; sent with PAGE_HEADERS (V-11).
+ * flat frame (TEMPRA-110, TEMPRA-126; TEMPRA-287's layout): a skip link, the large lockup linking
+ * to tempra.dev at the window's left gutter, the page as one centred column (a field wide, or a
+ * dialog wide with `wide` for consent's and the waitlist's), and terms and privacy at the
+ * window's foot. From the design stylesheet alone, with no script; sent with PAGE_HEADERS (V-11).
  */
-/** The Tempra mark before the name (TEMPRA-279): the small cut, at the name's size. */
-const WORDMARK = markSvg({ small: true });
+/** The Tempra mark before the name (TEMPRA-279): the standard cut, at the lockup's size. */
+const WORDMARK = markSvg();
 
-export function page(title: string, body: string): string {
+export function page(title: string, body: string, opts: { wide?: boolean } = {}): string {
   // Dark, whatever the system (TEMPRA-285): there is no account here to choose otherwise.
   return `<!doctype html>
 <html lang="en" data-theme="dark"><head><meta charset="utf-8">
@@ -25,7 +26,7 @@ export function page(title: string, body: string): string {
 <title>${esc(title)} · Tempra</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="${designHref}"></head>
-<body class="public narrow"><a class="skip-link" href="#main">Skip to content</a>
+<body class="public narrow${opts.wide ? " wide" : ""}"><a class="skip-link" href="#main">Skip to content</a>
 <header class="public-head"><a class="wordmark mark-lockup" href="${LEGAL}/">${WORDMARK}Tempra</a></header>
 <main id="main" class="public-main">${body}</main>
 <footer class="public-foot"><nav aria-label="Footer"><ul role="list"><li><a href="${LEGAL}/terms">Terms</a></li><li><a href="${LEGAL}/privacy">Privacy</a></li></ul></nav></footer></body></html>`;
@@ -163,6 +164,7 @@ ${opts.error ? alertNotice(ERROR_ID, opts.error.message) : ""}
     <button class="ghost" name="decision" value="deny">Cancel</button>
   </div>
 </form>`,
+    { wide: true },
   );
 }
 

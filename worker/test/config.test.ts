@@ -113,10 +113,10 @@ describe("each deployment has its own agent queue", () => {
   });
 });
 
-// TEMPRA-284: while production is invite-only, the landing page's one way in is Join now, which
-// signs people in or puts them on the list.
+// TEMPRA-284, TEMPRA-287: while production is invite-only, the landing page's one way in is
+// /sign-in, which signs people in or puts them on the list (its words are the site's).
 describe("the landing page's calls to action match production's SIGNUP", () => {
-  test("invite in production: Join now, never Request access, Sign up or Get started", async () => {
+  test("invite in production: /sign-in, never Request access, Sign up or Get started", async () => {
     const worker = (await (
       await config({ isPreview: false, mode: "production" } as never)
     ).worker) as { env: Record<string, unknown> };
@@ -127,7 +127,6 @@ describe("the landing page's calls to action match production's SIGNUP", () => {
     for (const page of ["pages/index.astro", "layouts/Base.astro"]) {
       const text = await file(page).text();
       expect(text).toContain("/sign-in");
-      expect(text).toContain("Join now");
       expect(text).not.toMatch(/Sign up|Get started|Request access|request-access/);
     }
   });

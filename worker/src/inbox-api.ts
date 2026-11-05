@@ -3,7 +3,7 @@ import type { User } from "./accounts";
 import type { Deps } from "./app";
 import type { ItemKind, Notifications } from "./notify";
 import { devOutbox, flushMail, itemLink } from "./notify-mail";
-import { esc } from "./oauth/pages";
+import { esc, PAGE_HEADERS } from "./oauth/pages";
 import { devSignIn, html } from "./signin";
 import { StoreError } from "./store/errors";
 
@@ -194,8 +194,8 @@ export function registerInboxApi(
     devOnly(c);
     const rows = devOutbox
       .map(
-        (m) =>
-          `<article><h2>${esc(m.subject)}</h2><p class="small muted">To ${esc(m.to)} · ${esc(m.at)}</p><pre>${esc(m.text)}</pre></article>`,
+        (m, i) =>
+          `<article><h2>${esc(m.subject)}</h2><p class="small muted">To ${esc(m.to)} · ${esc(m.at)}${m.html ? ` · <a href="/_dev/mail/${i}.html">HTML part</a>` : ""}</p><pre>${esc(m.text)}</pre></article>`,
       )
       .join("");
     return html(
@@ -203,7 +203,22 @@ export function registerInboxApi(
       200,
       {},
       "Dev outbox",
+      { wide: true },
     );
+  });
+
+  // A mail's HTML part as a mail client draws it (TEMPRA-287): its own inline styles, no script.
+  app.get("/_dev/mail/:n{[0-9]+\\.html}", (c) => {
+    devOnly(c);
+    const m = devOutbox[Number.parseInt(c.req.param("n"), 10)];
+    if (!m?.html) throw new StoreError(404, "no_route", "No such mail.");
+    return new Response(m.html, {
+      headers: {
+        ...PAGE_HEADERS,
+        "Content-Security-Policy":
+          "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
+      },
+    });
   });
 
   app.get("/_dev/mail.json", (c) => {

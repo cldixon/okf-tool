@@ -1,6 +1,8 @@
 import type { ActivityCounts } from "./accounts";
 import type { Deps } from "./app";
 import { mailKey } from "./mail-queue";
+import { renderMail } from "./mail-template";
+import { INVITATION_DAYS } from "./session";
 import { EMAIL } from "./signin";
 
 /**
@@ -34,27 +36,28 @@ export type Outcome =
   | "no_mail";
 
 /**
- * The invitation: "you're in, sign in with this email". Queued (TEMPRA-89), once a day per email
- * (its dedupe key), so a repeated click never mails twice.
+ * The invitation, "You're in" (TEMPRA-287): one button that signs the person in, a sign-in link
+ * of its own kind (single use, INVITATION_DAYS long, no code; `Sessions.createInvitationLink`),
+ * in the one mail template. Queued (TEMPRA-89), once a day per email (its dedupe key), so a
+ * repeated click never mails twice; a link made for a mail that dedupe drops is never sent, and
+ * lapses unused.
  */
 export async function sendInvitation(
-  d: Pick<Deps, "outbox">,
+  d: Pick<Deps, "outbox" | "sessions">,
   email: string,
   origin: string,
   opts: { asked?: boolean; now?: Date } = {},
 ): Promise<MailOutcome> {
   if (!d.outbox) return "no_mail";
-  const first = opts.asked
-    ? "You asked to join Tempra, and you're in."
-    : "You're invited to try Tempra.";
   try {
+    const secret = await d.sessions.createInvitationLink(email);
     await d.outbox.send({
       key: mailKey("waitlist-in", email, (opts.now ?? new Date()).toISOString().slice(0, 10)),
       kind: "waitlist",
       account: email,
       to: email,
       subject: "You're in: Tempra",
-      text: `${first}\n\nSign in with this email at ${origin}/sign-in\n`,
+      ...invitationMail(`${origin}/sign-in/link?t=${secret}`, origin, opts.asked ?? false),
     });
     return "sent";
   } catch (e) {
@@ -63,9 +66,21 @@ export async function sendInvitation(
   }
 }
 
+/** The invitation's words: one button that signs in, and what to do once it has lapsed. */
+export function invitationMail(link: string, origin: string, asked: boolean) {
+  return renderMail({
+    headline: "You're in",
+    line: asked
+      ? "You asked to join Tempra, and you're in. The button signs you in."
+      : "You're invited to Tempra. The button signs you in.",
+    button: { label: "Sign in to Tempra", href: link },
+    foot: `Works once, within ${INVITATION_DAYS} days. After that, sign in with this email at ${new URL(origin).host}.`,
+  });
+}
+
 const DAY = 86_400_000;
 
-export function operatorOps(d: Pick<Deps, "accounts" | "outbox">, origin: string) {
+export function operatorOps(d: Pick<Deps, "accounts" | "outbox" | "sessions">, origin: string) {
   return {
     async people(): Promise<People> {
       const [waiting, invited] = await Promise.all([d.accounts.waitlist(), d.accounts.invited()]);

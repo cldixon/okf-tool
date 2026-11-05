@@ -387,9 +387,14 @@ export async function pruneAccounts(db: D1Database, now: Date): Promise<PruneRes
   const invitationsBefore = iso(t - INVITATION_RETENTION_DAYS * DAY_MS);
   return {
     sessions: await pruneBatches(db, "sessions", "idle_expires <= ?1", [nowIso]),
-    sign_in_links: await pruneBatches(db, "sign_in_links", "created < ?1", [
-      iso(t - LINK_RETENTION_DAYS * DAY_MS),
-    ]),
+    // An invitation's link (TEMPRA-287) is kept until 30 days past its expiry, so a dead one can
+    // still fill its address in at /sign-in.
+    sign_in_links: await pruneBatches(
+      db,
+      "sign_in_links",
+      "created < ?1 AND (purpose <> 'invitation' OR expires < ?2)",
+      [iso(t - LINK_RETENTION_DAYS * DAY_MS), iso(t - INVITATION_RETENTION_DAYS * DAY_MS)],
+    ),
     invitations: await pruneBatches(
       db,
       "library_invitations",
