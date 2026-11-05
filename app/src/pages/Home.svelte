@@ -1,6 +1,8 @@
 <script lang="ts" module>
   /** The floating actions' button: where the focus goes back to when the panel closes. */
-  const actionsButton = () => document.querySelector<HTMLElement>(".page-actions .page-fab");
+  /** The home's Comments button in its corner (TEMPRA-283): where the focus goes back to. */
+  const commentsButton = () =>
+    document.querySelector<HTMLElement>(".home-head .page-tools [data-panel]");
 </script>
 
 <script lang="ts">
@@ -9,7 +11,7 @@
   import CommentsList from "../comments/CommentsList.svelte";
   import { LIBRARY_THREADS, type Placed } from "../comments/data";
   import { useThreads } from "../comments/data.svelte.ts";
-  import PageActions from "../page/PageActions.svelte";
+  import { IconButton } from "@tempra/design/components";
   import Panel from "../page/Panel.svelte";
   import { panelInUrl, threadInHash } from "../page/panel";
   import { here } from "../location.svelte.ts";
@@ -85,7 +87,7 @@
   function focusAfterDraw(to: "heading" | "opener") {
     void tick().then(() => {
       if (to === "heading") panelBox?.querySelector<HTMLElement>(".panel-head h2")?.focus();
-      else actionsButton()?.focus();
+      else commentsButton()?.focus();
     });
   }
   function openPanel() {
@@ -154,6 +156,21 @@
             <p class="view-meta home-who">{meta.join(" · ")}{#if guide}{meta.length > 0 ? " · " : ""}<a href={urls.file("guide.md")}>Start with the guide</a>{/if}</p>
           {/if}
         </div>
+        <!-- The home's corner (TEMPRA-283): the library's own threads, as a page's Comments
+             (a default the owner may change). -->
+        <div class="page-tools" role="group" aria-label="Library tools">
+          <IconButton
+            variant="outlined"
+            touch
+            icon="comments"
+            label={openCount > 0 ? `Comments, ${openCount} open` : "Comments"}
+            title="Comments"
+            count={openCount}
+            pressed={panel}
+            data-panel="comments"
+            onclick={() => (panel ? closePanel() : openPanel())}
+          />
+        </div>
       </header>
       {#if empty}
         <EmptyLibrary
@@ -184,9 +201,6 @@
     {/snippet}
   </Status>
 </PageColumn>
-<!-- What a person does here, floating at the page's bottom right (TEMPRA-172): on the home,
-     Comment on the library alone (TEMPRA-222). -->
-<PageActions {openCount} hidden={panel} onComment={openPanel} />
 {#if panel}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="panel-scrim" aria-hidden="true" onclick={closePanel}></div>

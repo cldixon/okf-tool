@@ -1,14 +1,14 @@
 /**
- * The page's panels (take 4, TEMPRA-114; tempra-dev: app/reader, The panels;
- * decisions/one-panel-from-the-top-bar): one at a time in the contents' column, opened from the
- * top bar's tools (or a quote, or `?panel=`), never by itself, and never remembered.
+ * The page's panels (take 4, TEMPRA-114; TEMPRA-283; tempra-dev: app/reader, The panels;
+ * decisions/page-tools-in-the-corner): one at a time in the contents' column, opened from the
+ * page's corner row (or a quote, or `?panel=`), never by itself, and never remembered. Page info
+ * holds what History and Properties did.
  */
-export type PanelName = "comments" | "history" | "properties";
+export type PanelName = "comments" | "info";
 
 export const PANEL_TITLES: Record<PanelName, string> = {
   comments: "Comments",
-  history: "History",
-  properties: "Properties",
+  info: "Page info",
 };
 
 /** How far down (px) a sheet's head is dragged to close it. */
@@ -35,7 +35,9 @@ export function panelInUrl(
   where: { search: string; hash: string } = location,
 ): PanelName | null {
   const p = new URLSearchParams(where.search).get("panel");
-  if (p === "comments" || p === "history" || p === "properties") return p;
+  if (p === "comments") return p;
+  // History and Properties are Page info since TEMPRA-283; their links still open it.
+  if (p === "info" || p === "history" || p === "properties") return "info";
   const id = hashId(where.hash);
   if (id === null || bodyIds.has(id)) return null;
   if (id === "comments" || threadInHash(bodyIds, where.hash)) return "comments";

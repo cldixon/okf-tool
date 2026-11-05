@@ -1,13 +1,13 @@
 import type { Urls } from "../urls";
 import type { Version } from "./data";
 
-/** How many versions the History panel lists at first, and adds with each "older versions". */
+/** How many versions Page info lists at first, and adds with each "older versions". */
 export const PAGE = 10;
 
 /**
- * Where a version in History leads: that version as it was (`?at=`, or the plain page for the
+ * Where a version in Page info leads: that version as it was (`?at=`, or the plain page for the
  * latest) with what it changed drawn in its text, the word diff from the version before it
- * (`?since=`); the first version has nothing before it and opens as it was. History stays open.
+ * (`?since=`); the first version has nothing before it and opens as it was. Page info stays open.
  */
 export function versionHref(urls: Urls, path: string, versions: Version[], n: number): string {
   const i = versions.findIndex((v) => v.n === n);
@@ -18,6 +18,6 @@ export function versionHref(urls: Urls, path: string, versions: Version[], n: nu
   const before = versions[i - 1];
   const params = new URLSearchParams();
   if (before) params.set("since", String(before.event.seq));
-  params.set("panel", "history");
+  params.set("panel", "info");
   return `${page}${page.includes("?") ? "&" : "?"}${params}`;
 }

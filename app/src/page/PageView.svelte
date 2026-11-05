@@ -1,6 +1,13 @@
 <script lang="ts" module>
-  /** The floating actions' button: where the focus goes back to when nothing else opened a panel. */
-  const actionsButton = () => document.querySelector<HTMLElement>(".page-actions .page-fab");
+  /**
+   * A panel's button in the page's corner row (TEMPRA-283), the one on screen (the row is drawn in
+   * the corner and under the byline, one of them hidden): where the focus goes back to when
+   * nothing else opened the panel.
+   */
+  const toolButton = (which: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>(`.page-tools [data-panel="${which}"]`)).find(
+      (el) => el.getClientRects().length > 0,
+    ) ?? null;
 </script>
 
 <script lang="ts">
@@ -24,7 +31,6 @@
   import { anchorId } from "../ui";
   import { dirOf, folderName, type Urls } from "../urls";
   import Byline from "./Byline.svelte";
-  import CheckActions from "./CheckActions.svelte";
   import CheckedLine from "./CheckedLine.svelte";
   import Contents from "./Contents.svelte";
   import { useCompare } from "./compare.svelte.ts";
@@ -32,29 +38,27 @@
   import { bodyHref, type PageData, standing, titleOf } from "./data";
   import type { ReadHistory } from "./reads";
   import { figureViewOf } from "./figures";
-  import HistoryList from "./HistoryList.svelte";
   import HoverCard from "./HoverCard.svelte";
   import { type Card, hoverCards } from "./hover";
   import type { Live } from "./live";
   import LiveAnnouncer from "./LiveAnnouncer.svelte";
   import LiveChange from "./LiveChange.svelte";
-  import PageActions from "./PageActions.svelte";
-  import PageMenu from "./PageMenu.svelte";
   import Panel from "./Panel.svelte";
   import { type PanelName, panelInUrl, threadInHash } from "./panel";
-  import PropertiesList from "./PropertiesList.svelte";
+  import PageInfo from "./PageInfo.svelte";
+  import PageTools from "./PageTools.svelte";
   import RawMarkdown from "./RawMarkdown.svelte";
   import ReviewBar from "./ReviewBar.svelte";
   import SourcesSection from "./SourcesSection.svelte";
   import VersionBar from "./VersionBar.svelte";
 
   /**
-   * A page (take 4, TEMPRA-114; tempra-dev: app/reader, app/comments,
-   * decisions/one-panel-from-the-top-bar): its path and ⋯ in the top bar, its actions (Comment,
-   * Check) floating at its bottom right (TEMPRA-172, decisions/a-pages-actions-float), the
+   * A page (take 4, TEMPRA-114; TEMPRA-283; tempra-dev: app/reader, app/comments,
+   * decisions/page-tools-in-the-corner): its path in the top bar, its tools in its top-right
+   * corner (Comments, Page info, Copy page | ⌄; under the byline where there is no column), the
    * title, description and byline, the body in the reader and its sources at the end, centred in
-   * its column; on the right the contents, or one panel in their place (Comments, History,
-   * Properties), opened only by the person and never remembered. Review mode and a version chosen
+   * its column; on the right the contents, or one panel in their place (Comments, Page info),
+   * opened only by the person and never remembered. Review mode and a version chosen
    * in History draw their diff in the text under a slim bar; View Markdown shows the stored file
    * in place of the page.
    */
@@ -172,30 +176,27 @@
   let opener: HTMLElement | null = null;
   let panelBox: HTMLDivElement | undefined = $state();
   // Focus (C-25, TEMPRA-133): opening a panel moves the focus to its heading (a draft's text box
-  // takes it instead), and closing it gives the focus back to the control that opened it (⋯ for
-  // History and Properties), unless the person has moved on. Both wait for the panel to draw (and
+  // takes it instead), and closing it gives the focus back to the control that opened it (its
+  // button in the corner row), unless the person has moved on. Both wait for the panel to draw (and
   // for the page to be taken out of inert, where the panel overlays it).
   function focusAfterDraw(to: "heading" | "opener") {
     void tick().then(() => {
       if (to === "heading") {
         panelBox?.querySelector<HTMLElement>(".panel-head h2")?.focus();
       } else {
-        const back = opener?.isConnected ? opener : actionsButton();
+        const back =
+          opener?.isConnected && opener.getClientRects().length > 0 ? opener : toolButton(closing);
         back?.focus();
       }
     });
   }
+  // The panel that last closed: whose corner button takes the focus back.
+  let closing: PanelName = "comments";
   function openPanel(which: PanelName, focus = true) {
     const focused = document.activeElement;
-    if (focused instanceof HTMLElement && !panelBox?.contains(focused)) {
-      // Nothing focused (a quote clicked, text selected): the actions' button stands in.
-      const menu = focused.closest(".menu");
-      opener =
-        focused === document.body
-          ? null
-          : menu
-            ? (menu.querySelector<HTMLElement>(":scope > button") ?? actionsButton())
-            : focused;
+    if (focused instanceof HTMLElement && !panelBox?.querySelector(".page-aside")?.contains(focused)) {
+      // Nothing focused (a quote clicked, text selected): the panel's corner button stands in.
+      opener = focused === document.body ? null : focused;
     }
     panel = which;
     if (focus) focusAfterDraw("heading");
@@ -203,6 +204,7 @@
   function closePanel() {
     const focused = document.activeElement;
     const lost = !focused || focused === document.body || panelBox?.contains(focused);
+    if (panel) closing = panel;
     panel = null;
     if (lost) focusAfterDraw("opener");
   }
@@ -335,17 +337,19 @@
 {#snippet hoverCard(card: Card)}<HoverCard {card} />{/snippet}
 <!-- The page's path over it (TEMPRA-145). -->
 {#snippet path()}<TopbarPath path={c.path} {title} />{/snippet}
-{#snippet actions()}{#if live && !moved}<LiveChange {urls} {live} />{/if}<PageMenu
+{#snippet tools(place: "side" | "head")}<PageTools
     {urls}
     path={c.path}
     {openCount}
     {panel}
+    newer={live !== null && !moved}
     {markdown}
     onPanel={togglePanel}
     onMarkdown={setMarkdown}
+    {place}
   />{/snippet}
 <div class={classes} bind:this={page}
-  ><PageBar {path} {actions} /><div class="page-grid"
+  ><PageBar {path} /><div class="page-grid"
     ><article class="doc" inert={modal}
       >{#if compare}<ReviewBar
           {urls}
@@ -380,7 +384,7 @@
             {live}
             {current}
             {status}
-          />{#if current}<CheckedLine {urls} path={c.path} standing={s} {name} />{/if}{#if hasContents}<details
+          />{#if current}<CheckedLine {urls} path={c.path} standing={s} {name} />{/if}{@render tools("head")}{#if hasContents}<details
               class="toc-inline"
               bind:this={inlineContents}
               ><summary>On this page<Icon name="down" /></summary><Contents
@@ -402,28 +406,12 @@
           {figureView}
         /><SourcesSection {urls} data={sources} {prepared} numbers={body.numbers} /></div
       ></article
-    ><!-- What a person does on the page, floating at its bottom right; aside while a panel is
-         open (TEMPRA-172): Comment, then Check. -->{#snippet check()}<CheckActions
-        {urls}
-        path={c.path}
-        standing={s}
-        {name}
-        {current}
-        reviewing={compare?.kind === "review"}
-        {mayVerify}
-        onVerified={props.onVerified}
-      />{/snippet}<PageActions
-      {openCount}
-      waiting={current && s.verified !== null && s.since > 0}
-      hidden={panel !== null}
-      onComment={() => openPanel("comments")}
-      more={check}
-    /><!-- The page dimmed behind an overlaid panel; a tap on it closes the panel (P-4). -->{#if modal}<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions --><div
+    ><!-- The page dimmed behind an overlaid panel; a tap on it closes the panel (P-4). -->{#if modal}<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions --><div
         class="panel-scrim"
         aria-hidden="true"
         onclick={closePanel}
       ></div>{/if}<div class="page-side" bind:this={panelBox}
-      >{#if panel === "comments"}<Panel name="comments" count={openCount > 0 ? `${openCount} open` : null} onClose={closePanel}
+      >{@render tools("side")}{#if panel === "comments"}<Panel name="comments" count={openCount > 0 ? `${openCount} open` : null} onClose={closePanel}
           ><CommentsList
             {urls}
             path={c.path}
@@ -437,10 +425,8 @@
             onActive={(id) => (active = id)}
             onChanged={props.onCommented}
           /></Panel
-        >{:else if panel === "history"}<Panel name="history" onClose={closePanel}
-          ><HistoryList {urls} page={c} standing={s} {name} comparing={compare?.kind === "since"} /></Panel
-        >{:else if panel === "properties"}<Panel name="properties" onClose={closePanel}
-          ><PropertiesList
+        >{:else if panel === "info"}<Panel name="info" onClose={closePanel}
+          ><PageInfo
             {urls}
             page={c}
             {links}
@@ -450,7 +436,9 @@
             {name}
             {current}
             reviewing={compare?.kind === "review"}
+            comparing={compare?.kind === "since"}
             {mayVerify}
+            live={live && !moved ? live : null}
             onVerified={props.onVerified}
           /></Panel
         >{:else if hasContents && !markdown}<nav class="page-contents" aria-label="Contents"

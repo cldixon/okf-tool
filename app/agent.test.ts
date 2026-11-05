@@ -3,14 +3,13 @@ import { flushSync } from "svelte";
 import CommentsList from "./src/comments/CommentsList.svelte";
 import { commentParts, type Placed } from "./src/comments/data";
 import { type FeedEvent, feedOf } from "./src/live";
-import PageActions from "./src/page/PageActions.svelte";
 import { type PresenceMessage, PresenceStore } from "./src/presence";
 import { Urls } from "./src/urls";
 import { draw, settle } from "./test/dom";
 
 // The library's managed agent in the app (TEMPRA-222; tempra-dev: agents/managed-agent): "Tempra
-// is replying…" on the thread it answers, cleared by its reply or a timeout; the home's page
-// actions with Comment alone; links in comments.
+// is replying…" on the thread it answers, cleared by its reply or a timeout; links in comments.
+// (The home's corner Comments is the page tools' look, TEMPRA-283.)
 
 const BY = { person: "u1", agent: "agt_t" };
 const AGENT = "tempra/agent";
@@ -187,19 +186,5 @@ describe("the Comments panel (CommentsList.svelte)", () => {
     expect(list.host.querySelectorAll(".thread-replying")).toHaveLength(1);
     expect(list.host.querySelector("section .thread-replying")).toBeNull();
     list.destroy();
-  });
-});
-
-describe("the page's actions (PageActions.svelte)", () => {
-  test("on the home: Comment alone, with the open count", async () => {
-    const actions = draw(PageActions, { openCount: 2, hidden: false, onComment: () => {} });
-    actions.host.querySelector<HTMLButtonElement>(".page-fab")?.click();
-    flushSync();
-    const items = [...actions.host.querySelectorAll(".menu-item")].map((i) =>
-      i.textContent?.trim(),
-    );
-    expect(items).toEqual(["Comment2 open"]);
-    expect(actions.host.innerHTML).toContain("Actions, 2 open comments");
-    actions.destroy();
   });
 });

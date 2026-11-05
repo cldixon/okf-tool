@@ -1,12 +1,13 @@
 /**
  * Comments after the first @tempra demo (TEMPRA-223): every comment author's round mark, Tempra's
- * own filled with the agent colour, and Comments in the page's ⋯ with its open count.
+ * own filled with the agent colour, and the page's corner tools (TEMPRA-283): Comments with its
+ * open count, Page info with the newer-version dot, Copy page with its ⌄.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { flushSync } from "svelte";
 import Avatar from "./src/Avatar.svelte";
 import { actorView, agentInitial, TEMPRA_ACTOR } from "./src/agents";
-import PageMenu from "./src/page/PageMenu.svelte";
+import PageTools from "./src/page/PageTools.svelte";
 import type { PanelName } from "./src/page/panel";
 import { Urls } from "./src/urls";
 import { draw } from "./test/dom";
@@ -93,44 +94,90 @@ describe("a comment author's round mark", () => {
   });
 });
 
-describe("Comments in the page's ⋯", () => {
-  function menu(openCount: number) {
+describe("the page's corner tools (TEMPRA-283)", () => {
+  function row(
+    props: {
+      openCount?: number;
+      panel?: PanelName | null;
+      newer?: boolean;
+      markdown?: boolean;
+    } = {},
+  ) {
     const opened: PanelName[] = [];
-    const d = draw(PageMenu, {
+    const markdown: boolean[] = [];
+    const d = draw(PageTools, {
       urls: new Urls("ann", "notes"),
       path: "a/page.md",
-      openCount,
-      panel: null,
-      markdown: false,
+      openCount: props.openCount ?? 0,
+      panel: props.panel ?? null,
+      newer: props.newer ?? false,
+      markdown: props.markdown ?? false,
       onPanel: (p: PanelName) => opened.push(p),
-      onMarkdown: () => {},
+      onMarkdown: (on: boolean) => markdown.push(on),
+      place: "side",
     });
-    const button = d.host.querySelector<HTMLButtonElement>("button[aria-expanded]");
-    button?.click();
-    flushSync();
-    const items = Array.from(d.host.querySelectorAll<HTMLElement>(".menu-list .menu-item"));
-    return {
-      d,
-      opened,
-      items,
-      texts: items.map((i) => i.textContent?.replace(/\s+/g, " ").trim()),
-    };
+    const button = (name: string) =>
+      d.host.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`);
+    return { d, opened, markdown, button };
   }
 
-  test("with History and Properties, showing the open count, opening the Comments panel", () => {
-    const m = menu(2);
-    expect(m.texts.slice(0, 4)).toEqual(["Copy page", "Comments2 open", "History", "Properties"]);
-    const comments = m.items[1] as HTMLElement;
-    expect(comments.querySelector(".menu-count")?.textContent).toBe("2 open");
-    comments.click();
+  test("Comments with its open count beside it, opening the Comments panel", () => {
+    const r = row({ openCount: 2 });
+    const c = r.button("Comments, 2 open");
+    expect(c).not.toBeNull();
+    expect(c?.className).toContain("icon-button outlined has-count");
+    expect(c?.querySelector(".icon-button-count")?.textContent).toBe("2");
+    expect(c?.getAttribute("title")).toBe("Comments");
+    expect(c?.getAttribute("aria-pressed")).toBe("false");
+    c?.click();
     flushSync();
-    expect(m.opened).toEqual(["comments"]);
-    m.d.destroy();
+    expect(r.opened).toEqual(["comments"]);
+    r.d.destroy();
   });
 
   test("no open threads: Comments alone, no count", () => {
-    const m = menu(0);
-    expect(m.texts[1]).toBe("Comments");
-    m.d.destroy();
+    const r = row();
+    const c = r.button("Comments");
+    expect(c?.querySelector(".icon-button-count")).toBeNull();
+    expect(c?.className).not.toContain("has-count");
+    r.d.destroy();
+  });
+
+  test("the open panel's button shows pressed", () => {
+    const r = row({ panel: "info" });
+    expect(r.button("Page info")?.getAttribute("aria-pressed")).toBe("true");
+    expect(r.button("Comments")?.getAttribute("aria-pressed")).toBe("false");
+    r.button("Page info")?.click();
+    flushSync();
+    expect(r.opened).toEqual(["info"]);
+    r.d.destroy();
+  });
+
+  test("a newer version puts the agent dot on Page info", () => {
+    const quiet = row();
+    expect(quiet.button("Page info")?.querySelector(".icon-button-dot")).toBeNull();
+    quiet.d.destroy();
+    const r = row({ newer: true });
+    const info = r.button("Page info, a newer version");
+    expect(info?.querySelector(".icon-button-dot")).not.toBeNull();
+    r.d.destroy();
+  });
+
+  test("Copy page, and its ⌄ with View Markdown and Download .md (no Copy link)", () => {
+    const r = row();
+    expect(r.button("Copy page")?.className).toBe("split-main");
+    const more = r.button("More copy options");
+    expect(more?.getAttribute("aria-expanded")).toBe("false");
+    more?.click();
+    flushSync();
+    const items = Array.from(r.d.host.querySelectorAll<HTMLElement>(".menu-list .menu-item")).map(
+      (i) => i.textContent?.replace(/\s+/g, " ").trim(),
+    );
+    expect(items).toEqual(["View Markdown", "Download .md"]);
+    const view = r.d.host.querySelector<HTMLButtonElement>(".menu-list button.menu-item");
+    view?.click();
+    flushSync();
+    expect(r.markdown).toEqual([true]);
+    r.d.destroy();
   });
 });

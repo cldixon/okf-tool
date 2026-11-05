@@ -17,6 +17,7 @@ import {
   SearchButton,
   SearchField,
   Segmented,
+  SplitButton,
   TextInput,
   Tile,
   ToolPill,
@@ -98,6 +99,67 @@ describe("buttons", () => {
     const a = draw(ToolPill, { label: "Tool", href: "/t" });
     expect(one(a.host, "a").className).toBe("tool-pill");
     a.destroy();
+  });
+
+  test("IconButton outlined (TEMPRA-283): a ring, a count beside the glyph, the agent dot", () => {
+    const d = draw(IconButton, {
+      variant: "outlined",
+      icon: "comments",
+      label: "Comments, 2 open",
+      count: 2,
+    });
+    const b = one(d.host, "button");
+    expect(b.className).toBe("icon-button outlined has-count");
+    expect(b.getAttribute("aria-label")).toBe("Comments, 2 open");
+    expect(one(d.host, ".icon-button-count").textContent).toBe("2");
+    expect(one(d.host, ".icon-button-count").getAttribute("aria-hidden")).toBe("true");
+    d.destroy();
+    const z = draw(IconButton, {
+      variant: "outlined",
+      icon: "comments",
+      label: "Comments",
+      count: 0,
+    });
+    expect(one(z.host, "button").className).toBe("icon-button outlined");
+    expect(z.host.querySelector(".icon-button-count")).toBeNull();
+    z.destroy();
+    const p = draw(IconButton, {
+      variant: "outlined",
+      icon: "info",
+      label: "Page info",
+      dot: true,
+      pressed: true,
+    });
+    const pb = one(p.host, "button");
+    expect(pb.getAttribute("aria-pressed")).toBe("true");
+    expect(one(p.host, ".icon-button-dot").getAttribute("aria-hidden")).toBe("true");
+    p.destroy();
+  });
+
+  test("SplitButton (TEMPRA-283): a main action and a ⌄ menu, each named", () => {
+    let copied = 0;
+    const d = draw(SplitButton, {
+      icon: "copy",
+      label: "Copy page",
+      menuLabel: "More copy options",
+      onclick: () => copied++,
+      children: createRawSnippet(() => ({
+        render: () => '<a class="menu-item" href="#m">View Markdown</a>',
+      })),
+    });
+    const wrap = one(d.host, ".split-button");
+    const main = one(wrap, "button.split-main") as HTMLButtonElement;
+    expect(main.getAttribute("aria-label")).toBe("Copy page");
+    main.click();
+    expect(copied).toBe(1);
+    const more = one(wrap, "button.split-more") as HTMLButtonElement;
+    expect(more.getAttribute("aria-label")).toBe("More copy options");
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    more.click();
+    flushSync();
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(one(wrap, ".menu-list.end .menu-item").textContent).toBe("View Markdown");
+    d.destroy();
   });
 
   test("IconButton: named by its label, a toggle when pressed, a touch area", () => {
@@ -383,6 +445,7 @@ describe("the catalogue (/_dev/design)", () => {
         "PillButton",
         "ToolPill",
         "IconButton",
+        "SplitButton",
         "SearchButton",
         "Field and TextInput",
         "SearchField",

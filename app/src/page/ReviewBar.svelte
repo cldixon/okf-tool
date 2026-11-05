@@ -63,7 +63,7 @@
     >{#if props.error}<span class="warn">{props.error}</span>{/if}<span class="review-actions"
       ><!-- Reached from History, which stays open. -->{#if version && !since.latest}<a
           class="button"
-          href={`${props.urls.pinned(version.event.seq).file(props.page.path)}&panel=history`}>v{version.n} as it was</a
+          href={`${props.urls.pinned(version.event.seq).file(props.page.path)}&panel=info`}>v{version.n} as it was</a
         >{/if}<a class="button" href={plain}>Back to latest</a></span
     ></section
   >

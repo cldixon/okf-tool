@@ -2177,6 +2177,109 @@ body.ground {
   color: var(--tempra-color-text);
 }
 
+/* A page's corner tool (TEMPRA-283; tempra-dev: decisions/page-tools-in-the-corner): the round
+   button outlined, 36px, its glyph in ink; a count beside the glyph makes it a pill; the agent
+   dot on its corner says a newer version waits. Pressed is the selected grey, not ink. */
+.icon-button.outlined {
+  width: var(--tempra-size-control);
+  height: var(--tempra-size-control);
+  border: 1px solid var(--tempra-color-border-strong);
+  border-radius: var(--tempra-radius-pill);
+  color: var(--tempra-color-text);
+}
+
+.icon-button.outlined.has-count {
+  gap: var(--tempra-space-06);
+  width: auto;
+  padding: 0 var(--tempra-space-12);
+}
+
+.icon-button-count {
+  font-size: var(--tempra-text-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.icon-button.outlined:hover:not(:disabled) {
+  background: var(--tempra-color-hover);
+}
+
+.icon-button.outlined[aria-pressed="true"],
+.icon-button.outlined[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: var(--tempra-color-selected);
+  background: var(--tempra-color-selected);
+  color: var(--tempra-color-text);
+}
+
+.icon-button-dot {
+  position: absolute;
+  top: var(--tempra-space-04);
+  right: var(--tempra-space-04);
+  width: var(--tempra-size-dot);
+  height: var(--tempra-size-dot);
+  border-radius: 50%;
+  background: var(--tempra-color-agent);
+  box-shadow: 0 0 0 var(--tempra-space-02) var(--tempra-color-bg);
+}
+
+/* A main action with a ⌄ for the related ones (TEMPRA-283): one outlined pill split by a
+   hairline, each part a button of its own. */
+.split-button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tempra-size-control);
+  border: 1px solid var(--tempra-color-border-strong);
+  border-radius: var(--tempra-radius-pill);
+}
+
+.split-button .menu {
+  display: inline-flex;
+  height: 100%;
+}
+
+.split-main,
+.split-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tempra-color-text);
+}
+
+.split-main {
+  width: var(--tempra-size-control);
+  border-radius: var(--tempra-radius-pill) 0 0 var(--tempra-radius-pill);
+}
+
+.split-more {
+  width: var(--tempra-space-28);
+  border-radius: 0 var(--tempra-radius-pill) var(--tempra-radius-pill) 0;
+}
+
+.split-main:hover:not(:disabled),
+.split-more:hover:not(:disabled) {
+  background: var(--tempra-color-hover);
+}
+
+.split-more[aria-expanded="true"],
+.split-more[aria-expanded="true"]:hover:not(:disabled) {
+  background: var(--tempra-color-selected);
+}
+
+.split-main svg,
+.split-more svg {
+  display: block;
+}
+
+.split-rule {
+  width: 1px;
+  height: var(--tempra-space-20);
+  background: var(--tempra-color-border-strong);
+}
+
 /* The change dot (the one colour): pulsing (.live) for an agent writing now; solid beside an
    empty library's last write. Nothing marks what changed since the person looked (TEMPRA-173). */
 .change-dot {
@@ -3588,6 +3691,22 @@ button.tree-name {
     height: var(--tempra-size-touch);
   }
 
+  .icon-button.outlined.touch.has-count {
+    width: auto;
+  }
+
+  .split-button.touch {
+    height: var(--tempra-size-touch);
+  }
+
+  .split-button.touch .split-main {
+    width: var(--tempra-size-touch);
+  }
+
+  .split-button.touch .split-more {
+    width: var(--tempra-size-control);
+  }
+
   .page-column {
     padding: var(--tempra-space-32) var(--tempra-space-16) var(--tempra-space-72);
   }
@@ -4546,66 +4665,129 @@ ul.events {
   }
 }
 
-/* ---------- A page's actions (TEMPRA-172; tempra-dev: decisions/a-pages-actions-float) ---------- */
+/* ---------- A page's tools (TEMPRA-283; tempra-dev: decisions/page-tools-in-the-corner) ---------- */
 
-/* One round + at the page's bottom right, in ink, the one raised thing on a flat page; its menu
-   opens upward (Comment, Check). Aside while a panel is open (the app sets `hidden`). In the
-   page, so an overlaid panel or the phone's drawer dims it with the rest; under their scrims. */
-.page-actions {
-  position: fixed;
-  right: max(var(--tempra-space-28), env(safe-area-inset-right));
-  bottom: max(var(--tempra-space-28), env(safe-area-inset-bottom));
-  z-index: 3;
+/* One row of round outlined buttons: Comments with its count, Page info, Copy page | ⌄. Beside
+   the text it sits in the right column's top corner, sticky, right-aligned with the floating
+   card's edge, and the outline or the open card starts below it; where there is no column (under
+   960px of page, the Markdown view, a phone) the row under the byline takes its place. */
+.page-view {
+  --page-tools-h: calc(var(--tempra-size-control) + 2 * var(--tempra-space-16));
 }
 
-.page-actions[hidden] {
+.page-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--tempra-space-08);
+}
+
+.page-side > .page-tools {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  justify-content: flex-end;
+  padding: var(--tempra-space-16) var(--tempra-space-16) 0 0;
+}
+
+.doc-head > .page-tools {
   display: none;
+  margin-top: var(--tempra-space-16);
 }
 
-.page-fab {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: var(--tempra-size-fab);
-  height: var(--tempra-size-fab);
+@container page (width >= 960px) {
+  .page-side > .page-aside {
+    top: var(--page-tools-h);
+    max-height: calc(
+      100dvh -
+      var(--tempra-size-topbar) -
+      var(--page-tools-h) -
+      var(--tempra-space-16)
+    );
+  }
+
+  .page-side > .page-contents {
+    top: var(--page-tools-h);
+    max-height: calc(100dvh - var(--tempra-size-topbar) - var(--page-tools-h));
+    padding-top: var(--tempra-space-16);
+  }
+
+  /* The Markdown view has no column: its row is the head's. */
+  .page-view.markdown-on:not(.panel-open) .page-side > .page-tools {
+    display: none;
+  }
+
+  .page-view.markdown-on:not(.panel-open) .doc-head > .page-tools {
+    display: flex;
+  }
+}
+
+@container page (width < 960px) {
+  .page-side > .page-tools {
+    display: none;
+  }
+
+  .doc-head > .page-tools {
+    display: flex;
+  }
+}
+
+/* The home's corner (TEMPRA-283): its library threads' Comments, at the head's end. */
+.home-head .page-tools {
+  flex: none;
+  align-self: flex-start;
+}
+
+/* Page info (TEMPRA-283): the newer version and the check on top, then About this page and
+   Versions, each under a quiet label; plain rows, no fills. */
+.page-info-now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tempra-space-08);
+  margin: 0 0 var(--tempra-space-16);
   padding: 0;
-  border: 0;
+  list-style: none;
+}
+
+.page-info-now li {
+  display: flex;
+  align-items: center;
+  gap: var(--tempra-space-08);
+  line-height: var(--tempra-leading-base);
+}
+
+.page-info-now .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.page-info-now .agent-dot {
+  flex: none;
+  width: var(--tempra-size-dot);
+  height: var(--tempra-size-dot);
   border-radius: 50%;
-  background: var(--tempra-color-text);
-  color: var(--tempra-color-bg);
-  box-shadow: var(--tempra-shadow);
+  background: var(--tempra-color-agent);
 }
 
-.page-fab:hover:not(:disabled) {
-  background: var(--tempra-color-text);
-  color: var(--tempra-color-bg);
+.page-info-now button,
+.page-info-now a.button {
+  padding: var(--tempra-space-04) var(--tempra-space-12);
+  font-size: var(--tempra-text-meta);
 }
 
-.page-fab svg {
-  transition: transform var(--tempra-motion-quick) ease;
+.page-info-section {
+  padding-top: var(--tempra-space-14);
+  border-top: 1px solid var(--tempra-color-border);
 }
 
-/* Open, the + turns into × over its menu. */
-.page-fab[aria-expanded="true"] svg {
-  transform: rotate(45deg);
+.page-info-section + .page-info-section {
+  margin-top: var(--tempra-space-16);
 }
 
-/* Something waits in the menu (open comments, changes since the check): a small ringed dot on
-   the button's corner. Greys only. */
-.page-fab-dot {
-  position: absolute;
-  top: var(--tempra-space-02);
-  right: var(--tempra-space-02);
-  width: 12px; /* one-off: the ringed dot */
-  height: 12px;
-  box-sizing: border-box;
-  border: 2px solid var(--tempra-color-text);
-  border-radius: 50%;
-  background: var(--tempra-color-bg);
-}
-
-.page-actions-list {
-  min-width: 240px; /* one-off: Review changes and its count on one line */
+.page-info-section > h3 {
+  margin: 0 0 var(--tempra-space-08);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-regular);
 }
 
 .menu-list .menu-count {
@@ -4613,21 +4795,6 @@ ul.events {
   padding-left: var(--tempra-space-12);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
-}
-
-/* Who checked the page, when there is nothing to do about it. */
-.menu-list .menu-line {
-  margin: 0;
-  padding: var(--tempra-space-06) var(--tempra-space-10);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-}
-
-@media (max-width: 900px) {
-  .page-actions {
-    right: max(var(--tempra-space-16), env(safe-area-inset-right));
-    bottom: max(var(--tempra-space-24), env(safe-area-inset-bottom));
-  }
 }
 
 /*

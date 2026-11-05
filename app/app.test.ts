@@ -229,7 +229,7 @@ describe("the page view (TEMPRA-128)", () => {
     const v3 = versionHref(urls, "a.md", versions, 3);
     expect(params(v3).get("at")).toBe("15");
     expect(params(v3).get("since")).toBe("8");
-    expect(params(v3).get("panel")).toBe("history");
+    expect(params(v3).get("panel")).toBe("info");
     expect(at(v3)).toMatchObject({ page: "file", at: 15, compare: { kind: "since", seq: 8 } });
     // The latest is the page itself, against the version before it.
     const v4 = params(versionHref(urls, "a.md", versions, 4));
@@ -255,7 +255,7 @@ describe("the page view (TEMPRA-128)", () => {
     expect(panelInUrl(headings, where("#thread-1"))).toBeNull();
     expect(threadInHash(headings, "#thread-1")).toBeNull();
     // ?panel= asks plainly, whatever the fragment.
-    expect(panelInUrl(headings, where("#comments", "?panel=history"))).toBe("history");
+    expect(panelInUrl(headings, where("#comments", "?panel=history"))).toBe("info");
     expect(panelInUrl(none, where(""))).toBeNull();
   });
 
