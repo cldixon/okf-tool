@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { aliasMoves, hostRedirect, hostsFrom } from "../src/hosts";
+import { aliasMoves, hostRedirect, hostsFrom, linkOrigin, ownHostnames } from "../src/hosts";
 import { setup } from "./harness";
 
 // TEMPRA-276 (tempra-dev decisions/the-app-at-tempra-dev.md): the app at tempra.dev, the landing
@@ -15,6 +15,24 @@ const HTML = { Accept: "text/html,application/xhtml+xml" };
 const at = (url: string, init: RequestInit = {}) => new Request(url, init);
 
 describe("hosts", () => {
+  test("links from an alias or redirect host name the app's own host (TEMPRA-289)", () => {
+    expect(linkOrigin("https://app.tempra.dev", HOSTS)).toBe("https://tempra.dev");
+    expect(linkOrigin("https://www.tempra.dev", HOSTS)).toBe("https://tempra.dev");
+    expect(linkOrigin("https://tempra.dev", HOSTS)).toBe("https://tempra.dev");
+    expect(linkOrigin("https://pr-7.tempra.dev", HOSTS)).toBe("https://pr-7.tempra.dev");
+    expect(linkOrigin("http://localhost:8787", HOSTS)).toBe("http://localhost:8787");
+    expect(linkOrigin("https://app.tempra.dev", null)).toBe("https://app.tempra.dev");
+  });
+
+  test("a source_url names none of the deployment's hosts, whichever it came in on", () => {
+    expect(ownHostnames("app.tempra.dev", HOSTS)).toEqual([
+      "app.tempra.dev",
+      "tempra.dev",
+      "www.tempra.dev",
+    ]);
+    expect(ownHostnames("localhost", null)).toEqual(["localhost"]);
+  });
+
   test("read from the bindings, the primary never its own alias", () => {
     expect(HOSTS).toEqual({
       primary: "tempra.dev",
