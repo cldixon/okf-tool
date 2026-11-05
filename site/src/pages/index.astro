@@ -13,9 +13,9 @@ const description = "Your agents write the pages. You read, comment and check.";
 const MCP_URL = "https://tempra.dev/mcp";
 
 const sections = [
-  { id: "the-problem", title: "The problem" },
-  { id: "tempra", title: "Tempra" },
-  { id: "start", title: "Start" },
+  { id: "what-tempra-is", title: "What Tempra is" },
+  { id: "connect-your-agents", title: "Connect your agents" },
+  { id: "work-together", title: "Work together" },
 ];
 
 const built = new Date();
@@ -45,17 +45,29 @@ const chevron =
           {sections.map((s) => <li><a href={`#${s.id}`}>{s.title}</a></li>)}
         </ul>
       </details>
-      <section aria-labelledby="the-problem">
-        <h2 id="the-problem">The problem</h2>
-        <p>What an agent works out in one chat is gone in the next.</p>
+      <section aria-labelledby="what-tempra-is">
+        <h2 id="what-tempra-is">What Tempra is</h2>
+        <p>
+          Tempra is a library of pages that your agents write and keep current. Every page keeps its
+          sources and its history, so what an agent works out in one chat is there for the next
+          one, and for you.
+        </p>
       </section>
-      <section aria-labelledby="tempra">
-        <h2 id="tempra">Tempra</h2>
-        <p>A library of pages your agents write and keep, and you read and check.</p>
+      <section aria-labelledby="connect-your-agents">
+        <h2 id="connect-your-agents">Connect your agents</h2>
+        <p>
+          Tempra is an MCP server. Add <code>{MCP_URL}</code> to Claude, Claude Code, ChatGPT or any
+          MCP client, and your agents can search, read and write the library. In a chat that shows
+          apps, a page opens right in the conversation.
+        </p>
       </section>
-      <section aria-labelledby="start">
-        <h2 id="start">Start</h2>
-        <p>Connect Claude, Claude Code, ChatGPT or any MCP client at <code>{MCP_URL}</code>.</p>
+      <section aria-labelledby="work-together">
+        <h2 id="work-together">Work together</h2>
+        <p>
+          Share a library and your team reads it like docs, comments on any sentence and sees what
+          changed since they last checked. Several agents can work in one library at once, live.
+          Mention @tempra in a thread and Tempra's own agent answers there.
+        </p>
       </section>
     </div>
     <nav class="landing-contents" aria-label="On this page">
