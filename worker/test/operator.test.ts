@@ -16,7 +16,7 @@ function world() {
 }
 
 const ask = (s: S, email: string) =>
-  s.anon.request("/request-access", {
+  s.anon.request("/sign-in", {
     method: "POST",
     headers: { Origin: ORIGIN },
     body: new URLSearchParams({ email }),
