@@ -499,7 +499,8 @@ async function openBrowser() {
   const signInAs = async (email: string, next: string, byCode = false) => {
     await page.goto(`${base}/sign-in?next=${encodeURIComponent(next)}`);
     await page.locator('input[name="email"]').fill(email);
-    await page.getByRole("button", { name: "Join now" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("heading", { name: "Check your email" }).waitFor();
     if (byCode) {
       const code = (await page.locator("#dev-code").innerText()).trim();
       if (!/^[0-9A-Z]{8}$/.test(code)) throw new Error(`the dev code reads "${code}"`);
@@ -510,6 +511,8 @@ async function openBrowser() {
     }
     const link = await page.locator('a[href*="/sign-in/link?t="]').first().getAttribute("href");
     await page.goto(new URL(link ?? "", base).href);
+    // The link's page names the address it is for (TEMPRA-287).
+    await page.getByText(`Continue as ${email.toLowerCase()}`).waitFor();
     await page.getByRole("button", { name: "Continue" }).click();
   };
   /** The session cookie, for requests made beside the browser. */

@@ -51,6 +51,7 @@ ${list}
     200,
     {},
     "Waitlist",
+    { wide: true },
   );
 }
 

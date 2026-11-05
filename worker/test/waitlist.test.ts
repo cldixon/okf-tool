@@ -11,7 +11,7 @@ function beta() {
   return s;
 }
 
-/** Join now (TEMPRA-284): `/sign-in`, the one way in, and so onto the waitlist. */
+/** Sign in (TEMPRA-284, TEMPRA-287): `/sign-in`, the one way in, and so onto the waitlist. */
 const ask = (s: S, email: string, path = "/sign-in") =>
   s.anon.request(path, {
     method: "POST",
@@ -37,7 +37,7 @@ const decide = async (client: S["app"], email: string, decision: string, origin 
 };
 
 describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
-  test("one way in, Join now, says the right thing in each mode", async () => {
+  test("one way in, Sign in, says the right thing in each mode", async () => {
     const s = beta();
     const page = async (path: string) => {
       const r = await s.anon.request(path, { redirect: "manual" });
@@ -45,23 +45,26 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
     };
     // invite: one page for both, with no second path.
     let signIn = await page("/sign-in");
-    expect(signIn.text).toContain("<title>Join Tempra");
-    expect(signIn.text).toContain("<h1>Join Tempra</h1>");
-    expect(signIn.text).toContain("Already in? We'll email you a sign-in link.");
-    expect(signIn.text).toContain(">Join now</button>");
+    expect(signIn.text).toContain("<title>Sign in to Tempra");
+    expect(signIn.text).toContain("<h1>Sign in to Tempra</h1>");
+    expect(signIn.text).toContain(
+      "Enter your email. We'll send you a sign-in link and code, or, if you're new, add you to the waitlist.",
+    );
+    expect(signIn.text).toContain(">Continue</button>");
     expect(signIn.text).not.toContain("request-access");
-    expect(signIn.text).not.toContain("creates your account");
+    expect(signIn.text).not.toMatch(/Join|Sign up/);
     // open: the link creates the account.
     Object.assign(s.env, { SIGNUP: "open" });
     signIn = await page("/sign-in");
-    expect(signIn.text).toContain("The same link creates your account.");
-    expect(signIn.text).toContain(">Join now</button>");
+    expect(signIn.text).toContain("If you're new, it sets up your account.");
+    expect(signIn.text).toContain(">Continue</button>");
+    expect(signIn.text).not.toMatch(/Join|Sign up/);
     // closed: no new accounts; sign-in only.
     Object.assign(s.env, { SIGNUP: "closed" });
     signIn = await page("/sign-in");
     expect(signIn.text).toContain("<h1>Sign in</h1>");
     expect(signIn.text).toContain("not taking new accounts");
-    expect(signIn.text).not.toContain("Join now");
+    expect(signIn.text).not.toContain("Join");
     const posted = await ask(s, "friend@example.com");
     expect(await posted.text()).toContain("Check your email");
     await settle();
@@ -69,7 +72,7 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
     expect(await s.accounts.waitlist()).toHaveLength(0);
   });
 
-  test("/request-access keeps working: a GET goes to Join now, a POST is its post", async () => {
+  test("/request-access keeps working: a GET goes to Sign in, a POST is its post", async () => {
     const s = beta();
     for (const mode of ["invite", "open", "closed"]) {
       Object.assign(s.env, { SIGNUP: mode });
@@ -101,17 +104,35 @@ describe("the waitlist (v2 spec: Accounts and sign-in, The waitlist)", () => {
     expect(r.status).toBe(200);
     const text = await r.text();
     expect(text).toContain("Check your email");
-    expect(text).toContain("a note that it's on the list");
+    expect(text).toContain("We've sent an email to <strong>friend@example.com</strong>.");
+    expect(text).toContain("It has a sign-in link and a code, or tells you what's next.");
     expect(text).toContain('name="code"');
-    expect(text).toContain("If you asked several times, wait an hour");
+    expect(text).toContain("Works once, within 15 minutes. Nothing? Check spam, or");
     await ask(s, "friend@example.com");
     await settle();
     expect(s.outbox.map((m) => [m.to, m.subject])).toEqual([
       ["friend@example.com", "You're on the list: Tempra"],
       ["owner@example.com", "Tempra waitlist: friend@example.com"],
     ]);
-    expect(s.outbox[0]?.text).toContain("we'll email this address when you're in");
+    expect(s.outbox[0]?.text).toContain(
+      "Thanks for asking to join Tempra. We'll email you here when you're in.",
+    );
+    expect(s.outbox[0]?.html).toContain("You&#39;re on the list</h1>");
+    // No portal: the notice opens the app's waitlist.
+    expect(s.outbox[1]?.text).toContain("friend@example.com asked to join");
     expect(s.outbox[1]?.text).toContain(`${ORIGIN}/waitlist`);
+  });
+
+  test("the operator's notice opens the admin portal's People page where there is one", async () => {
+    const s = beta();
+    Object.assign(s.env, { ADMIN_ORIGIN: "https://admin.example" });
+    await ask(s, "friend@example.com");
+    await settle();
+    const notice = operatorMail(s)[0];
+    expect(notice?.subject).toBe("Tempra waitlist: friend@example.com");
+    expect(notice?.text).toContain("Open People:\nhttps://admin.example/");
+    expect(notice?.text).not.toContain("/waitlist");
+    expect(notice?.html).toContain('href="https://admin.example/"');
   });
 
   test("the page says the same whoever asks; an account or an invite is sent a sign-in link", async () => {

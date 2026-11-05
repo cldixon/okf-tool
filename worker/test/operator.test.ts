@@ -32,7 +32,11 @@ describe("the operator's portal", () => {
     await settle();
     const mail = s.outbox.filter((m) => m.to === "friend@example.com");
     expect(mail.map((m) => m.subject)).toEqual(["You're in: Tempra"]);
-    expect(mail[0]?.text).toContain(`${ORIGIN}/sign-in`);
+    // One button signs them in (TEMPRA-287): an invitation link, no code.
+    expect(mail[0]?.text).toContain(`Sign in to Tempra:\n${ORIGIN}/sign-in/link?t=`);
+    expect(mail[0]?.text).toContain("Works once, within 7 days.");
+    expect(mail[0]?.text).not.toMatch(/code/i);
+    expect(mail[0]?.html).toContain(">Sign in to Tempra</a>");
     const people = await ops.people();
     expect(people.notYet.map((p) => p.email)).toEqual(["friend@example.com"]);
     expect(people.signedUp).toEqual([]);
@@ -66,11 +70,72 @@ describe("the operator's portal", () => {
     expect(await ops.decide("spam@example.com", "dismissed")).toBe("dismissed");
     await settle();
     expect(s.outbox.map((m) => [m.to, m.text.split("\n")[0]])).toEqual([
-      ["asked@example.com", "You asked to join Tempra, and you're in."],
+      ["asked@example.com", "You're in"],
     ]);
     const people = await ops.people();
     expect(people.waiting).toEqual([]);
     expect(people.notYet.map((p) => p.email)).toEqual(["asked@example.com"]);
+  });
+
+  test("the invitation signs in with one click, once, within 7 days (TEMPRA-287)", async () => {
+    const { s, ops } = world();
+    s.outbox.length = 0;
+    expect(await ops.invite("friend@example.com")).toBe("invited");
+    await settle();
+    const text = s.outbox.find((m) => m.to === "friend@example.com")?.text ?? "";
+    const link = /\/sign-in\/link\?t=([0-9a-f]+)/.exec(text);
+    expect(link).toBeTruthy();
+    const t = link?.[1] ?? "";
+    // GET names the email and uses nothing up, however often a scanner fetches it.
+    for (let i = 0; i < 2; i++) {
+      const page = await s.anon.request(`/sign-in/link?t=${t}`);
+      const body = await page.text();
+      expect(body).toContain("<h1>You're in</h1>");
+      expect(body).toContain(
+        "Continue as <strong>friend@example.com</strong> to set up your account.",
+      );
+    }
+    // Outside the sign-in link limits: five sign-in emails an hour still go out.
+    for (let i = 0; i < 5; i++) {
+      expect(await s.deps.sessions.createLink("friend@example.com", null)).toBeTruthy();
+    }
+    const post = () =>
+      s.anon.request("/sign-in/link", {
+        method: "POST",
+        headers: { Origin: ORIGIN },
+        body: new URLSearchParams({ t, next: "/" }),
+        redirect: "manual",
+      });
+    const first = await post();
+    expect(first.status).toBe(303);
+    expect(first.headers.get("Set-Cookie")).toContain("__Host-tempra_session=");
+    // Used: the link opens sign-in with the address filled in, on GET and on POST.
+    const again = await post();
+    expect([again.status, again.headers.get("Location")]).toEqual([
+      303,
+      "/sign-in?email=friend%40example.com",
+    ]);
+    const opened = await s.anon.request(`/sign-in/link?t=${t}`, { redirect: "manual" });
+    expect(opened.headers.get("Location")).toBe("/sign-in?email=friend%40example.com");
+    const form = await (await s.anon.request("/sign-in?email=friend%40example.com")).text();
+    expect(form).toContain('value="friend@example.com"');
+  });
+
+  test("an expired invitation link opens sign-in with its address", async () => {
+    const { s, ops } = world();
+    s.outbox.length = 0;
+    await ops.invite("friend@example.com");
+    await settle();
+    const t = /\/sign-in\/link\?t=([0-9a-f]+)/.exec(s.outbox[0]?.text ?? "")?.[1] ?? "";
+    s.db.run(
+      "UPDATE sign_in_links SET expires = '2000-01-01T00:00:00.000Z' WHERE purpose = 'invitation'",
+    );
+    const r = await s.anon.request(`/sign-in/link?t=${t}`, { redirect: "manual" });
+    expect(r.headers.get("Location")).toBe("/sign-in?email=friend%40example.com");
+    // An unknown link is the plain expired page.
+    const unknown = await s.anon.request("/sign-in/link?t=00ff");
+    expect(unknown.status).toBe(400);
+    expect(await unknown.text()).toContain("expired or was already used");
   });
 
   test("inviting someone who is waiting decides them too", async () => {

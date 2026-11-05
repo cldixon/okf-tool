@@ -13,6 +13,8 @@ export const SESSION_COOKIE = "__Host-tempra_session";
 export const SESSION_IDLE_DAYS = 30;
 export const SESSION_MAX_DAYS = 90;
 export const LINK_MINUTES = 15;
+/** How long the invitation's sign-in link (TEMPRA-287) works. */
+export const INVITATION_DAYS = 7;
 /** Sign-in emails per address, and per IP, in any hour. */
 export const LINKS_PER_EMAIL_HOUR = 5;
 export const LINKS_PER_IP_HOUR = 20;
@@ -34,6 +36,16 @@ export interface Sessions {
     change?: { user: string } | null,
     code?: string,
   ): Promise<string | null>;
+  /**
+   * The invitation's sign-in link (TEMPRA-287): single use, INVITATION_DAYS long, no code, outside
+   * the per-email and per-IP limits (the operator sends it, once a day at most per email).
+   */
+  createInvitationLink(email: string): Promise<string>;
+  /**
+   * The email an invitation link went to, used or expired or not (until it is pruned, 30 days
+   * past its expiry), so a dead one can fill the address in at /sign-in. Null if unknown.
+   */
+  invitationEmail(secret: string): Promise<string | null>;
   /** Uses up a link of that purpose: its email (and account), or null if unknown, used or expired. */
   consumeLink(
     secret: string,
@@ -72,7 +84,7 @@ export interface Sessions {
   endById(userId: string, id: string): Promise<void>;
 }
 
-export type LinkPurpose = "sign-in" | "email-change";
+export type LinkPurpose = "sign-in" | "email-change" | "invitation";
 
 /** A session's person, and a library by name with their membership, as one query finds them. */
 export interface SessionAccess {
@@ -239,7 +251,8 @@ export function d1Sessions(
       const hourAgo = iso(t - 3_600_000);
       const counts = await db
         .prepare(
-          `SELECT (SELECT COUNT(*) FROM sign_in_links WHERE email = ?1 AND created > ?2) AS by_email,
+          `SELECT (SELECT COUNT(*) FROM sign_in_links
+                   WHERE email = ?1 AND created > ?2 AND purpose <> 'invitation') AS by_email,
                   (SELECT COUNT(*) FROM sign_in_links WHERE ip = ?3 AND created > ?2) AS by_ip`,
         )
         .bind(email, hourAgo, ip ?? "")
@@ -265,6 +278,27 @@ export function d1Sessions(
         )
         .run();
       return secret;
+    },
+
+    async createInvitationLink(email) {
+      const t = now();
+      const secret = newSecret();
+      await db
+        .prepare(
+          `INSERT INTO sign_in_links (hash, email, created, expires, ip, purpose, user, code_hash)
+           VALUES (?, ?, ?, ?, NULL, 'invitation', NULL, NULL)`,
+        )
+        .bind(hash(secret), email, iso(t), iso(t + INVITATION_DAYS * DAY_MS))
+        .run();
+      return secret;
+    },
+
+    async invitationEmail(secret) {
+      const row = await db
+        .prepare("SELECT email FROM sign_in_links WHERE hash = ? AND purpose = 'invitation'")
+        .bind(hash(secret))
+        .first<{ email: string }>();
+      return row?.email ?? null;
     },
 
     async consumeCode(email, typed) {

@@ -93,9 +93,9 @@ describe("magic-link sign-in (v2 spec: Accounts and sign-in)", () => {
     });
     expect((await s.accounts.user("new.person@example.com")).actor).toBe("human:new-person");
 
-    // Opening the link again (or a scanner fetching it) shows a button; posting it again fails.
+    // Opening a used link says so; posting it again fails.
     const opened = await s.anon.request(link.url.pathname + link.url.search);
-    expect(await opened.text()).toContain("Continue");
+    expect(await opened.text()).toContain("This link has expired");
     const again = await post(s, "/sign-in/link", { t: link.t, next: "/" });
     expect(again.status).toBe(400);
     expect(await again.text()).toContain("This link has expired");
@@ -177,13 +177,37 @@ describe("magic-link sign-in (v2 spec: Accounts and sign-in)", () => {
     const link = "https://app.tempra.dev/sign-in/link?t=abc&next=%2F";
     const mail = signInMail(link, "K7QMX2PD");
     expect(mail.html).toContain('href="https://app.tempra.dev/sign-in/link?t=abc&#38;next=%2F"');
-    expect(mail.html).toContain(">Sign in to Tempra</a>");
+    expect(mail.html).toContain(">Sign in</a>");
+    expect(mail.html).toContain(">Sign in to Tempra</h1>");
     expect(mail.html).toContain(">K7QMX2PD</p>");
     expect(mail.subject).toBe("Tempra sign-in code: K7QMX2PD");
     // The link is a hyperlink, never its raw address as text.
     expect(mail.html.replace(/href="[^"]*"/g, "")).not.toContain("sign-in/link");
     expect(mail.text).toContain(link);
     expect(signInMail(link, null).subject).toBe("Your Tempra sign-in link");
+  });
+
+  test("the link's page names its email and uses nothing up (TEMPRA-287)", async () => {
+    const s = setup();
+    const link = await askLink(s, "Ann@Example.com");
+    for (let i = 0; i < 2; i++) {
+      const page = await (await s.anon.request(`/sign-in/link?t=${link?.t}&next=%2Fagents`)).text();
+      expect(page).toContain("<h1>Sign in</h1>");
+      expect(page).toContain("Continue as <strong>ann@example.com</strong> on this device.");
+      expect(page).toContain('href="/sign-in?next=%2Fagents">Use another email</a>');
+    }
+    const r = await post(s, "/sign-in/link", { t: link?.t ?? "", next: "/" });
+    expect(r.status).toBe(303);
+  });
+
+  test("Check your email: the same words for everyone, the code and the small print", async () => {
+    const s = setup();
+    const page = await (await post(s, "/sign-in", { email: "ann@example.com" })).text();
+    expect(page).toContain("<h1>Check your email</h1>");
+    expect(page).toContain("We've sent an email to <strong>ann@example.com</strong>.");
+    expect(page).toContain(">Continue</button>");
+    expect(page).toContain("Works once, within 15 minutes. Nothing? Check spam, or ");
+    expect(page).toContain(">use another email</a>.");
   });
 
   test("an expired link is refused", async () => {
@@ -363,7 +387,7 @@ describe("who may sign up: SIGNUP (v2 spec: A4)", () => {
     });
     expect(r.status).toBe(403);
     // A dead end with a way onward (TEMPRA-125).
-    expect(await r.text()).toContain('href="/sign-in">Join now</a>');
+    expect(await r.text()).toContain('href="/sign-in">Back to sign in</a>');
     expect(
       s.db.query("SELECT COUNT(*) AS n FROM users WHERE email = 'friend@example.com'").get(),
     ).toEqual({ n: 0 });

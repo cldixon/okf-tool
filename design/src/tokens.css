@@ -212,6 +212,7 @@
   --tempra-text-h2: 22px; /* an attachment's name, a compose dialog's name */
   --tempra-text-page: 28px; /* a view's title (h1); a page's title on a phone */
   --tempra-text-title: 36px; /* a page's title */
+  --tempra-text-lockup: 26px; /* the server pages' large lockup: the mark and Tempra at the left gutter */
   --tempra-text-code: 0.92em; /* code, a step under the text around it */
 
   /* Weights: three */
@@ -255,6 +256,7 @@
   --tempra-space-40: 2.5rem;
   --tempra-space-48: 3rem;
   --tempra-space-56: 3.5rem;
+  --tempra-space-64: 4rem;
   --tempra-space-72: 4.5rem;
   --tempra-space-96: 6rem;
   --tempra-space-gutter: var(--tempra-space-08); /* the frame's gutter */
