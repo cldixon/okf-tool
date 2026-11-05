@@ -1,19 +1,38 @@
 /*
  * A page's page (take 4, TEMPRA-114; tempra-dev: app/reader, decisions/one-panel-from-the-top-
  * bar): the text (title, description, byline, body, sources) at the end of its column, a gap
- * from the outline as Linear's docs set it (TEMPRA-277), and on the right its contents, or one panel in their place (Comments, History, Properties). The page's
- * width decides what fits (container queries on `page`, the page's scroller): under 1100px the
- * contents keep a narrower column of their own down to 700px (TEMPRA-150), and hide below that
- * (On this page under the byline); a panel takes the column down to 960px and overlays the page
- * below that; on a phone (900px and under, the window's call) a panel is a sheet from the bottom.
+ * from the outline as Linear's docs set it (TEMPRA-277), and on the right its contents, or one
+ * panel in their place (Comments, History, Properties). The text and the contents are centred
+ * together in the page, as Linear's docs are: the right column takes half the spare room, so
+ * the text never drifts right with all of it on its left. The page's width decides what fits
+ * (container queries on `page`, the page's scroller): under 1100px the contents keep a narrower
+ * column of their own down to 700px (TEMPRA-150), and hide below that (On this page under the
+ * byline); a panel takes the column down to 960px and overlays the page below that; on a phone (900px and under, the window's call) a panel is a sheet from the bottom.
  */
 
 /* The right column is the panel's width whether it holds the contents or a panel, so opening a
    panel takes the contents' space and never moves the text (C-17). */
 /* --page-side is the right column's width in each layout below, so a wide or full figure
-   (prose.css, TEMPRA-161) knows the text's column: the page's width (100cqi of `page`) less it. */
+   (prose.css, TEMPRA-161) knows the text's column: the page's width (100cqi of `page`) less it.
+   --page-centred is the right column that centres the text and the contents as one group (the
+   text's column, the gap, and the contents with their padding; the text's own padding sits
+   outside it): the contents' box and half of what the page has beyond the group. At a panel's width at least,
+   so a panel fits it and opening one never moves the text; a laptop's page gets the panel's
+   width, as before, and a wide one the group centred. */
 .page-view {
-  --page-side: var(--tempra-size-panel);
+  --page-group: calc(
+    var(--tempra-size-column-text) +
+    var(--tempra-space-56) +
+    var(--tempra-size-contents) +
+    var(--tempra-space-page)
+  );
+  --page-centred: calc(
+    var(--tempra-size-contents) +
+    var(--tempra-space-page) +
+    (100cqi - var(--page-group)) /
+    2
+  );
+  --page-side: max(var(--tempra-size-panel), var(--page-centred));
 }
 
 .page-grid {
@@ -47,7 +66,7 @@
   width: 100%;
   max-width: var(--doc-max);
   min-width: 0;
-  padding: var(--tempra-space-40) var(--doc-end) 140px var(--doc-pad); /* one-off: room under the text for the page's actions */
+  padding: var(--tempra-space-56) var(--doc-end) 140px var(--doc-pad); /* one-off: room under the text for the page's actions */
 }
 
 /* Nothing beside the text: centred. */
@@ -81,7 +100,8 @@
   max-width: calc(var(--tempra-size-contents) + 2 * var(--tempra-space-page));
   max-height: calc(100dvh - var(--tempra-size-topbar));
   overflow: auto;
-  padding: var(--tempra-space-48) var(--tempra-space-page) var(--tempra-space-24) 0;
+  padding: calc(var(--tempra-space-56) + var(--tempra-space-08)) var(--tempra-space-page)
+    var(--tempra-space-24) 0; /* level with the title's first line */
 }
 
 .toc {
@@ -155,10 +175,14 @@
 
 /* ---------- A panel: in the contents' column, its title, a count and × ---------- */
 
+/* A panel is a panel's width at the page's right edge, however wide the column centring the
+   text has made its column. */
 .page-aside {
   position: sticky;
   top: 0;
   display: flex;
+  width: var(--tempra-size-panel);
+  margin-left: auto;
   flex-direction: column;
   height: calc(100dvh - var(--tempra-size-topbar));
   border-left: 1px solid var(--tempra-color-border);
@@ -186,7 +210,9 @@
     top: var(--tempra-space-16);
     height: auto;
     max-height: calc(100dvh - var(--tempra-size-topbar) - 2 * var(--tempra-space-16));
-    margin: var(--tempra-space-16) var(--tempra-space-16) 0 0;
+    /* A panel's width less the inset, at the page's right edge however wide the column is. */
+    width: calc(var(--tempra-size-panel) - var(--tempra-space-16));
+    margin: var(--tempra-space-16) var(--tempra-space-16) 0 auto;
     overflow: hidden;
     border: 1px solid var(--tempra-color-border);
     border-radius: var(--tempra-radius-card);
@@ -650,14 +676,14 @@
    and the text moves over for it. */
 @container page (700px <= width < 1100px) {
   .page-view:not(.panel-open):not(.markdown-on) {
-    --page-side: calc(var(--tempra-size-contents) + var(--tempra-space-24));
+    --page-side: max(
+      calc(var(--tempra-size-contents) + var(--tempra-space-24)),
+      var(--page-centred)
+    );
   }
 
   .page-view:not(.panel-open):not(.markdown-on) .page-grid {
-    grid-template-columns: [text] minmax(0, 1fr) [side] calc(
-        var(--tempra-size-contents) +
-        var(--tempra-space-24)
-      );
+    grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   }
 
   .page-view:not(.panel-open):not(.markdown-on) .page-side {
