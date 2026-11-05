@@ -7,8 +7,8 @@ export interface Me {
   /** The account's name, when the person gave one (TEMPRA-54): the avatar's initials. */
   name?: string | null;
   actor: string;
-  /** The account's theme (take 4): light, dark, or null for the system's. */
-  theme?: "light" | "dark" | null;
+  /** The account's theme (take 4): as chosen, dark when never chosen (TEMPRA-285). */
+  theme?: "system" | "light" | "dark" | null;
 }
 
 /** An actor as a person reads it: a handle for a person (`human:cl_dixon` → `cl_dixon`), an agent as is. */

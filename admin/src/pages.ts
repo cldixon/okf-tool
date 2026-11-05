@@ -28,8 +28,9 @@ const time = (iso: string | null) =>
 const WORDMARK = markSvg({ small: true });
 
 export function frame(title: string, body: string): string {
+  // Dark, as the server pages and the landing page are (TEMPRA-285).
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en" data-theme="dark"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(title)} · Tempra admin</title>

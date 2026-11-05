@@ -197,7 +197,8 @@ export function d1Sessions(
       email: row.email,
       actor: row.actor,
       handle: row.handle,
-      theme: row.theme === "light" || row.theme === "dark" ? row.theme : null,
+      theme:
+        row.theme === "system" || row.theme === "light" || row.theme === "dark" ? row.theme : null,
     };
     return { row, user };
   }

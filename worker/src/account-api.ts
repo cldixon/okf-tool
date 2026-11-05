@@ -1,6 +1,6 @@
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import type { Context, Hono } from "hono";
-import { checkName, checkTheme, type User } from "./accounts";
+import { checkName, checkTheme, themeOf, type User } from "./accounts";
 import type { Deps } from "./app";
 import { deleteAccount } from "./lifecycle";
 import {
@@ -63,7 +63,7 @@ export function registerAccountApi(
       handle: user.handle,
       name: account?.name ?? null,
       actor: user.actor,
-      theme: user.theme ?? null,
+      theme: themeOf(user.theme),
       sessions: sessions.map((s) => ({ ...s, current: s.id === current })),
       usage,
       limits,
@@ -84,7 +84,7 @@ export function registerAccountApi(
     if (theme !== undefined) await d.accounts.setTheme(user.id, theme);
     if (name !== undefined) await d.accounts.setName(user.id, name);
     return c.json({
-      ...(theme !== undefined && { theme }),
+      ...(theme !== undefined && { theme: themeOf(theme) }),
       ...(name !== undefined && { name }),
     });
   });

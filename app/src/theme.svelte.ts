@@ -4,7 +4,8 @@ import { useMe } from "./ui.svelte.ts";
 /*
  * The account's theme (take 4, TEMPRA-113; tempra-dev: app/workspace, Theme): System, Light or
  * Dark, stored on the account and put on the shell's root by the server (`data-theme`), so a
- * page never flashes the wrong scheme. The app changes it in place and saves it.
+ * page never flashes the wrong scheme. The app changes it in place and saves it. Dark when the
+ * person never chose (TEMPRA-285): the server puts it on the root and /me answers it.
  */
 
 export type Theme = "system" | "light" | "dark";
@@ -39,7 +40,7 @@ export function useTheme() {
   $effect(() => {
     const m = me.current;
     if (m && m.theme !== undefined) {
-      const t: Theme = m.theme ?? "system";
+      const t: Theme = m.theme ?? "dark";
       if (t !== currentTheme()) applyTheme(t);
     }
   });
@@ -58,7 +59,7 @@ export function useTheme() {
       applyTheme(t);
       void api("/api/v1/account", {
         method: "PATCH",
-        body: JSON.stringify({ theme: t === "system" ? null : t }),
+        body: JSON.stringify({ theme: t }),
       }).catch(() => {});
     },
   };

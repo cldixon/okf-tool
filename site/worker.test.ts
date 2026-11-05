@@ -16,6 +16,12 @@ test("the apex serves assets with security headers", async () => {
   expect(r.headers.get("X-Content-Type-Options")).toBe("nosniff");
 });
 
+test("every page is dark, whatever the system (TEMPRA-285)", async () => {
+  // Base.astro is every page's layout; the tokens' light-dark() follow the root's data-theme.
+  const layout = await Bun.file(new URL("./src/layouts/Base.astro", import.meta.url)).text();
+  expect(layout).toContain('<html lang="en" data-theme="dark">');
+});
+
 test("an SVG may style itself inline, and nothing more", async () => {
   const svgEnv = {
     ASSETS: {

@@ -2,7 +2,14 @@ import { type Doc, parseMarkdown } from "@tempra/editor/doc";
 import { type Context, Hono } from "hono";
 import { routePath } from "hono/route";
 import { registerAccountApi } from "./account-api";
-import { type Accounts, checkNewToken, humanActor, type MemberRole, type User } from "./accounts";
+import {
+  type Accounts,
+  checkNewToken,
+  humanActor,
+  type MemberRole,
+  themeOf,
+  type User,
+} from "./accounts";
 import { tokenAgent } from "./agents";
 import type { Authenticate, TokenInfo } from "./auth";
 import type { AuthCache } from "./authcache";
@@ -1338,7 +1345,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
       handle: account.handle,
       name: account.name ?? null,
       actor: account.actor,
-      theme: account.theme ?? null,
+      theme: themeOf(account.theme),
     });
   });
 

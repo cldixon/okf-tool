@@ -96,6 +96,8 @@ describe("the operator's portal (TEMPRA-278)", async () => {
     const r = await app.request("/", await signedIn(), env(op));
     expect(r.status).toBe(200);
     const html = await r.text();
+    // Dark, as the server pages and the landing page are (TEMPRA-285).
+    expect(html).toContain('<html lang="en" data-theme="dark"><head>');
     expect(html).toContain('action="/invite"');
     expect(html).toContain("Waiting (1)");
     expect(html).toContain("asked@example.com");
