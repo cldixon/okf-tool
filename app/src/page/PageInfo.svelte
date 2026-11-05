@@ -51,9 +51,16 @@
     props.live ? names.label(props.live.change.actor, props.live.change.by) : null,
   );
   const newerNote = $derived(props.live?.change.note ?? "");
+  /** The check line has something to say: changes since, who checked, or Mark as checked. */
+  const checkSays = $derived(
+    props.current &&
+      ((s.verified && (s.since > 0 || !!who)) ||
+        (!s.verified && props.mayVerify && !props.reviewing) ||
+        !!check.error),
+  );
 </script>
 
-{#if props.live || props.current}<ul class="page-info-now">
+{#if props.live || checkSays}<ul class="page-info-now">
     {#if props.live}<li class="page-info-newer"
         ><span class="agent-dot" aria-hidden="true"></span><span class="grow" title={newerNote || undefined}>A newer version{newerBy ? ` by ${newerBy}` : ""}</span><button
           type="button"

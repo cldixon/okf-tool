@@ -4049,7 +4049,9 @@ ul.events {
     top: var(--tempra-space-16);
     height: auto;
     max-height: calc(100dvh - var(--tempra-size-topbar) - 2 * var(--tempra-space-16));
-    margin: var(--tempra-space-16) var(--tempra-space-16) 0 0;
+    /* A panel's width less the inset, at the page's right edge however wide the column is. */
+    width: calc(var(--tempra-size-panel) - var(--tempra-space-16));
+    margin: var(--tempra-space-16) var(--tempra-space-16) 0 auto;
     overflow: hidden;
     border: 1px solid var(--tempra-color-border);
     border-radius: var(--tempra-radius-card);
@@ -4801,6 +4803,12 @@ ul.events {
 .page-info-section {
   padding-top: var(--tempra-space-14);
   border-top: 1px solid var(--tempra-color-border);
+}
+
+/* Nothing to do now (a reader, or a checked page with no news): no rule under the head. */
+.page-info-section:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .page-info-section + .page-info-section {

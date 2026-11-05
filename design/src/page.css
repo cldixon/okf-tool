@@ -966,6 +966,12 @@
   border-top: 1px solid var(--tempra-color-border);
 }
 
+/* Nothing to do now (a reader, or a checked page with no news): no rule under the head. */
+.page-info-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .page-info-section + .page-info-section {
   margin-top: var(--tempra-space-16);
 }

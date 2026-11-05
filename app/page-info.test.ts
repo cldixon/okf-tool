@@ -34,7 +34,10 @@ const ev = (seq: number, op: string, actor: string, note: string | null = null):
     meta: note ? { note } : null,
   }) as unknown as HistoryEvent;
 
-const written = [ev(10, "put", "claude-ai/connector", "Created"), ev(20, "put", "claude-ai/connector", "Six weeks")];
+const written = [
+  ev(10, "put", "claude-ai/connector", "Created"),
+  ev(20, "put", "claude-ai/connector", "Six weeks"),
+];
 const checkedThen = [...written, ev(25, "verify", "human:ann")];
 const changedSince = [...checkedThen, ev(30, "put", "claude-ai/connector", "Edits only")];
 
@@ -59,7 +62,9 @@ function info(events: HistoryEvent[], over: Record<string, unknown> = {}) {
 }
 
 const now = (host: Element) =>
-  [...host.querySelectorAll(".page-info-now > li")].map((li) => li.textContent?.replace(/\s+/g, " ").trim());
+  [...host.querySelectorAll(".page-info-now > li")].map((li) =>
+    li.textContent?.replace(/\s+/g, " ").trim(),
+  );
 
 describe("Page info", () => {
   test("its sections: About this page, then Versions newest first", () => {
@@ -94,7 +99,8 @@ describe("Page info", () => {
     expect(now(never.host)).toEqual(["Nobody has checked this pageMark as checked"]);
     never.destroy();
     const reader = info(written, { mayVerify: false });
-    expect(now(reader.host)).toEqual([]);
+    // A reader has nothing to do here: no empty list above About this page.
+    expect(reader.host.querySelector(".page-info-now")).toBeNull();
     reader.destroy();
     // An earlier version on screen: no check at all (it is of the latest only).
     const old = info(changedSince, { current: false });
