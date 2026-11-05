@@ -1,71 +1,75 @@
 ---
+/**
+ * The landing page as a Tempra page (TEMPRA-286, candidate C, "the page is a doc"): the line as
+ * its title, the sub as its description, a byline by Tempra's own agent, three short sections and
+ * the contents beside them, in one window. The byline's date is the day it is served: the site's
+ * Worker rewrites `time[data-edited]` (worker.ts); the build's date is only the fallback.
+ */
 import Base from "../layouts/Base.astro";
-import { APP } from "../site";
 
-// The loop first, then what has shipped, in plain words (TEMPRA-126, W-2 and W-4).
-const features = [
-  {
-    title: "Comments, answered",
-    body: "Select text and comment, or ask for a change. Mention @tempra and it answers in the thread; your own agents pick up what is left open.",
-  },
-  {
-    title: "Agents at work, live",
-    body: "See which page an agent is reading or writing as it works, and its changes arrive while you read.",
-  },
-  {
-    title: "Figures, diagrams and charts",
-    body: "Pages hold images, video and PDFs, and diagrams and charts that agents write as text and Tempra draws.",
-  },
-  {
-    title: "History and checking",
-    body: "Every change is kept with who made it. See what changed since you last checked a page, and export a library as plain markdown at any time.",
-  },
+const description = "Your agents write the pages. You read, comment and check.";
+
+// The MCP endpoint people connect at: the app's host since TEMPRA-276.
+const MCP_URL = "https://tempra.dev/mcp";
+
+const sections = [
+  { id: "the-problem", title: "The problem" },
+  { id: "tempra", title: "Tempra" },
+  { id: "start", title: "Start" },
 ];
 
-const steps = [
-  "Join with your email.",
-  "Connect Claude, Claude Code or any MCP client with one URL.",
-  "Ask it to write down what you know.",
-];
+const built = new Date();
+const edited = {
+  iso: built.toISOString().slice(0, 10),
+  text: built.toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" }),
+};
+
+const chevron =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 ---
 
-<Base
-  title="Tempra: your agents write it down"
-  description="A knowledge base your AI agents write and you read, comment on and check, with every change kept."
->
-  <section aria-labelledby="hero">
-    <h1 id="hero">Your agents write it down. You read, comment and check.</h1>
-    <p class="lede">
-      Tempra is a knowledge base for you and your AI agents. They write the pages; you read them,
-      comment, and mark what you have checked. Every change is kept.
-    </p>
-    <p class="public-actions">
-      <a class="button primary" href={`${APP}/sign-in`}>Join now</a>
-    </p>
-    <p class="muted">Tempra is in private beta.</p>
-  </section>
-
-  <section aria-labelledby="features">
-    <h2 id="features">What you get</h2>
-    <ul class="features" role="list">
-      {
-        features.map((f) => (
-          <li>
-            <h3>{f.title}</h3>
-            <p>{f.body}</p>
-          </li>
-        ))
-      }
-    </ul>
-  </section>
-
-  <section aria-labelledby="start">
-    <h2 id="start">Start in three steps</h2>
-    <ol class="steps" role="list">
-      {steps.map((s) => <li>{s}</li>)}
-    </ol>
-    <p class="public-actions">
-      <a class="button primary" href={`${APP}/sign-in`}>Join now</a>
-    </p>
-  </section>
+<Base title="Tempra: docs for agents, for humans" description={description} landing>
+  <article class="landing-doc" aria-labelledby="title">
+    <div class="landing-text">
+      <h1 id="title">Docs for agents, for humans.</h1>
+      <p class="landing-description">{description}</p>
+      <p class="landing-byline">
+        <span class="avatar-mark agent tempra" aria-hidden="true">T</span>
+        <span>Tempra</span>
+        <span class="muted" aria-hidden="true">·</span>
+        <span class="muted">edited <time data-edited datetime={edited.iso}>{edited.text}</time></span>
+      </p>
+      <details class="toc-inline">
+        <summary>On this page<Fragment set:html={chevron} /></summary>
+        <ul class="toc" role="list">
+          {sections.map((s) => <li><a href={`#${s.id}`}>{s.title}</a></li>)}
+        </ul>
+      </details>
+      <section aria-labelledby="the-problem">
+        <h2 id="the-problem">The problem</h2>
+        <p>What an agent works out in one chat is gone in the next.</p>
+      </section>
+      <section aria-labelledby="tempra">
+        <h2 id="tempra">Tempra</h2>
+        <p>A library of pages your agents write and keep, and you read and check.</p>
+      </section>
+      <section aria-labelledby="start">
+        <h2 id="start">Start</h2>
+        <p>Connect Claude, Claude Code, ChatGPT or any MCP client at <code>{MCP_URL}</code>.</p>
+      </section>
+    </div>
+    <nav class="landing-contents" aria-label="On this page">
+      <ul class="toc" role="list">
+        {
+          sections.map((s, i) => (
+            <li>
+              <a href={`#${s.id}`} aria-current={i === 0 ? "location" : undefined}>
+                {s.title}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </article>
 </Base>
