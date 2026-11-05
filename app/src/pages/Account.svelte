@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { api, field, post } from "../api";
   import ConfirmDialog from "../ConfirmDialog.svelte";
@@ -121,7 +122,7 @@
             Email
             <input type="email" name="email" autocomplete="email" defaultValue={a.email} required />
           </label>
-          <button type="submit" disabled={action.busy}>Change</button>
+          <Button type="submit" disabled={action.busy}>Change</Button>
         </p>
       </form>
       <form onsubmit={(e) => changeName(e, a.name)}>
@@ -136,7 +137,7 @@
               defaultValue={a.name ?? ""}
             />
           </label>
-          <button type="submit" disabled={action.busy}>Change</button>
+          <Button type="submit" disabled={action.busy}>Change</Button>
         </p>
       </form>
       <p class="small muted">Optional. Your avatar's initials come from it.</p>
@@ -145,7 +146,7 @@
           <label>
             Handle <input type="text" name="handle" defaultValue={a.handle} required />
           </label>
-          <button type="submit" disabled={action.busy}>Change</button>
+          <Button type="submit" disabled={action.busy}>Change</Button>
         </p>
       </form>
       <p class="small muted">Your handle is in every library's address.</p>
@@ -192,11 +193,7 @@
                 </td>
                 <td class="small muted">{s.user_agent ?? ""}</td>
                 <td>
-                  {#if s.current}this device{:else}<button
-                      type="button"
-                      disabled={action.busy}
-                      onclick={() => void endSession(s.id)}>Sign out</button
-                    >{/if}
+                  {#if s.current}this device{:else}<Button disabled={action.busy} onclick={() => void endSession(s.id)}>Sign out</Button>{/if}
                 </td>
               </tr>
             {/each}
@@ -206,10 +203,10 @@
       <!-- Signing out stays a server form: it must work whatever state the app is in. -->
       <div class="actions">
         <form method="post" action="/sign-out">
-          <button type="submit">Sign out</button>
+          <Button type="submit">Sign out</Button>
         </form>
         <form method="post" action="/sign-out/everywhere">
-          <button type="submit">Sign out everywhere</button>
+          <Button type="submit">Sign out everywhere</Button>
         </form>
       </div>
       <h2>Delete account</h2>
@@ -222,7 +219,7 @@
           </label>
         </p>
         <p>
-          <button type="submit" disabled={action.busy}>Delete account</button>
+          <Button type="submit" disabled={action.busy}>Delete account</Button>
         </p>
       </form>
       <p>

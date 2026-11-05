@@ -158,14 +158,6 @@
   list-style: none;
 }
 
-.home-recent-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--tempra-space-16);
-  padding: var(--tempra-space-04) 0;
-}
-
 .home-recent-title {
   min-width: 0;
   color: var(--tempra-color-text);
@@ -176,11 +168,6 @@
 
 .home-recent-title:hover {
   text-decoration: underline;
-}
-
-.home-recent-meta {
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
 }
 
 /* An empty library (board 31): one box with the steps and the waiting line, Import below. */
@@ -283,37 +270,65 @@
   margin-bottom: var(--tempra-space-32);
 }
 
-/* An entry: who, what they did, when; the live one carries the pulsing dot at the right. */
-.entry {
+/* Who changed what, and when (ChangeRow, TEMPRA-288): the avatar, the line and its detail, the
+   time at the right. Activity's Summary, the home's Recently changed and the live entry. */
+.change-row {
   display: grid;
   grid-template-columns: var(--tempra-size-avatar) minmax(0, 1fr) auto;
   gap: var(--tempra-space-12);
   padding: var(--tempra-space-12) var(--tempra-space-10);
-  border-radius: var(--tempra-radius-box);
   font-size: var(--tempra-text-ui);
 }
 
-/* On Activity's Summary, entries are rows with hairlines between them, no fill. */
-.activity-day .entry {
+/* Rows in a list have hairlines between them, no fill. */
+.activity-day .change-row,
+.home-recent .change-row {
   border-bottom: 1px solid var(--tempra-color-border);
-  border-radius: 0;
 }
 
-.entry > .avatar-mark {
-  margin-top: 1px;
+/* A run of one person's changes reads as one block: no rule inside it, no avatar again. */
+.activity-day .change-row:has(+ .change-row.continued),
+.home-recent .change-row:has(+ .change-row.continued) {
+  padding-bottom: var(--tempra-space-04);
+  border-bottom-color: transparent;
 }
 
-.entry-body {
+.change-row.continued {
+  padding-top: var(--tempra-space-04);
+}
+
+.change-row-lead {
+  display: flex;
+  padding-top: 1px;
+}
+
+.change-row-body {
   display: flex;
   flex-direction: column;
   gap: var(--tempra-space-04);
   min-width: 0;
 }
 
-.entry-line {
+.change-row-line {
   margin: 0;
   font-size: var(--tempra-text-base);
   overflow-wrap: anywhere;
+}
+
+/* Where and by whom, under a line that names the page (Recently changed). */
+.change-row-meta {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+.change-row-when {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--tempra-space-08);
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  white-space: nowrap;
 }
 
 .entry-words,
@@ -357,65 +372,39 @@
   font-size: var(--tempra-text-label);
 }
 
-.entry-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--tempra-space-08);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  white-space: nowrap;
-}
-
-/* Activity's controls (take 4, TEMPRA-115): the view switch and the filters, Download at the
-   right end of the row. */
-.activity-filters select {
+/* Activity's controls (take 4, TEMPRA-115; TEMPRA-288 from the design system's Select,
+   SearchField and PillButton): the view switch and the filters, Download at the row's end. */
+.activity-filters .pill-select {
   max-width: 14rem; /* one-off: a filter's select */
 }
 
-a.activity-download {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tempra-space-06);
+.activity-download {
   margin-left: auto;
-  font-size: var(--tempra-text-meta);
 }
 
-/* The text filter: an outlined pill with a search glyph inside it. */
+/* The text filter: the SearchField as a pill, from 14rem to 24rem. */
 .activity-find {
   display: flex;
-  flex: 1 1 14rem; /* one-off: the text filter, from 14rem to 24rem */
-  align-items: center;
-  gap: var(--tempra-space-06);
+  flex: 1 1 14rem; /* one-off: the text filter's width */
   max-width: 24rem;
-  padding: 0 var(--tempra-space-12);
-  border: 1px solid var(--tempra-color-border);
+  margin: 0;
+}
+
+.activity-find .search-field {
+  width: 100%;
+}
+
+.view-filters .search-field > input {
   border-radius: var(--tempra-radius-pill);
-  color: var(--tempra-color-muted);
-}
-
-.activity-find:focus-within {
-  outline: var(--tempra-focus-ring);
-  outline-offset: var(--tempra-focus-offset-field);
-}
-
-.activity-find input:not([type="checkbox"], [type="radio"], [type="file"]) {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 0; /* a field's height inside the pill (--tempra-space-field) */
-  border: 0;
-  outline: 0;
-  background: none;
-  color: var(--tempra-color-text);
-  font-size: var(--tempra-text-meta);
 }
 
 /* The live entry: an agent writing now, the pulsing dot and "now" at the right. */
-.entry.live {
+.change-row.live {
   align-items: center;
 }
 
 .entry-now {
+  display: flex;
   flex-direction: row;
   align-items: center;
   gap: var(--tempra-space-06);
@@ -489,18 +478,30 @@ a.activity-download {
   white-space: nowrap;
 }
 
-.events-note,
-.events-aside {
-  margin-left: var(--tempra-space-10);
+/* The note under its path, so a long one wraps beneath it rather than around it. */
+.events-note {
+  display: block;
   color: var(--tempra-color-muted);
 }
 
-.events-aside {
+/* Version and Revert…: a column of their own at the row's end (TEMPRA-288). */
+.events-table td.events-actions {
+  color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.events-actions a {
+  color: var(--tempra-color-muted);
+}
+
+.events-actions a + a {
+  margin-left: var(--tempra-space-10);
 }
 
 @media (max-width: 900px) {
-  .entry {
+  .change-row {
     gap: var(--tempra-space-10);
     padding: var(--tempra-space-12) var(--tempra-space-08);
   }

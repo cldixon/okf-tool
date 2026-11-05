@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import MentionArea from "../MentionArea.svelte";
@@ -80,7 +81,6 @@
         ? "Comment on the page"
         : "Comment on the library"}
   />{#if action.error}<div class="notice">{action.error}</div>{/if}<div class="actions"
-    ><button type="button" class="ghost" onclick={() => props.onDone()}>Cancel</button
-    ><button class="primary" type="submit" disabled={action.busy || !text.trim()}>Comment</button></div
+    ><Button variant="ghost" onclick={() => props.onDone()}>Cancel</Button><Button variant="primary" type="submit" disabled={action.busy || !text.trim()}>Comment</Button></div
   ></form
 >

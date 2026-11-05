@@ -1171,13 +1171,21 @@ async function browserRenders(
       await page.goto(`${lib}/`);
       await home();
       const recent = main.getByRole("region", { name: "Recently changed" });
-      await recent
-        .locator(".home-recent-row")
-        .first()
+      // Each row a ChangeRow, as Activity's are (TEMPRA-288): the avatar, the page, where and who,
+      // and when at the right.
+      const newest = recent.locator(".change-row").first();
+      await newest
         .getByRole("link", { name: "Gate since", exact: true })
         .waitFor({ timeout: 10_000 });
-      const meta = await recent.locator(".home-recent-meta").first().innerText();
-      if (!/ · just now$/.test(meta)) throw new Error(`Recently changed says "${meta}"`);
+      const meta = await newest.locator(".change-row-meta").innerText();
+      const when = await newest.locator(".change-row-when").innerText();
+      if (
+        !/for @/.test(meta) ||
+        when !== "just now" ||
+        !(await newest.locator(".avatar-mark").count())
+      ) {
+        throw new Error(`Recently changed says "${meta}", "${when}"`);
+      }
       if ((await main.getByText(/^Since /).count()) > 0) throw new Error("the home counts change");
       if ((await main.getByRole("region", { name: "For you here" }).count()) > 0) {
         throw new Error("the home still has For you here");
@@ -1191,8 +1199,8 @@ async function browserRenders(
         .getByRole("link", { name: /^Activity/ })
         .click();
       await page.waitForURL(`${lib}/-/activity`);
-      await main.locator(".activity-day .entry").first().waitFor({ timeout: 15_000 });
-      const above = await main.locator(".activity-day .entry").first().innerText();
+      await main.locator(".activity-day .change-row").first().waitFor({ timeout: 15_000 });
+      const above = await main.locator(".activity-day .change-row").first().innerText();
       if (!above.includes("Gate since")) throw new Error(`the newest entry reads "${above}"`);
       if ((await main.getByText("New since you looked").count()) > 0) {
         throw new Error("Activity still marks what is new since the last look");
@@ -4301,7 +4309,7 @@ async function browserRenders(
         await main
           .getByRole("heading", { level: 1, name: "Activity", exact: true })
           .waitFor({ timeout: 15_000 });
-        await main.locator("article.entry").first().waitFor({ timeout: 10_000 });
+        await main.locator("article.change-row").first().waitFor({ timeout: 10_000 });
         if (shots) await page.screenshot({ path: `${shots}/activity.png` });
         await page.waitForTimeout(500);
         await agentAppends(
@@ -4309,11 +4317,13 @@ async function browserRenders(
           "gate: an agent writes while Activity is open",
         );
         await main
-          .locator("article.entry", { hasText: "gate: an agent writes while Activity is open" })
+          .locator("article.change-row", {
+            hasText: "gate: an agent writes while Activity is open",
+          })
           .first()
           .waitFor({ timeout: 10_000 });
         // The agent is writing now: the live entry heads the Summary with the pulsing dot.
-        const liveEntry = main.locator("article.entry.live");
+        const liveEntry = main.locator("article.change-row.live");
         await liveEntry.waitFor({ timeout: 10_000 });
         if (!/is editing/.test(await liveEntry.innerText())) {
           throw new Error(`live entry: ${await liveEntry.innerText()}`);
@@ -4349,8 +4359,8 @@ async function browserRenders(
         const ringOn = async (what: string) => {
           const ring = await page.evaluate<string>(`(() => {
             const el = document.activeElement;
-            // The filter field draws its ring on its pill (:focus-within), the rest on themselves.
-            const s = getComputedStyle(el.closest(".activity-find") || el);
+            // The filter is the design system's SearchField: its input draws the ring itself.
+            const s = getComputedStyle(el);
             return el.matches(":focus-visible") + " " + s.outlineStyle + " " + s.outlineWidth;
           })()`);
           if (ring !== "true solid 2px") throw new Error(`${what}'s focus ring: ${ring}`);
@@ -4417,7 +4427,7 @@ async function browserRenders(
         await markStay();
         await main.getByRole("button", { name: "Summary", exact: true }).click();
         await page.waitForURL(`${lib}/-/activity`);
-        await main.locator("article.entry").first().waitFor({ timeout: 10_000 });
+        await main.locator("article.change-row").first().waitFor({ timeout: 10_000 });
         if (!(await stayed())) throw new Error("the switch reloaded the page");
       },
     );
@@ -4466,7 +4476,7 @@ async function browserRenders(
             .getByRole("navigation", { name: "Library" })
             .getByRole("link", { name: /^Activity/ })
             .click();
-          await main.locator("article.entry").first().waitFor({ timeout: 15_000 });
+          await main.locator("article.change-row").first().waitFor({ timeout: 15_000 });
           await page.goBack();
         }
         await page.waitForTimeout(2000); // the feed's catch-up and the tree's refresh settle
@@ -4522,7 +4532,7 @@ async function browserRenders(
         {
           name: "Activity",
           url: `${lib}/-/activity`,
-          ready: () => main.locator("article.entry").first().waitFor({ timeout: 15_000 }),
+          ready: () => main.locator("article.change-row").first().waitFor({ timeout: 15_000 }),
         },
         {
           name: "Every event",

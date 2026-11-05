@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { actorText } from "../agents";
   import Moment from "../Moment.svelte";
   import type { Urls } from "../urls";
@@ -46,4 +47,4 @@
       ></li
     >
   {/each}
-</ol>{#if older > 0}<button type="button" class="ghost older-versions" onclick={() => (shown += PAGE)}>{older} older version{older === 1 ? "" : "s"}</button>{/if}
+</ol>{#if older > 0}<Button variant="ghost" class="older-versions" onclick={() => (shown += PAGE)}>{older} older version{older === 1 ? "" : "s"}</Button>{/if}

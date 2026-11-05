@@ -12,7 +12,7 @@
    * where comments can anchor, with a quiet notice under it.
    */
 
-  import { Icon } from "@tempra/design/components";
+  import { Button, Icon } from "@tempra/design/components";
   import type { Code } from "mdast";
   import Caption from "./Caption.svelte";
   import { drawDiagram, fenceAlt, figureLang } from "./diagram";
@@ -53,14 +53,10 @@
             {@attach drawDiagram(node.value, `d${id ?? ""}-`, fail, lang, figure?.kind === "diagram" ? figure.chart : undefined)}
           ></div
         >{/if}<span class="figure-tools" data-skip=""
-        ><button
-          type="button"
-          aria-pressed={showSource}
-          onclick={(e) => {
+        ><Button aria-pressed={showSource} onclick={(e) => {
             e.stopPropagation();
             showSource = !showSource;
-          }}>Source</button
-        >{#if open && figure}<button
+          }}>Source</Button>{#if open && figure}<button
             type="button"
             class="figure-enlarge"
             aria-label={`Enlarge ${lang === "mermaid" ? "diagram" : lang === "svg" ? "figure" : "chart"}${figure.caption ? `: ${figure.caption}` : ""}`}

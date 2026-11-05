@@ -1,6 +1,8 @@
 <script lang="ts">
   import {
     byPerson,
+    continuesRun,
+    entryTime,
     type Entry,
     groupByDay,
     type LedgerRequest,
@@ -71,8 +73,18 @@
         title={titles.of(live.path)}
       />
     {/if}
-    {#each day.items as e (e.id)}
-      <EntryRow entry={e} {urls} actor={actors.view(e.actor, e.by)} {now} />
+    {#each day.items as e, j (e.id)}
+      <!-- A run of one person's changes is one block (TEMPRA-288); the live entry starts none. -->
+      {@const prev = day.items[j - 1]}
+      {@const continued = continuesRun(prev, e)}
+      <EntryRow
+        entry={e}
+        {urls}
+        actor={actors.view(e.actor, e.by)}
+        {now}
+        {continued}
+        time={!continued || !prev || entryTime(prev.ts, now) !== entryTime(e.ts, now)}
+      />
     {/each}
   </section>
 {/each}

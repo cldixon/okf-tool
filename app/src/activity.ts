@@ -459,6 +459,31 @@ export function groupByDay<T extends { ts: string }>(
   return days;
 }
 
+/** How far apart two entries of one person may be and still read as one run (TEMPRA-288). */
+export const RUN_GAP_MS = 30 * 60_000;
+
+/**
+ * Whether `e` continues the run `prev` is in, on Activity's Summary (TEMPRA-288): the same actor
+ * acting for the same person, and within RUN_GAP_MS of it (entries are newest first). A run is
+ * drawn as one block, the name and avatar once.
+ */
+export function continuesRun(
+  prev: Pick<Entry, "actor" | "by" | "ts"> | undefined,
+  e: Pick<Entry, "actor" | "by" | "ts">,
+): boolean {
+  if (!prev || prev.actor !== e.actor) return false;
+  if ((prev.by?.person ?? null) !== (e.by?.person ?? null)) return false;
+  return Math.abs(Date.parse(prev.ts) - Date.parse(e.ts)) <= RUN_GAP_MS;
+}
+
+/** A sentence's parts without the name before them: its first words capitalised ("Deleted …"). */
+export function withoutName(parts: Part[]): Part[] {
+  const [first, ...rest] = parts;
+  if (typeof first !== "string") return parts;
+  const words = first.trimStart();
+  return [words.charAt(0).toUpperCase() + words.slice(1), ...rest];
+}
+
 /**
  * When, beside an entry under its day's heading: "14 min ago" today (relativeTime), the time of
  * day on an earlier day.

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { field, post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import type { Me } from "../ui";
@@ -98,7 +99,7 @@
       </label>
     </p>
     <p>
-      <button class="primary" type="submit" disabled={action.busy}>Create</button>
+      <Button variant="primary" type="submit" disabled={action.busy}>Create</Button>
     </p>
   </form>
 {/if}

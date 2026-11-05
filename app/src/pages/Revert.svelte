@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { type LedgerRequest, touchedBy } from "../activity";
   import { useAgentNames } from "../agents.svelte.ts";
   import { api, field, post } from "../api";
@@ -75,8 +76,7 @@
             <input type="text" name="note" defaultValue={`Revert: ${r.note ?? "a change"}`} />
           </label>
           <p class="actions">
-            <button class="primary" type="submit" disabled={action.busy}>Revert</button><a
-              class="button" href={urls.activity({ view: "events" })}>Cancel</a>
+            <Button variant="primary" type="submit" disabled={action.busy}>Revert</Button><Button href={urls.activity({ view: "events" })}>Cancel</Button>
           </p>
         </form>
       </div>

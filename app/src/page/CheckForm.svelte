@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { field } from "../api";
   import type { Urls } from "../urls";
   import { useCheck } from "./checked.svelte.ts";
@@ -17,6 +18,5 @@
 </script>
 
 <form class="verify-form" onsubmit={submit}
-  ><input type="text" name="note" placeholder="Note (optional)" aria-label="Note" /><button class="primary" type="submit" disabled={check.busy}>Mark as checked</button
-  >{#if check.error}<span class="warn">{check.error}</span>{/if}</form
+  ><input type="text" name="note" placeholder="Note (optional)" aria-label="Note" /><Button variant="primary" type="submit" disabled={check.busy}>Mark as checked</Button>{#if check.error}<span class="warn">{check.error}</span>{/if}</form
 >

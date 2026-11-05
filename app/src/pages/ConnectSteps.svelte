@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import CopyField from "../CopyField.svelte";
 
   /**
@@ -34,7 +35,7 @@
 <svelte:element this={heading}>Other clients and scripts</svelte:element>
 <p>
   {#if props.onNewToken}
-    <button type="button" onclick={props.onNewToken}>New token</button>
+    <Button onclick={props.onNewToken}>New token</Button>
   {:else}
     <a
       href={props.library

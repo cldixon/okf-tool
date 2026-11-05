@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import type { Urls } from "../urls";
   import type { Namer } from "./byline";
   import type { PageFile, Standing } from "./data";
@@ -26,10 +27,7 @@
   <section class="review-bar" aria-label="Version"
     ><span class="review-what"><VersionWhat {version} {name} lead={`v${version.n} as it was`} /></span
     ><span class="review-actions"
-      >{#if before}<a class="button" href={`${page}${page.includes("?") ? "&" : "?"}since=${before.event.seq}`}>Changes in v{version.n}</a>{/if}<a
-        class="button"
-        href={urls.pinned(undefined).file(c.path)}>Back to latest</a
-      ></span
+      >{#if before}<Button href={`${page}${page.includes("?") ? "&" : "?"}since=${before.event.seq}`}>Changes in v{version.n}</Button>{/if}<Button href={urls.pinned(undefined).file(c.path)}>Back to latest</Button></span
     ></section
   >
 {/if}

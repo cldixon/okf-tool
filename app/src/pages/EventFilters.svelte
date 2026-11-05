@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { Icon } from "@tempra/design/components";
+  import { SearchField, Select } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { KINDS } from "../activity";
 
-  /** Every event's own filters: the kind, and text to find in the path or the note. */
+  /**
+   * Every event's own filters: the kind, and text to find in the path or the note, from the design
+   * system's Select and SearchField (TEMPRA-288).
+   */
   let {
     kind,
     q,
@@ -27,25 +30,10 @@
     e.preventDefault();
     onChange({ q: text.trim() || undefined });
   }
+  const kinds = [{ value: "", label: "Any kind" }, ...KINDS.map((k) => ({ value: k, label: k }))];
 </script>
 
-<select
-  class="pill-select"
-  aria-label="Kind"
-  value={kind}
-  onchange={(e) => onChange({ kind: e.currentTarget.value || undefined })}
->
-  <option value="">Any kind</option>
-  {#each KINDS as k (k)}
-    <option value={k}>{k}</option>
-  {/each}
-</select>
+<Select label="Kind" value={kind} options={kinds} onchange={(v) => onChange({ kind: v || undefined })} />
 <form class="activity-find" onsubmit={submit}>
-  <Icon name="search" />
-  <input
-    type="search"
-    aria-label="Filter by path or note"
-    placeholder="Filter by path or note"
-    bind:value={text}
-  />
+  <SearchField label="Filter by path or note" placeholder="Filter by path or note" bind:value={text} />
 </form>

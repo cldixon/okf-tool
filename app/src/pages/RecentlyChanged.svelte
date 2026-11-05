@@ -1,10 +1,15 @@
 <script lang="ts">
+  import { ChangeRow } from "@tempra/design/components";
+  import Avatar from "../Avatar.svelte";
   import type { ActedBy, ActorView } from "../agents";
   import Moment from "../Moment.svelte";
   import { dirOf, folderName, type Urls } from "../urls";
   import type { Changed } from "./home";
 
-  /** Recently changed: the last few pages edited, each with who and when; absent when none. */
+  /**
+   * Recently changed: the last few pages edited, each a ChangeRow as Activity's are (TEMPRA-288):
+   * who, the page, its folder and who for, when; absent when none.
+   */
   let {
     urls,
     changed,
@@ -22,9 +27,13 @@
       {#each changed as c (c.path)}
         {@const who = view(c.actor, c.by)}
         {@const folder = dirOf(c.path)}
-        <li class="home-recent-row">
-          <a class="home-recent-title" href={urls.file(c.path)}>{c.title}</a>
-          <span class="home-recent-meta">{#if folder}<span>{`${folderName(folder)} · `}</span>{/if}{who.name}{who.for ? ` for ${who.for}` : ""} · <Moment ts={c.ts} /></span>
+        <li>
+          <ChangeRow>
+            {#snippet lead()}<Avatar name={who.mark} fullName={who.fullName} agent={who.agent} tempra={who.tempra} />{/snippet}
+            <a class="home-recent-title" href={urls.file(c.path)}>{c.title}</a>
+            {#snippet detail()}<span class="change-row-meta">{#if folder}{`${folderName(folder)} · `}{/if}{who.name}{who.for ? ` for ${who.for}` : ""}</span>{/snippet}
+            {#snippet when()}<Moment ts={c.ts} />{/snippet}
+          </ChangeRow>
         </li>
       {/each}
     </ul>

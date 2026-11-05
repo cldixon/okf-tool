@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, Chip, ComposeDialog, Dialog } from "@tempra/design/components";
+  import { Button, Chip, ComposeDialog, Dialog, Select } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { api, field, post } from "../api";
   import ConfirmDialog from "../ConfirmDialog.svelte";
@@ -195,18 +195,24 @@
       {#snippet fields()}
         <label class="compose-field">
           <span>Library</span>
-          <select name="library">
-            {#each libraries as l (l)}
-              <option value={l} selected={l === chosen}>{l}</option>
-            {/each}
-          </select>
+          <Select
+            variant="plain"
+            name="library"
+            value={chosen}
+            options={libraries.map((l) => ({ value: l, label: l }))}
+          />
         </label>
         <label class="compose-field">
           <span>Access</span>
-          <select name="scope">
-            <option value="write" selected>Read and write</option>
-            <option value="read">Read only</option>
-          </select>
+          <Select
+            variant="plain"
+            name="scope"
+            value="write"
+            options={[
+              { value: "write", label: "Read and write" },
+              { value: "read", label: "Read only" },
+            ]}
+          />
         </label>
         <label class="compose-field">
           <span>Directory</span>
@@ -218,10 +224,15 @@
         </label>
         <label class="compose-field">
           <span>Tools</span>
-          <select name="tiers">
-            <option value="all" selected>All MCP tools</option>
-            <option value="files">File tools only</option>
-          </select>
+          <Select
+            variant="plain"
+            name="tiers"
+            value="all"
+            options={[
+              { value: "all", label: "All MCP tools" },
+              { value: "files", label: "File tools only" },
+            ]}
+          />
         </label>
       {/snippet}
       <input
