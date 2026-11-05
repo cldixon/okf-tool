@@ -4565,13 +4565,18 @@ async function browserRenders(
  * gate emulates: an account that never chose is dark (TEMPRA-285).
  */
 async function followSystem(page: import("playwright-core").Page) {
-  const status = await page.evaluate(`
-    fetch("/api/v1/account", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: "system" }),
-    }).then((r) => r.status)`);
-  if (status !== 200) throw new Error(`setting the theme to System answered ${status}`);
+  if ((await page.locator("html:not([data-theme])").count()) > 0) return;
+  // As a person does, from the avatar's menu; the choice is saved on the account.
+  const account = page.locator(".menu-list.account");
+  await page.getByRole("button", { name: "Account menu" }).click();
+  const saved = page.waitForResponse(
+    (r) => r.url().endsWith("/api/v1/account") && r.request().method() === "PATCH",
+    { timeout: 15_000 },
+  );
+  await account.getByRole("button", { name: "System", exact: true }).click();
+  if ((await saved).status() !== 200) throw new Error("setting the theme to System failed");
+  await page.keyboard.press("Escape");
+  await account.waitFor({ state: "detached", timeout: 5000 });
   await page.reload();
   await page.locator("html:not([data-theme])").waitFor({ timeout: 15_000 });
 }
