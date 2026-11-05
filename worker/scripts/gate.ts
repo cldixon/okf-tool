@@ -5163,6 +5163,97 @@ async function pagePanel(token: string): Promise<string[]> {
   return problems;
 }
 
+/**
+ * The changes panel (TEMPRA-291, a spike; tempra-dev app/source-diff): an agent edits the page
+ * the page panel's step wrote, then calls `diff`; the gate's host draws the panel under the CSP
+ * its `_meta.ui` declares (none): the head, Pierre's diff stacked, then split.
+ */
+async function changesPanel(token: string): Promise<string[]> {
+  // biome-ignore lint/suspicious/noExplicitAny: the panel's DOM, untyped in this file.
+  type Dom = any;
+  const client = new Client({ name: "gate", version: "1.0.0" });
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
+      fetch,
+      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+    }),
+  );
+  const text = (r: unknown) =>
+    ((r as { content?: { type: string; text?: string }[] }).content ?? [])
+      .map((c) => c.text ?? "")
+      .join("\n");
+  const args = { path: "gate-page/margin.md" };
+  let html: string;
+  let csp: Record<string, string[]>;
+  let result: Record<string, unknown>;
+  try {
+    const edit = await client.callTool({
+      name: "edit",
+      arguments: {
+        ...args,
+        edits: [{ old: "over revenue.", new: "as a share of revenue." }],
+        note: "gate: a change to diff",
+      },
+    });
+    if (edit.isError) return [`editing margin.md: ${text(edit)}`];
+    const read = await client.readResource({ uri: "ui://tempra/changes" });
+    const content = read.contents[0] as { text?: string; _meta?: { ui?: { csp?: object } } };
+    html = content.text ?? "";
+    csp = (content._meta?.ui?.csp ?? {}) as Record<string, string[]>;
+    result = (await client.callTool({ name: "diff", arguments: args })) as Record<string, unknown>;
+    if (result.isError) return [`diff: ${text(result)}`];
+  } finally {
+    await client.close();
+  }
+  const hostJs = await Bun.build({
+    entrypoints: [join(import.meta.dir, "panel-host.ts")],
+    target: "browser",
+    minify: true,
+  });
+  if (!hostJs.success || !hostJs.outputs[0]) return [`panel host: ${hostJs.logs.join("; ")}`];
+  const hostCode = await hostJs.outputs[0].text();
+  const b = await openBrowser();
+  if (typeof b === "string") return [b];
+  const { page, step, problems } = b;
+  const panel = page.frameLocator('iframe[title="Changes panel"]');
+  const shots = process.env.GATE_SCREENSHOTS;
+  try {
+    await step("the host draws the page's changes: the head and the diff, stacked", async () => {
+      await page.setViewportSize({ width: 900, height: 900 });
+      await page.setContent("<!doctype html><html><body></body></html>");
+      await page.addScriptTag({ content: hostCode, type: "module" });
+      await page.waitForFunction('typeof window.startPanel === "function"');
+      const frame = { title: "Changes panel", width: 760, height: 700 };
+      const call = [html, csp, args, result, frame].map((v) => JSON.stringify(v)).join(", ");
+      await page.evaluate(`window.startPanel(${call})`);
+      await panel
+        .getByRole("heading", { name: "gate-page/margin.md", level: 1 })
+        .waitFor({ timeout: 15_000 });
+      await panel.locator(".cp-meta", { hasText: "1 added, 1 removed" }).waitFor();
+      await panel.getByRole("button", { name: "Stacked", pressed: true }).waitFor();
+      // Pierre draws into its shadow root, which Playwright's locators pierce.
+      const line = panel.locator('[data-line][data-line-type="change-addition"]').first();
+      await line.waitFor({ timeout: 10_000 });
+      const added = await line.evaluate((e: Dom) => e.textContent);
+      if (!String(added).includes("as a share of revenue")) {
+        throw new Error(`the added line reads ${JSON.stringify(added)}`);
+      }
+      if (shots) await page.screenshot({ path: `${shots}/changes-panel.png`, fullPage: true });
+    });
+    await step("Split shows the two versions side by side", async () => {
+      await panel.getByRole("button", { name: "Split" }).click();
+      await panel.getByRole("button", { name: "Split", pressed: true }).waitFor();
+      await panel.locator('pre[data-diff-type="split"]').waitFor({ timeout: 10_000 });
+      if (shots) {
+        await page.screenshot({ path: `${shots}/changes-panel-split.png`, fullPage: true });
+      }
+    });
+  } finally {
+    await b.close();
+  }
+  return problems;
+}
+
 /** Runs the daily maintainers as the app's Export now does, and reads the export from R2. */
 async function nightlyExport(owner: string, slug: string, originals: number): Promise<string[]> {
   const lib = `${base}/${owner}/${slug}`;
@@ -5939,6 +6030,12 @@ try {
   );
   for (const p of shown) console.log(`  - ${p}`);
   if (shown.length > 0) failed = true;
+  const changed = await changesPanel(mcpToken).catch((e) => [String(e)]);
+  console.log(
+    `${changed.length === 0 ? "PASS" : "FAIL"} the changes panel: an MCP host draws a page's Markdown diff, stacked and split`,
+  );
+  for (const p of changed) console.log(`  - ${p}`);
+  if (changed.length > 0) failed = true;
   if (!mcpOk) failed = true;
   // Several agents at once over MCP: a stale edit refused, turns on one page, parallel
   // writes; every write must reach the change feed. Patient, since the gate's earlier steps

@@ -556,6 +556,7 @@ describe("MCP server", () => {
     expect(list.resources.map((r) => [r.uri, r.title])).toEqual([
       ["ui://tempra/upload", "Upload a file"],
       ["ui://tempra/page", "Show a page"],
+      ["ui://tempra/changes", "Changes to a page"],
       ["tempra://owner/demo/t/a.md", "A"],
     ]);
     const res = await client.readResource({ uri: "tempra://owner/demo/t/a.md" });
