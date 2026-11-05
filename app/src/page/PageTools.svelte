@@ -10,7 +10,9 @@
    * outlined buttons in the page's top-right corner, or under the byline where there is no column
    * (the stylesheet's call: the page draws it in both places). Comments with its open count, Page
    * info with the agent dot while a newer version waits, and Copy page with a ⌄ for View Markdown
-   * and Download .md. The open panel's button shows pressed; pressing it again closes it.
+   * and Download .md. The open panel's button shows pressed; pressing it again closes it. Copy page
+   * says what happened where it was pressed: a check for two seconds once copied (a × if it could
+   * not), as CopyField does.
    */
   let props: {
     urls: Urls;
@@ -56,7 +58,7 @@
     onclick={() => props.onPanel("info")}
   /><SplitButton
     touch
-    icon="copy"
+    icon={page.state === "copied" ? "check" : page.state === "failed" ? "x" : "copy"}
     label={copyLabel}
     menuLabel="More copy options"
     onclick={() => page.copy(() => storedFile(props.urls, props.path))}

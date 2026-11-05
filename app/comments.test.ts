@@ -10,7 +10,7 @@ import { actorView, agentInitial, TEMPRA_ACTOR } from "./src/agents";
 import PageTools from "./src/page/PageTools.svelte";
 import type { PanelName } from "./src/page/panel";
 import { Urls } from "./src/urls";
-import { draw } from "./test/dom";
+import { draw, settle } from "./test/dom";
 
 // happy-dom lays nothing out; the menu takes the choices it can see (as chrome.test.ts does).
 const rects = Element.prototype.getClientRects;
@@ -179,5 +179,34 @@ describe("the page's corner tools (TEMPRA-283)", () => {
     flushSync();
     expect(r.markdown).toEqual([true]);
     r.d.destroy();
+  });
+
+  test("Copy page shows a check once copied, a × if it could not", async () => {
+    const clipboard = navigator.clipboard;
+    const fetched = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("# A page\n")) as unknown as typeof fetch;
+    const glyph = (r: ReturnType<typeof row>) =>
+      r.d.host.querySelector("button.split-main svg")?.getAttribute("class") ?? "";
+    for (const [works, name, icon] of [
+      [true, "Copied", "lucide-check"],
+      [false, "Could not copy", "lucide-x"],
+    ] as const) {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: () => (works ? Promise.resolve() : Promise.reject(new Error("denied"))),
+        },
+      });
+      const r = row();
+      expect(glyph(r)).toContain("lucide-copy");
+      r.button("Copy page")?.click();
+      await settle(20);
+      flushSync();
+      expect(r.button(name)).not.toBeNull();
+      expect(glyph(r)).toContain(icon);
+      r.d.destroy();
+    }
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: clipboard });
+    globalThis.fetch = fetched;
   });
 });
