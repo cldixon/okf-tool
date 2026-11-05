@@ -207,3 +207,83 @@
 .page-panel .pp-sources h2 {
   margin-top: 0;
 }
+
+/* ---------- The changes panel (TEMPRA-291, a spike; tempra-dev app/source-diff) ----------
+ * `diff` draws a page's Markdown source between two versions with Pierre's diffs, in its own
+ * shadow root. Pierre reads its colours and fonts from custom properties, which inherit into the
+ * shadow root, so the panel's look is set here on the diff's container: the host's surface,
+ * text and mono, and greys only (no red or green): an added line on the comment grey, a removed
+ * one on the inset, told apart by the + and − in the gutter and by word emphasis.
+ */
+.changes-panel .cp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tempra-space-04) var(--tempra-space-12);
+  margin-bottom: var(--tempra-space-12);
+}
+
+.changes-panel .cp-where {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: var(--tempra-text-ui);
+}
+
+.changes-panel .cp-title {
+  margin: 0;
+  font-size: var(--tempra-text-name);
+  font-weight: var(--tempra-weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.changes-panel .cp-meta {
+  flex: 1;
+  margin: 0;
+  font-size: var(--tempra-text-ui);
+}
+
+.changes-panel .cp-layout {
+  display: inline-flex;
+  gap: var(--tempra-space-04);
+}
+
+.changes-panel .cp-layout button {
+  padding: var(--tempra-space-02) var(--tempra-space-12);
+  font-size: var(--tempra-text-ui);
+}
+
+.changes-panel .cp-layout button[aria-pressed="true"] {
+  border-color: var(--panel-text);
+  background: var(--panel-text);
+  color: var(--panel-surface);
+}
+
+.changes-panel .cp-diff {
+  --diffs-font-family: var(--font-mono, var(--tempra-font-mono));
+  --diffs-header-font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+  --diffs-font-size: var(--tempra-text-ui);
+  --diffs-line-height: 1.55;
+  --diffs-light-bg: var(--panel-surface);
+  --diffs-dark-bg: var(--panel-surface);
+  --diffs-light: var(--panel-text);
+  --diffs-dark: var(--panel-text);
+  --diffs-fg-number-override: var(--panel-muted);
+  --diffs-addition-color-override: var(--panel-text);
+  --diffs-deletion-color-override: var(--panel-muted);
+  --diffs-bg-addition-override: var(--tempra-color-comment);
+  --diffs-bg-addition-number-override: var(--tempra-color-comment);
+  --diffs-bg-addition-emphasis-override: var(--tempra-color-comment-active);
+  --diffs-bg-deletion-override: var(--panel-inset);
+  --diffs-bg-deletion-number-override: var(--panel-inset);
+  --diffs-bg-deletion-emphasis-override: var(--tempra-color-hover);
+  --diffs-bg-separator-override: var(--panel-inset);
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+}
+
+/* Pierre's theme sets its own `color-scheme` on its host; the host's light or dark wins here. */
+.changes-panel .cp-diff > diffs-container {
+  color-scheme: inherit;
+}

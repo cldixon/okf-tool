@@ -1,7 +1,7 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { pagePanel, uploadPanel } from "@tempra/app/panels";
+import { changesPanel, pagePanel, uploadPanel } from "@tempra/app/panels";
 import { z } from "zod";
 import type { TokenInfo } from "../auth";
 import { chartForRender, libraryText } from "../chart-data";
@@ -166,6 +166,13 @@ const pagePanelMeta = (origin: string) => ({
  * The panel's document, its fonts at this deployment's own `/_design/` URLs and Pele at its
  * `/_app/` chunk (app/build.ts leaves `__TEMPRA_ORIGIN__` for the origin).
  */
+/**
+ * The changes panel (TEMPRA-291, a spike; tempra-dev: app/source-diff): `diff` draws the page's
+ * Markdown between two versions in the chat with Pierre's diffs, stacked or split. Everything is
+ * in its one document and the result, so it declares no domains.
+ */
+export const CHANGES_PANEL_URI = "ui://tempra/changes";
+const changesPanelMeta = { ui: { prefersBorder: true } };
 export const pagePanelHtml = (origin: string) =>
   pagePanel
     .replaceAll('url("/_design/', `url("${origin}/_design/`)
@@ -1913,7 +1920,8 @@ export function buildServer(ctx: McpContext): McpServer {
       "diff",
       {
         title: "Compare versions",
-        description: `${BEYOND}unified diff of a page between two sequence numbers. Omit both to see its latest change; omit \`to\` for head.`,
+        description: `${BEYOND}unified diff of a page between two sequence numbers. Omit both to see its latest change; omit \`to\` for head. In a chat that shows apps, the person sees it drawn in a panel.`,
+        _meta: { ui: { resourceUri: CHANGES_PANEL_URI } },
         inputSchema: {
           path: z.string(),
           from: z.number().int().optional(),
@@ -1923,8 +1931,23 @@ export function buildServer(ctx: McpContext): McpServer {
         annotations: readOnly,
       },
       guarded(async ({ path, from, to, library }) => {
-        const d = await pick(library).lib.diff(path, { from, to });
-        return text(d.diff || `No difference in ${d.path} between seq ${d.from} and ${d.to}.`);
+        const { token, lib } = pick(library);
+        const d = await lib.diff(path, { from, to });
+        const result = text(
+          d.diff || `No difference in ${d.path} between seq ${d.from} and ${d.to}.`,
+        );
+        // The changes panel's data (TEMPRA-291): the host hands it to the panel.
+        result.structuredContent = {
+          changes: {
+            v: 1,
+            library: { owner: token.library.owner, slug: token.library.slug },
+            path: d.path,
+            from: d.from,
+            to: d.to,
+            patch: d.diff,
+          },
+        };
+        return result;
       }),
     );
 
@@ -2202,6 +2225,22 @@ export function buildServer(ctx: McpContext): McpServer {
           text: pagePanelHtml(ctx.origin),
           _meta: pagePanelMeta(ctx.origin),
         },
+      ],
+    }),
+  );
+
+  server.registerResource(
+    "changes_panel",
+    CHANGES_PANEL_URI,
+    {
+      title: "Changes to a page",
+      description: "The panel `diff` draws in the chat: a page's Markdown between two versions.",
+      mimeType: MCP_APP_MIME,
+      _meta: changesPanelMeta,
+    },
+    async (uri) => ({
+      contents: [
+        { uri: uri.href, mimeType: MCP_APP_MIME, text: changesPanel, _meta: changesPanelMeta },
       ],
     }),
   );
