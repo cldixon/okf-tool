@@ -173,7 +173,7 @@
       <ChangeRow>
         {#snippet lead()}<AvatarMark kind="agent" initials="C" />{/snippet}
         Claude Code for @dev edited <a href="#change-row">Revenue</a>
-        {#snippet detail()}<q class="entry-note">Tightened the definition</q>{/snippet}
+        {#snippet detail()}<span class="change-row-meta">Metrics · Claude Code for @dev</span>{/snippet}
         {#snippet when()}14 min ago{/snippet}
       </ChangeRow>
       <ChangeRow continued>
@@ -185,6 +185,13 @@
         {#snippet lead()}<AvatarMark kind="agent" initials="C" />{/snippet}
         Claude Code for @dev is editing <a href="#change-row">Revenue</a>
         {#snippet when()}<span class="entry-now"><span class="change-dot live" aria-hidden="true"></span>now</span>{/snippet}
+      </ChangeRow>
+    </div>
+    <!-- Bare (no lead): Activity by page's row (TEMPRA-308). -->
+    <div class="activity-day">
+      <ChangeRow class="activity-page">
+        <a class="activity-page-title" href="#change-row">Retention cohorts</a><span class="activity-page-folder">Metrics</span><span class="change-dot live" aria-hidden="true"></span>
+        {#snippet detail()}<p class="activity-page-line">Edited twice by Claude Code for @dev, +252 −42 words · “Split week zero from churned accounts”</p>{/snippet}
       </ChangeRow>
     </div>
   {/snippet}

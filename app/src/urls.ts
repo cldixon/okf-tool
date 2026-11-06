@@ -73,7 +73,7 @@ export class Urls {
     return `${this.base}-/restore/${enc(path)}${query({ to })}`;
   }
   /**
-   * Activity (take 4, TEMPRA-115): the Summary (requests grouped by day) or Every event (the
+   * Activity (take 4, TEMPRA-115): By page (each day's changes by page, TEMPRA-308) or Every event (the
    * ledger as a table), filtered as the page's controls set.
    */
   activity(filters: ActivityFilters = {}) {
@@ -129,7 +129,7 @@ export type SettingsSection =
   | "recovery"
   | "delete";
 
-/** Activity's views: the Summary (the default) and Every event (the ledger as a table). */
+/** Activity's views: By page (`summary`, the default) and Every event (the ledger as a table). */
 export type ActivityView = "summary" | "events";
 
 /** Whose requests a view shows: anyone, agents only, people only. */
@@ -137,7 +137,7 @@ export type Who = "everyone" | "agents" | "people";
 
 /**
  * Activity's filters, in the URL so a view can be linked. Both views: who, and the server's
- * folder `prefix` (reachable by URL, no control). Every event also: one exact `actor`, an event
+ * folder `prefix` (All folders, TEMPRA-308). Every event also: one exact `actor`, an event
  * `kind` and a text filter `q` on path or note.
  */
 export interface ActivityFilters {

@@ -7,6 +7,8 @@
    * detail (a note, the pages touched, where and by whom) in the middle, the time at the right.
    * `continued` is a further row of the same person's run: no lead and no rule above it, so a run
    * of changes reads as one block. `live` is an agent writing now (the time row's pulsing dot).
+   * With no lead at all it is `bare`: no avatar column, the line at the row's start (Activity by
+   * page, TEMPRA-308, where the line is a page and its detail says who).
    */
   let {
     lead,
@@ -20,9 +22,10 @@
   }: ChangeRowProps = $props();
 </script>
 
-<article {...rest} class={["change-row", continued && "continued", live && "live", extra]}
-  ><span class="change-row-lead">{#if lead && !continued}{@render lead()}{/if}</span
-  ><div class="change-row-body"
+<article
+  {...rest}
+  class={["change-row", continued && "continued", live && "live", !lead && "bare", extra]}
+  >{#if lead}<span class="change-row-lead">{#if !continued}{@render lead()}{/if}</span>{/if}<div class="change-row-body"
     ><p class="change-row-line">{@render children()}</p
     >{#if detail}{@render detail()}{/if}</div
   >{#if when}<span class="change-row-when">{@render when()}</span>{/if}</article
