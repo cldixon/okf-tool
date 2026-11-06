@@ -53,18 +53,24 @@ export type IconButtonProps = {
   dot?: boolean;
   onclick?: (e: MouseEvent) => void;
   title?: string;
+  /** What a press did ("Copied", "Couldn't copy"), shown under the button a moment and said in a
+      polite live region while set; null between (TEMPRA-312). It also names the button then. */
+  tip?: string | null;
 } & Rest;
 
 export type SplitButtonProps = {
   /** The main part's glyph. */
   icon: Glyph;
-  /** The main part's accessible name and tooltip ("Copy page", then "Copied" a moment). */
+  /** The main part's accessible name and tooltip ("Copy page"). */
   label: string;
   onclick?: (e: MouseEvent) => void;
   /** The ⌄ part's accessible name ("More copy options"). */
   menuLabel: string;
   /** A 44px area on a phone. */
   touch?: boolean;
+  /** What the main part did ("Copied", "Couldn't copy"), shown under the pill a moment and said in
+      a polite live region while set; null between (TEMPRA-312). It also names the main part then. */
+  tip?: string | null;
   /** The ⌄ menu's choices; handed a way to close the menu. */
   children: Snippet<[() => void]>;
 } & Rest;

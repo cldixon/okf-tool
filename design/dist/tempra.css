@@ -473,6 +473,8 @@
   --tempra-motion-quick: 0.15s; /* a chevron or a + turning */
   --tempra-motion-pulse: 1.6s; /* the change dot's pulse while an agent writes */
   --tempra-motion-shimmer: 2s; /* one pass of the shimmer over a name an agent is at now (TEMPRA-219) */
+  --tempra-motion-press: 0.12s; /* a button pressed coming back to its size (TEMPRA-312) */
+  --tempra-scale-press: 0.96; /* a button while pressed: a slight scale-down (TEMPRA-312) */
 }
 
 /* The account's theme (take 4): the shell puts it on the root; the tokens above follow. */
@@ -2280,6 +2282,59 @@ body.ground {
   width: 1px;
   height: var(--tempra-space-20);
   background: var(--tempra-color-border-strong);
+}
+
+/* A press (TEMPRA-312): every round button, split button and pill scales down a little while
+   pressed and comes back over --tempra-motion-press, the ordinary feedback of most apps. A split
+   button presses as one pill, whichever part is pressed (not the choices in its menu). None under
+   reduced motion. */
+.icon-button,
+.split-button,
+.pill-button {
+  transition: transform var(--tempra-motion-press) ease-out;
+}
+
+.icon-button:active:not(:disabled),
+.split-button:has(> .split-main:active, > .menu > .split-more:active),
+.pill-button:active:not(:disabled) {
+  transform: scale(var(--tempra-scale-press));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-button,
+  .split-button,
+  .pill-button {
+    transition: none;
+  }
+
+  .icon-button:active:not(:disabled),
+  .split-button:has(> .split-main:active, > .menu > .split-more:active),
+  .pill-button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* A button's tip (TEMPRA-312): a few words under it for a moment once it has acted ("Copied",
+   "Couldn't copy"), a hover card's look at its smallest, in the top layer at the coordinates the
+   component gives it. It takes no pointer, so it never stands in the way. */
+.button-tip {
+  position: fixed;
+  inset: auto;
+  top: var(--float-y, 0);
+  left: var(--float-x, 0);
+  margin: 0;
+  padding: var(--tempra-space-04) var(--tempra-space-08);
+  border: 1px solid var(--tempra-color-border);
+  border-radius: var(--tempra-radius-row);
+  background: var(--tempra-color-bg);
+  box-shadow: var(--tempra-shadow);
+  color: var(--tempra-color-text);
+  font-family: var(--tempra-font-text);
+  font-size: var(--tempra-text-ui);
+  line-height: var(--tempra-leading-base);
+  white-space: nowrap;
+  overflow: visible;
+  pointer-events: none;
 }
 
 /* The change dot (the one colour): pulsing (.live) for an agent writing now; solid beside an

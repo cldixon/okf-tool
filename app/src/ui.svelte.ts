@@ -91,29 +91,35 @@ export function useSharedNow() {
 
 /**
  * Copies text from a click (or text fetched for it, as Copy page fetches the file); `state` says
- * "copied" (or "failed") for a moment after.
+ * "copied" (or "failed") for 1.5 s from the latest click, and `tip` says it in words for a
+ * button's `tip` ("Copied", "Couldn't copy"; null between; TEMPRA-312).
  */
 export function useCopy() {
   let state = $state<"idle" | "copied" | "failed">("idle");
+  let presses = $state(0);
   $effect(() => {
+    void presses;
     if (state === "idle") return;
     const t = setTimeout(() => {
       state = "idle";
-    }, 2000);
+    }, 1500);
     return () => clearTimeout(t);
   });
+  const done = (next: "copied" | "failed") => {
+    state = next;
+    presses++;
+  };
   return {
     get state() {
       return state;
     },
+    get tip(): string | null {
+      return state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : null;
+    },
     copy: (text: string | (() => Promise<string>)) =>
       (typeof text === "string" ? navigator.clipboard.writeText(text) : copyText(text)).then(
-        () => {
-          state = "copied";
-        },
-        () => {
-          state = "failed";
-        },
+        () => done("copied"),
+        () => done("failed"),
       ),
   };
 }
