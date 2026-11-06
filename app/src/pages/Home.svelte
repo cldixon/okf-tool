@@ -193,7 +193,7 @@
         {#if files !== null}
           <RecentlyChanged
             {urls}
-            changed={recentlyChanged(home.requests, files)}
+            changed={recentlyChanged(home.changed, files)}
             view={(a, by) => actors.view(a, by)}
           />
         {/if}
