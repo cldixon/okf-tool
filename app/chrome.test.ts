@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { flushSync, tick } from "svelte";
 import { draw } from "./test/dom";
 import MenuFixture from "./test/MenuFixture.svelte";
+import MenuFormFixture from "./test/MenuFormFixture.svelte";
 
 /*
  * The shared chrome every page leans on (Menu.svelte, Portal.svelte): the menu's keys and how it
@@ -68,6 +69,34 @@ describe("Menu", () => {
     m.key(document.activeElement as Element, "Home");
     expect(document.activeElement).toBe(choices()[0]);
     m.destroy();
+  });
+
+  test("a choice that submits a form (Sign out) closes it only after the click", async () => {
+    let submitted = 0;
+    const d = draw(MenuFormFixture, { onsubmit: () => submitted++ });
+    const button = d.host.querySelector<HTMLButtonElement>("button.menu-button");
+    const list = () => d.host.querySelector(".menu-list");
+    button?.click();
+    flushSync();
+    list()?.querySelector<HTMLButtonElement>("button[type=submit]")?.click();
+    flushSync();
+    // Still in the page when the browser submits the form: closing at once kept Sign out from
+    // signing out.
+    expect(list()?.querySelector("form")?.isConnected).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    flushSync();
+    expect(list()).toBeNull();
+    expect(submitted).toBe(1);
+    // A link still closes it at once.
+    button?.click();
+    flushSync();
+    list()
+      ?.querySelector<HTMLAnchorElement>("a")
+      ?.addEventListener("click", (e) => e.preventDefault());
+    list()?.querySelector<HTMLAnchorElement>("a")?.click();
+    flushSync();
+    expect(list()).toBeNull();
+    d.destroy();
   });
 
   test("Escape closes it and gives the focus back to its button", () => {
