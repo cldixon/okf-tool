@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { flushSync } from "svelte";
 import { actorView } from "./src/agents";
 import type { FeedEvent } from "./src/live";
 import { type HistoryEvent, type PageFile, standing } from "./src/page/data";
@@ -67,15 +68,100 @@ const now = (host: Element) =>
   );
 
 describe("Page info", () => {
-  test("its sections: About this page, then Versions newest first", () => {
+  test("its sections: About this page, then Current version", () => {
     const d = info(changedSince);
     const heads = [...d.host.querySelectorAll(".page-info-section > h3")].map((h) => h.textContent);
-    expect(heads).toEqual(["About this page", "Versions"]);
-    const notes = [...d.host.querySelectorAll(".version-note")].map((n) => n.textContent);
-    expect(notes).toEqual(["Edits only", "Six weeks", "Created"]);
+    expect(heads).toEqual(["About this page", "Current version"]);
     // The facts are Properties' (Status), and the check is no longer among them.
     expect(d.host.querySelector(".facts")?.textContent).toContain("Status");
     expect(d.host.querySelector(".panel-section.check")).toBeNull();
+    d.destroy();
+  });
+
+  test("collapsed: the current version alone, then Earlier versions (n), closed", () => {
+    const d = info(changedSince);
+    const notes = () => [...d.host.querySelectorAll(".version-note")].map((n) => n.textContent);
+    expect(notes()).toEqual(["Edits only"]);
+    const latest = d.host.querySelector<HTMLAnchorElement>(".latest-version a.version");
+    expect(latest?.querySelector(".version-n")?.textContent).toBe("v3");
+    // One click from what it changed (the latest with ?since= the one before).
+    expect(latest?.getAttribute("href")).toContain("since=20");
+    expect(latest?.getAttribute("aria-current")).toBe("true");
+    const toggle = d.host.querySelector<HTMLButtonElement>("button.disclosure");
+    expect(toggle?.textContent).toBe("Earlier versions 2");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(d.host.querySelector("#page-info-earlier")).toBeNull();
+    d.destroy();
+  });
+
+  test("expanded: the rest newest first, and closing again", () => {
+    const d = info(changedSince);
+    const toggle = d.host.querySelector<HTMLButtonElement>("button.disclosure");
+    toggle?.click();
+    flushSync();
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle?.getAttribute("aria-controls")).toBe("page-info-earlier");
+    const earlier = d.host.querySelector("#page-info-earlier");
+    expect(
+      [...(earlier?.querySelectorAll(".version-note") ?? [])].map((n) => n.textContent),
+    ).toEqual(["Six weeks", "Created"]);
+    toggle?.click();
+    flushSync();
+    expect(d.host.querySelector("#page-info-earlier")).toBeNull();
+    d.destroy();
+  });
+
+  test("a single version: that row alone, no disclosure", () => {
+    const d = info([ev(10, "put", "claude-ai/connector", "Created")]);
+    expect([...d.host.querySelectorAll(".version-n")].map((n) => n.textContent)).toEqual(["v1"]);
+    expect(d.host.querySelector("button.disclosure")).toBeNull();
+    d.destroy();
+  });
+
+  test("many versions: ten earlier at a time, then n older versions", () => {
+    const many = Array.from({ length: 25 }, (_, i) =>
+      ev(10 * (i + 1), "put", "claude-ai/connector", `Edit ${i + 1}`),
+    );
+    const d = info(many);
+    expect(d.host.querySelector("button.disclosure")?.textContent).toBe("Earlier versions 24");
+    d.host.querySelector<HTMLButtonElement>("button.disclosure")?.click();
+    flushSync();
+    const rows = () => d.host.querySelectorAll("#page-info-earlier .version-n");
+    expect(rows().length).toBe(10);
+    expect(rows()[0]?.textContent).toBe("v24");
+    const more = () => d.host.querySelector<HTMLButtonElement>(".older-versions");
+    expect(more()?.textContent).toBe("14 older versions");
+    more()?.click();
+    flushSync();
+    expect(rows().length).toBe(20);
+    more()?.click();
+    flushSync();
+    expect(rows().length).toBe(24);
+    expect(more()).toBeNull();
+    d.destroy();
+  });
+
+  test("an earlier version on screen: the list starts open with it marked", () => {
+    const events = changedSince;
+    const d = draw(PageInfo, {
+      urls: new Urls("ann", "notes"),
+      page: { ...page, seq: 20 } as PageFile,
+      links: { inbound: [], broken: [] },
+      head: 30,
+      standing: standing(events, 20),
+      reads: null,
+      name: (actor: string) => actorView(actor, null, {}, null),
+      current: false,
+      reviewing: false,
+      comparing: true,
+      mayVerify: true,
+      live: null,
+      onVerified() {},
+    });
+    expect(d.host.querySelector("button.disclosure")?.getAttribute("aria-expanded")).toBe("true");
+    const marked = d.host.querySelector('#page-info-earlier a.version[aria-current="true"]');
+    expect(marked?.querySelector(".version-n")?.textContent).toBe("v2");
+    expect(marked?.classList.contains("chosen")).toBe(true);
     d.destroy();
   });
 

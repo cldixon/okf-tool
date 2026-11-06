@@ -1,29 +1,16 @@
-<script lang="ts" module>
-  /**
-   * A panel's button in the page's corner row (TEMPRA-283), the one on screen (the row is drawn in
-   * the corner and under the byline, one of them hidden): where the focus goes back to when
-   * nothing else opened the panel.
-   */
-  const toolButton = (which: string) =>
-    Array.from(document.querySelectorAll<HTMLElement>(`.page-tools [data-panel="${which}"]`)).find(
-      (el) => el.getClientRects().length > 0,
-    ) ?? null;
-</script>
-
 <script lang="ts">
+  import { Icon } from "@tempra/design/components";
   import { tick, untrack } from "svelte";
   import { useActors } from "../agents.svelte.ts";
+  import { post } from "../api";
   import CommentsList from "../comments/CommentsList.svelte";
   import { highlightsOf, placeThreads, type Thread } from "../comments/data";
   import { useDraft } from "../comments/data.svelte.ts";
-  import { useFrame } from "../frame.svelte.ts";
-  import { Icon } from "@tempra/design/components";
   import { attachmentSource } from "../images";
   import { here } from "../location.svelte.ts";
   import PageBar from "../PageBar.svelte";
   import Reader from "../Reader.svelte";
   import { type BodyOptions, prepare } from "../reader/prepare";
-  import { post } from "../api";
   import { pushRecent } from "../recent";
   import { useLibraryTitle, useRole } from "../role.svelte.ts";
   import { type Compare, navigate } from "../router";
@@ -36,19 +23,20 @@
   import { useCompare } from "./compare.svelte.ts";
   import { contentsOf } from "./contents";
   import { bodyHref, type PageData, standing, titleOf } from "./data";
-  import type { ReadHistory } from "./reads";
   import { figureViewOf } from "./figures";
   import HoverCard from "./HoverCard.svelte";
   import { type Card, hoverCards } from "./hover";
-  import type { Live } from "./live";
   import LiveAnnouncer from "./LiveAnnouncer.svelte";
   import LiveChange from "./LiveChange.svelte";
-  import Panel from "./Panel.svelte";
-  import { type PanelName, panelInUrl, threadInHash } from "./panel";
+  import type { Live } from "./live";
+  import PageFrame from "./PageFrame.svelte";
   import PageInfo from "./PageInfo.svelte";
   import PageTools from "./PageTools.svelte";
+  import Panel from "./Panel.svelte";
+  import { cornerButton, type PanelName, panelInUrl, threadInHash } from "./panel";
   import RawMarkdown from "./RawMarkdown.svelte";
   import ReviewBar from "./ReviewBar.svelte";
+  import type { ReadHistory } from "./reads";
   import SourcesSection from "./SourcesSection.svelte";
   import VersionBar from "./VersionBar.svelte";
 
@@ -122,9 +110,12 @@
       exists: (path) => !broken.has(path),
       // A chart's data file, as the file's own route answers it (TEMPRA-207).
       fileText: async (path) => {
-        const res = await fetch(urls.api(`files/${path.split("/").map(encodeURIComponent).join("/")}`), {
-          credentials: "same-origin",
-        }).catch(() => null);
+        const res = await fetch(
+          urls.api(`files/${path.split("/").map(encodeURIComponent).join("/")}`),
+          {
+            credentials: "same-origin",
+          },
+        ).catch(() => null);
         return res?.ok ? res.text() : null;
       },
       footnote: (label, defined) => {
@@ -185,7 +176,9 @@
         panelBox?.querySelector<HTMLElement>(".panel-head h2")?.focus();
       } else {
         const back =
-          opener?.isConnected && opener.getClientRects().length > 0 ? opener : toolButton(closing);
+          opener?.isConnected && opener.getClientRects().length > 0
+            ? opener
+            : cornerButton(closing);
         back?.focus();
       }
     });
@@ -194,7 +187,10 @@
   let closing: PanelName = "comments";
   function openPanel(which: PanelName, focus = true) {
     const focused = document.activeElement;
-    if (focused instanceof HTMLElement && !panelBox?.querySelector(".page-aside")?.contains(focused)) {
+    if (
+      focused instanceof HTMLElement &&
+      !panelBox?.querySelector(".page-aside")?.contains(focused)
+    ) {
       // Nothing focused (a quote clicked, text selected): the panel's corner button stands in.
       opener = focused === document.body ? null : focused;
     }
@@ -208,31 +204,6 @@
     panel = null;
     if (lost) focusAfterDraw("opener");
   }
-  // Where the panel overlays the page (under 960px of page, and the phone's sheet: the
-  // stylesheet's call, read from the panel's position), it is modal (C-26, P-4): the page, the top
-  // bar and the sidebar it dims are inert, and a tap on the dimmed page closes it.
-  const frame = useFrame();
-  let overlaid = $state(false);
-  let page: HTMLDivElement | undefined = $state();
-  $effect(() => {
-    if (!panel) {
-      overlaid = false;
-      return;
-    }
-    const measure = () => {
-      const el = panelBox?.querySelector(".page-aside");
-      overlaid = el ? getComputedStyle(el).position === "fixed" : false;
-    };
-    measure();
-    const watch = new ResizeObserver(measure);
-    if (page) watch.observe(page);
-    return () => watch.disconnect();
-  });
-  const modal = $derived(panel !== null && overlaid);
-  $effect(() => {
-    frame.setModal(modal);
-    return () => frame.setModal(false);
-  });
   function togglePanel(which: PanelName) {
     if (panel === which) closePanel();
     else openPanel(which);
@@ -312,9 +283,7 @@
       gone = true;
     };
   });
-  const reads = $derived(
-    readsNow?.url === readUrl ? readsNow.reads : (props.data.reads ?? null),
-  );
+  const reads = $derived(readsNow?.url === readUrl ? readsNow.reads : (props.data.reads ?? null));
 
   // Recent files, for the quick switcher.
   $effect(() => {
@@ -329,14 +298,12 @@
   });
   const mayVerify = $derived(role.current !== null && role.current !== "read");
   const hasContents = $derived(contents.length >= 2);
-  const classes = $derived(
-    ["page-view", panel ? "panel-open" : "", markdown ? "markdown-on" : ""].filter(Boolean).join(" "),
-  );
 </script>
 
 {#snippet hoverCard(card: Card)}<HoverCard {card} />{/snippet}
 <!-- The page's path over it (TEMPRA-145). -->
 {#snippet path()}<TopbarPath path={c.path} {title} />{/snippet}
+{#snippet bar()}<PageBar {path} />{/snippet}
 {#snippet tools(place: "side" | "head")}<PageTools
     {urls}
     path={c.path}
@@ -348,10 +315,8 @@
     onMarkdown={setMarkdown}
     {place}
   />{/snippet}
-<div class={classes} bind:this={page}
-  ><PageBar {path} /><div class="page-grid"
-    ><article class="doc" inert={modal}
-      >{#if compare}<ReviewBar
+<PageFrame open={panel !== null} classes={markdown ? "markdown-on" : ""} onScrim={closePanel} before={bar} bind:sideBox={panelBox}
+  >{#snippet text()}{#if compare}<ReviewBar
           {urls}
           page={c}
           {compare}
@@ -405,13 +370,7 @@
           onComment={current ? startDraft : undefined}
           {figureView}
         /><SourcesSection {urls} data={sources} {prepared} numbers={body.numbers} /></div
-      ></article
-    ><!-- The page dimmed behind an overlaid panel; a tap on it closes the panel (P-4). -->{#if modal}<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions --><div
-        class="panel-scrim"
-        aria-hidden="true"
-        onclick={closePanel}
-      ></div>{/if}<div class="page-side" bind:this={panelBox}
-      >{@render tools("side")}{#if panel === "comments"}<Panel name="comments" count={openCount > 0 ? `${openCount} open` : null} onClose={closePanel}
+      >{/snippet}{#snippet side()}{@render tools("side")}{#if panel === "comments"}<Panel name="comments" count={openCount > 0 ? `${openCount} open` : null} onClose={closePanel}
           ><CommentsList
             {urls}
             path={c.path}
@@ -443,7 +402,5 @@
           /></Panel
         >{:else if hasContents && !markdown}<nav class="page-contents" aria-label="Contents"
           ><Contents headings={contents} /></nav
-        >{/if}</div
-    ></div
-  ></div
+        >{/if}{/snippet}</PageFrame
 >

@@ -800,6 +800,11 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
     ),
   );
 
+  // The pages changed last, each once (the home's Recently changed, TEMPRA-302).
+  app.get(`${BASE}/changed`, async (c) =>
+    c.json(await c.var.lib.changed({ limit: num(c, "limit") })),
+  );
+
   app.get(`${BASE}/requests/:id`, async (c) => c.json(await c.var.lib.request(c.req.param("id"))));
 
   app.get(`${BASE}/history/*`, async (c) => c.json(await c.var.lib.history(tail(c, "/history/"))));

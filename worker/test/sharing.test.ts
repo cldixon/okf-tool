@@ -41,7 +41,14 @@ describe("invitations (tempra-dev: v2/sharing, TEMPRA-61)", () => {
     // Invited is not yet in: the library stays a 404 until they accept.
     expect((await call(friend.app, `${API}/tree`)).status).toBe(404);
     const [inv] = await pending(friend.app);
-    expect(inv).toMatchObject({ owner: "owner", slug: "demo", role: "write", handle: "owner" });
+    // The title too, for the invitee to see the library by its name (TEMPRA-300); demo has none.
+    expect(inv).toMatchObject({
+      owner: "owner",
+      slug: "demo",
+      title: null,
+      role: "write",
+      handle: "owner",
+    });
 
     const owners = (await (await call(s.app, `${API}/members`)).json()) as {
       invitations: Pending[];
