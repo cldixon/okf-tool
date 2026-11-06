@@ -931,7 +931,7 @@ async function browserRenders(
         throw new Error("the open file is not marked in the tree");
       }
       // The current row is marked by its text, not a fill (TEMPRA-310): its name the text colour
-      // with no fill behind it, another page's name muted.
+      // with no fill behind it, another page's name and a folder's muted.
       const marking = await page.evaluate<string[]>(`(() => {
         const ink = (v) => {
           const probe = document.createElement("span");
@@ -954,6 +954,12 @@ async function browserRenders(
           .find((a) => !a.closest(".tree-row").matches(":hover"));
         if (other && getComputedStyle(other).color !== ink("--tempra-color-muted")) {
           wrong.push("a row at rest is not muted");
+        }
+        const folder = [...document.querySelectorAll(".ws-sidebar .tree-row.dir > button.tree-name")]
+          .find((b) => !b.closest(".tree-row").matches(":hover"));
+        if (!folder) wrong.push("no folder row to check");
+        else if (getComputedStyle(folder).color !== ink("--tempra-color-muted")) {
+          wrong.push("a folder's name is not muted");
         }
         return wrong;
       })()`);

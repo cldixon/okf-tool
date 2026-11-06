@@ -1293,9 +1293,10 @@ a.button.pill-button {
   align-items: center;
   justify-content: center;
   width: var(--tempra-size-icon);
-  color: var(--tempra-color-faint);
+  color: var(--tempra-color-muted);
 }
 
+.tree-row:hover > button.tree-name,
 .tree-row:hover .tree-chevron {
   color: var(--tempra-color-text);
 }
@@ -1323,14 +1324,15 @@ a.button.pill-button {
   text-overflow: ellipsis;
 }
 
-/* A folder's row is one button: it opens and closes the folder, and is never the current row. */
+/* A folder's row is one button: it opens and closes the folder, and is never the current row. Its
+   name rests muted in the rows' weight, as Linear's docs draw a section's label (TEMPRA-310), so
+   only the current page is ever in the text colour; a hover brings it up, as any row's. */
 button.tree-name {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--tempra-color-text);
+  color: var(--tempra-color-muted);
   font: inherit;
-  font-weight: var(--tempra-weight-medium);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
