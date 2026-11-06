@@ -92,20 +92,33 @@ export async function ensureEmailRouting(): Promise<void> {
     return;
   }
   const z = ["-z", inbound.zone];
+  let step = "reading the zone's Email Routing settings";
   try {
-    const settings = JSON.parse(await cf(["email-routing", "settings", "get", ...z])) as {
-      enabled?: boolean;
-    };
-    if (!settings.enabled) {
+    // Only to switch routing on once. Reading the settings takes Zone Settings Read, which the
+    // rules and addresses do not; a token without it goes on to the rules, routing being on.
+    let settings: { enabled?: boolean } | null = null;
+    try {
+      settings = JSON.parse(await cf(["email-routing", "settings", "get", ...z])) as {
+        enabled?: boolean;
+      };
+    } catch (e) {
+      console.log(
+        `Email Routing: could not read the zone's settings (${cfReason(e)}); taking routing as on. Zone Settings Read lets deploy switch it on.`,
+      );
+    }
+    if (settings && !settings.enabled) {
+      step = "enabling Email Routing";
       console.log(`Email Routing: enabling on ${inbound.zone}`);
       await cf(["email-routing", "enable", ...z]);
     }
+    step = "listing the destination addresses (Email Routing Addresses)";
     const addresses = JSON.parse(await cf(["email-routing", "addresses", "list"])) as {
       email: string;
       verified?: string | null;
     }[];
     const known = new Map(addresses.map((a) => [a.email.toLowerCase(), a]));
     if (!known.has(operator.toLowerCase())) {
+      step = "registering the operator's address (Email Routing Addresses Edit)";
       console.log(
         "Email Routing: registered the operator's address; Cloudflare mails it a verification link, and the next deploy forwards to it once it is clicked",
       );
@@ -119,9 +132,11 @@ export async function ensureEmailRouting(): Promise<void> {
       );
       return;
     }
+    step = "listing the zone's rules (Email Routing Rules)";
     const rules = JSON.parse(
       await cf(["email-routing", "rules", "list-account", ...z]),
     ) as RoutingRule[];
+    step = "creating or correcting a rule (Email Routing Rules Edit)";
     for (const route of inbound.routes) {
       const to = route.to === "operator" ? operator : route.to;
       const matchers = [{ type: "literal", field: "to", value: route.address }];
@@ -155,12 +170,8 @@ export async function ensureEmailRouting(): Promise<void> {
       }
     }
   } catch (e) {
-    // cf's own reason (an API error such as "[10000] Authentication error") is a later line of
-    // its output; the first line only names the command.
-    const lines = (e as Error).message.split("\n").map((l) => l.replace(/^[│┌└\s]+/, "").trim());
-    const reason = lines.find((l) => /\[\d+\]/.test(l)) ?? lines.find(Boolean) ?? "unknown error";
     console.log(
-      `::warning::Email Routing not applied (${reason}). The token needs Email Routing Rules and Addresses permissions; the rules in place keep working.`,
+      `::warning::Email Routing not applied: ${step} was refused (${cfReason(e)}). The rules in place keep working.`,
     );
   }
 }
