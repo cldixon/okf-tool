@@ -930,6 +930,40 @@ async function browserRenders(
       if ((await sidebar.locator(`a[aria-current="page"][data-path="${nested}"]`).count()) !== 1) {
         throw new Error("the open file is not marked in the tree");
       }
+      // The current row is marked by its text, not a fill (TEMPRA-310): its name the text colour
+      // with no fill behind it, another page's name and a folder's muted.
+      const marking = await page.evaluate<string[]>(`(() => {
+        const ink = (v) => {
+          const probe = document.createElement("span");
+          probe.style.color = "var(" + v + ")";
+          document.body.append(probe);
+          const c = getComputedStyle(probe).color;
+          probe.remove();
+          return c;
+        };
+        const wrong = [];
+        const cur = document.querySelector('.ws-sidebar .tree a[aria-current="page"]');
+        const row = cur?.closest(".tree-row");
+        if (!cur || !row) return ["no current row"];
+        const fill = getComputedStyle(row).backgroundColor;
+        if (fill !== "rgba(0, 0, 0, 0)") wrong.push("the current row has a fill: " + fill);
+        if (getComputedStyle(cur).color !== ink("--tempra-color-text")) {
+          wrong.push("the current row's name is not the text colour");
+        }
+        const other = [...document.querySelectorAll(".ws-sidebar .tree-row > a:not([aria-current])")]
+          .find((a) => !a.closest(".tree-row").matches(":hover"));
+        if (other && getComputedStyle(other).color !== ink("--tempra-color-muted")) {
+          wrong.push("a row at rest is not muted");
+        }
+        const folder = [...document.querySelectorAll(".ws-sidebar .tree-row.dir > button.tree-name")]
+          .find((b) => !b.closest(".tree-row").matches(":hover"));
+        if (!folder) wrong.push("no folder row to check");
+        else if (getComputedStyle(folder).color !== ink("--tempra-color-muted")) {
+          wrong.push("a folder's name is not muted");
+        }
+        return wrong;
+      })()`);
+      if (marking.length > 0) throw new Error(`the tree's current row: ${marking.join("; ")}`);
       // Page info (its versions) from the corner row; Escape closes it.
       await openInfo();
       await historyPanel.locator("a.version").first().waitFor({ timeout: 10_000 });
