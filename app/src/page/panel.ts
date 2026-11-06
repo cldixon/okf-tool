@@ -11,6 +11,16 @@ export const PANEL_TITLES: Record<PanelName, string> = {
   info: "Page info",
 };
 
+/**
+ * A panel's button in the corner row (TEMPRA-283), the one on screen (the row is drawn in the
+ * side column's corner and under the head, one of them hidden): where the focus goes back to when
+ * nothing else opened the panel. A page's and the home's alike.
+ */
+export const cornerButton = (which: PanelName): HTMLElement | null =>
+  Array.from(document.querySelectorAll<HTMLElement>(`.page-tools [data-panel="${which}"]`)).find(
+    (el) => el.getClientRects().length > 0,
+  ) ?? null;
+
 /** How far down (px) a sheet's head is dragged to close it. */
 export const DRAG_TO_CLOSE = 60;
 

@@ -2,14 +2,10 @@
   import type { Snippet } from "svelte";
 
   /**
-   * A page's column in the frame (everything but a page, which lays out its own columns);
-   * `inert` while a panel over it is modal (the home's Comments, TEMPRA-222).
+   * A page's column in the frame (everything but a page and the library's home, which lay out
+   * their own columns: page/PageFrame.svelte).
    */
-  let {
-    children,
-    wide = false,
-    inert = false,
-  }: { children: Snippet; wide?: boolean; inert?: boolean } = $props();
+  let { children, wide = false }: { children: Snippet; wide?: boolean } = $props();
 </script>
 
-<div class={wide ? "page-column wide" : "page-column"} inert={inert || undefined}>{@render children()}</div>
+<div class={wide ? "page-column wide" : "page-column"}>{@render children()}</div>

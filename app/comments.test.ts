@@ -153,6 +153,29 @@ describe("the page's corner tools (TEMPRA-283)", () => {
     r.d.destroy();
   });
 
+  test("the home's row: Comments alone, the library's tools", () => {
+    const opened: PanelName[] = [];
+    const d = draw(PageTools, {
+      urls: new Urls("ann", "notes"),
+      openCount: 1,
+      panel: "comments",
+      onPanel: (p: PanelName) => opened.push(p),
+      place: "side",
+    });
+    const group = d.host.querySelector(".page-tools.page-tools-side");
+    expect(group?.getAttribute("aria-label")).toBe("Library tools");
+    const buttons = Array.from(d.host.querySelectorAll("button")).map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    expect(buttons).toEqual(["Comments, 1 open"]);
+    const c = d.host.querySelector<HTMLButtonElement>('button[data-panel="comments"]');
+    expect(c?.getAttribute("aria-pressed")).toBe("true");
+    c?.click();
+    flushSync();
+    expect(opened).toEqual(["comments"]);
+    d.destroy();
+  });
+
   test("a newer version puts the agent dot on Page info", () => {
     const quiet = row();
     expect(quiet.button("Page info")?.querySelector(".icon-button-dot")).toBeNull();
