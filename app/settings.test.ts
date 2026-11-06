@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { cache } from "./src/api";
 import { chosenLibrary, monthLines } from "./src/pages/account";
 import ConnectSteps from "./src/pages/ConnectSteps.svelte";
 import Invitations from "./src/pages/Invitations.svelte";
@@ -126,6 +127,7 @@ describe("drawn", () => {
             id: "i1",
             owner: "bob",
             slug: "plans",
+            title: "Q4 plans",
             role: "write",
             handle: "bob",
             expires: "2026-11-30T00:00:00Z",
@@ -135,15 +137,26 @@ describe("drawn", () => {
     });
     const { host } = draw(Invitations, {});
     await settle(10);
-    expect(host.querySelector(".invitation-from > span:last-child")?.textContent).toBe(
-      "@bob invited you",
+    // The library by libraryLabel (its title, the owner after it), its tile by the title.
+    expect(host.querySelector(".invitation-library")?.textContent).toBe("Q4 plans (@bob)");
+    expect(host.querySelector(".invitation .lib-tile.shared")?.textContent).toBe("Q");
+    expect(host.querySelector(".invitation-from")?.textContent).toBe("@bob invited you");
+    expect(host.querySelector(".invitation-access")?.textContent).toStartWith(
+      "Can read and write · open until ",
     );
-    expect(host.querySelector(".invitation-access")?.textContent).toBe(
-      "Your accessCan read and write",
+    const buttons = [...host.querySelectorAll(".invitation-actions button")].map(
+      (b) => b.textContent,
     );
-    expect(host.querySelector(".lib-tile.shared")?.textContent).toBe("P");
-    const buttons = [...host.querySelectorAll(".actions button")].map((b) => b.textContent);
     expect(buttons).toEqual(["Accept", "Decline"]);
+  });
+
+  test("no invitations: one quiet line", async () => {
+    cache.drop("invitations"); // the test before loaded one
+    restore = serve({ "/api/v1/invitations": { invitations: [] } });
+    const { host } = draw(Invitations, {});
+    await settle(10);
+    expect(host.querySelector(".view-empty")?.textContent).toBe("No invitations");
+    expect(host.querySelector(".invitations")).toBeNull();
   });
 
   test("Members: the owner's view, and a changed access waiting for its confirmation", async () => {
