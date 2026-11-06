@@ -1,23 +1,22 @@
 <script lang="ts" module>
-  /** The settings pages' chunk, fetched once, on the first settings page (pages/settings.ts). */
-  let settingsChunk: Promise<typeof import("./pages/settings")> | null = null;
-  const settings = () => {
-    settingsChunk ??= import("./pages/settings");
-    return settingsChunk;
-  };
+  import { lazy } from "./chunks";
+
+  /**
+   * The settings pages' chunk, fetched once, on the first settings page (pages/settings.ts). A
+   * tab from before a deploy asks for a name the new build does not serve; `lazy` then loads the
+   * page afresh, once (chunks.ts), rather than leave it blank.
+   */
+  const settings = lazy(() => import("./pages/settings"));
 
   /** The components' catalogue (/_dev/design, local dev only), a chunk of its own. */
-  let designChunk: Promise<typeof import("./pages/Design.svelte")> | null = null;
-  const design = () => {
-    designChunk ??= import("./pages/Design.svelte");
-    return designChunk;
-  };
+  const design = lazy(() => import("./pages/Design.svelte"));
 
   /** The pages that lay out their column themselves (a page's columns, the person's views). */
   const OWN_COLUMN = new Set(["file", "directory", "activity"]);
 </script>
 
 <script lang="ts">
+  import { Button, Notice } from "@tempra/design/components";
   import AccountFrame from "./AccountFrame.svelte";
   import type { AccountPage, Place } from "./frame";
   import { here } from "./location.svelte.ts";
@@ -108,6 +107,12 @@
   {/key}
 {/snippet}
 
+<!-- A part of the app that would not load even after the page loaded afresh (chunks.ts). -->
+{#snippet chunkFailed()}
+  <Notice>This page didn't load. Reload to try again.</Notice>
+  <p><Button href={location.href}>Reload</Button></p>
+{/snippet}
+
 {#snippet body()}
   {#if !route}
     <!-- The Worker serves this page only at the app's own URLs, so this is a bug, not a 404. -->
@@ -115,13 +120,13 @@
   {:else if route.page === "libraries"}
     <Libraries create={route.create} />
   {:else if route.page === "welcome"}
-    {#await settings() then S}<S.Welcome me={me.current} />{/await}
+    {#await settings() then S}<S.Welcome me={me.current} />{:catch}{@render chunkFailed()}{/await}
   {:else if route.page === "agents"}
-    {#await settings() then S}<S.Agents me={me.current} newToken={route.newToken} library={route.library} />{/await}
+    {#await settings() then S}<S.Agents me={me.current} newToken={route.newToken} library={route.library} />{:catch}{@render chunkFailed()}{/await}
   {:else if route.page === "account"}
-    {#await settings() then S}<S.Account done={route.done} />{/await}
+    {#await settings() then S}<S.Account done={route.done} />{:catch}{@render chunkFailed()}{/await}
   {:else if route.page === "invitations"}
-    {#await settings() then S}<S.Invitations />{/await}
+    {#await settings() then S}<S.Invitations />{:catch}{@render chunkFailed()}{/await}
   {:else if route.page === "redirect"}
     <Redirect to={route.to} />
   {:else if pinnedUrls}
@@ -143,18 +148,18 @@
            version view. -->
       <Redirect to={urls.diff(route.path, route.from, route.to)} />
     {:else if route.page === "settings"}
-      {#await settings() then S}<S.Settings {urls} me={me.current?.handle ?? null} section={route.section} />{/await}
+      {#await settings() then S}<S.Settings {urls} me={me.current?.handle ?? null} section={route.section} />{:catch}{@render chunkFailed()}{/await}
     {:else if route.page === "revert"}
-      {#await settings() then S}<S.Revert {urls} request={route.request} />{/await}
+      {#await settings() then S}<S.Revert {urls} request={route.request} />{:catch}{@render chunkFailed()}{/await}
     {:else if route.page === "restore"}
-      {#await settings() then S}<S.Restore {urls} path={route.path} to={route.to} />{/await}
+      {#await settings() then S}<S.Restore {urls} path={route.path} to={route.to} />{:catch}{@render chunkFailed()}{/await}
     {/if}
   {/if}
 {/snippet}
 
 {#if route?.page === "design"}
   <!-- The catalogue draws every component in light and dark, with no frame around it. -->
-  {#await design() then D}<D.default />{/await}
+  {#await design() then D}<D.default />{:catch}{@render chunkFailed()}{/await}
 {:else if libraryUrls && place}
   <!-- A library's pages share one workspace, kept mounted while the person moves within it. -->
   {#key libraryKey}

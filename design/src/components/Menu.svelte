@@ -118,7 +118,14 @@
       class={`menu-list ${props.align ?? "start"}${props.up ? " up" : ""}${props.listClass ? ` ${props.listClass}` : ""}`}
       onclick={(e) => {
         const choice = (e.target as Element).closest("a, button");
-        if (choice && !choice.hasAttribute("data-stay")) setOpen(false);
+        if (!choice || choice.hasAttribute("data-stay")) return;
+        // A button that submits a form (Sign out) closes the menu after the click: closing at
+        // once takes the form out of the page before the browser submits it.
+        if (choice instanceof HTMLButtonElement && choice.type === "submit" && choice.form) {
+          setTimeout(() => setOpen(false));
+        } else {
+          setOpen(false);
+        }
       }}
     >
       {@render props.children(() => setOpen(false))}

@@ -5766,6 +5766,36 @@ async function freshAccountConnects(): Promise<string[]> {
       });
       if (mcp.status !== 401) throw new Error(`MCP after delete: ${mcp.status}`);
     });
+    await step("the avatar's menu opens Account and Agents, and signs out", async () => {
+      await switchTo(asOwner);
+      const menu = () => page.getByRole("button", { name: /Account menu/ });
+      for (const [item, heading] of [
+        ["Account", "Account"],
+        ["Agents", "Agents"],
+      ] as const) {
+        await menu().click();
+        // The menu's own link: account pages' sidebars name the same pages.
+        await page
+          .locator(".menu-list.account")
+          .getByRole("link", { name: item, exact: true })
+          .click();
+        await page.waitForURL(`${base}/${item.toLowerCase()}`, { timeout: 15_000 });
+        await page
+          .getByRole("heading", { level: 1, name: heading, exact: true })
+          .waitFor({ timeout: 15_000 });
+      }
+      // Sign out posts its form from inside the menu: the menu closes only after the click, or
+      // the form leaves the page before the browser sends it.
+      await menu().click();
+      await page
+        .locator(".menu-list.account")
+        .getByRole("button", { name: "Sign out", exact: true })
+        .click();
+      await page.waitForURL((u) => u.pathname.startsWith("/sign-in"), { timeout: 15_000 });
+      // The session it ended is refused from now on, not only dropped from this browser.
+      const me = await fetch(`${base}/api/v1/me`, { headers: { Cookie: cookie } });
+      if (me.status !== 401) throw new Error(`still signed in after Sign out: ${me.status}`);
+    });
     return problems;
   } finally {
     await b.close();
