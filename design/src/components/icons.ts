@@ -30,7 +30,7 @@ import List from "@lucide/svelte/icons/list";
 import LogOut from "@lucide/svelte/icons/log-out";
 import Maximize2 from "@lucide/svelte/icons/maximize-2";
 import Menu from "@lucide/svelte/icons/menu";
-import MessageSquare from "@lucide/svelte/icons/message-square";
+import MessageCircle from "@lucide/svelte/icons/message-circle";
 import PanelLeft from "@lucide/svelte/icons/panel-left";
 import Plug from "@lucide/svelte/icons/plug";
 import Plus from "@lucide/svelte/icons/plus";
@@ -49,7 +49,7 @@ import X from "@lucide/svelte/icons/x";
 export const ICONS = {
   refresh: RefreshCw,
   markdown: Code,
-  comments: MessageSquare,
+  comments: MessageCircle,
   review: CircleCheck,
   contents: List,
   history: History,
