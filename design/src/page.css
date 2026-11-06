@@ -7,7 +7,8 @@
  * the text never drifts right with all of it on its left. The page's width decides what fits
  * (container queries on `page`, the page's scroller): under 1100px the contents keep a narrower
  * column of their own down to 700px (TEMPRA-150), and hide below that (On this page under the
- * byline); a panel takes the column down to 960px and overlays the page below that; on a phone (900px and under, the window's call) a panel is a sheet from the bottom.
+ * byline); a panel takes the column down to 960px and overlays the page below that; on a phone (900px and under, the window's call) a panel is a sheet from the bottom. The
+ * library's home is laid out the same way (its head for the title, no contents; TEMPRA-283).
  */
 
 /* The right column is the panel's width whether it holds the contents or a panel, so opening a
@@ -859,7 +860,8 @@
 /* One row of round outlined buttons: Comments with its count, Page info, Copy page | ⌄. Beside
    the text it sits in the right column's top corner, sticky, right-aligned with the floating
    card's edge, and the outline or the open card starts below it; where there is no column (under
-   960px of page, the Markdown view, a phone) the row under the byline takes its place. */
+   960px of page, the Markdown view, a phone) the row under the head (a page's byline, the home's
+   quiet line) takes its place. The library's home has the same row, Comments alone. */
 .page-view {
   --page-tools-h: calc(var(--tempra-size-control) + 2 * var(--tempra-space-16));
 }
@@ -878,7 +880,7 @@
   padding: var(--tempra-space-16) var(--tempra-space-16) 0 0;
 }
 
-.doc-head > .page-tools {
+.page-tools-head {
   display: none;
   margin-top: var(--tempra-space-16);
 }
@@ -905,7 +907,7 @@
     display: none;
   }
 
-  .page-view.markdown-on:not(.panel-open) .doc-head > .page-tools {
+  .page-view.markdown-on:not(.panel-open) .page-tools-head {
     display: flex;
   }
 }
@@ -915,15 +917,9 @@
     display: none;
   }
 
-  .doc-head > .page-tools {
+  .page-tools-head {
     display: flex;
   }
-}
-
-/* The home's corner (TEMPRA-283): its library threads' Comments, at the head's end. */
-.home-head .page-tools {
-  flex: none;
-  align-self: flex-start;
 }
 
 /* Page info (TEMPRA-283): the newer version and the check on top, then About this page and
