@@ -161,6 +161,43 @@ button.ghost {
   color: var(--tempra-color-muted);
 }
 
+/* A disclosure (TEMPRA-309): a quiet text button that shows what follows it. A chevron that turns
+   a quarter while open, the label in ink, a count beside it in the muted grey; a row's radius, no
+   ring until hovered. */
+button.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tempra-space-06);
+  padding: var(--tempra-space-06) var(--tempra-space-10);
+  border-color: transparent;
+  border-radius: var(--tempra-radius-row);
+  background: transparent;
+  color: var(--tempra-color-text);
+  font-size: var(--tempra-text-meta);
+  line-height: var(--tempra-leading-base);
+}
+
+button.disclosure svg {
+  flex: none;
+  color: var(--tempra-color-faint);
+  transition: transform var(--tempra-motion-quick) ease;
+}
+
+button.disclosure[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.disclosure-count {
+  color: var(--tempra-color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.disclosure svg {
+    transition: none;
+  }
+}
+
 input:not([type="checkbox"], [type="radio"], [type="file"]),
 select,
 textarea {

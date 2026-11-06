@@ -17,7 +17,7 @@
    * in one card. On top, what there is to do now: a newer version (Show it), and the check (the
    * changes since someone checked, with Show changes into review mode; Mark as checked on a page
    * nobody checked, for a write member; or a quiet line saying who checked it). Then About this
-   * page (the facts) and Versions.
+   * page (the facts) and Current version, the rest of the versions on demand (TEMPRA-309).
    */
   let props: {
     urls: Urls;
@@ -73,7 +73,7 @@
   </ul>{/if}<section class="page-info-section" aria-labelledby="page-info-about"
   ><h3 id="page-info-about">About this page</h3
   ><PropertiesList urls={props.urls} page={props.page} links={props.links} head={props.head} standing={s} reads={props.reads} name={props.name} /></section
-><section class="page-info-section" aria-labelledby="page-info-versions"
-  ><h3 id="page-info-versions">Versions</h3
+><section class="page-info-section page-info-versions" aria-labelledby="page-info-versions"
+  ><h3 id="page-info-versions">Current version</h3
   ><HistoryList urls={props.urls} page={props.page} standing={s} name={props.name} comparing={props.comparing} /></section
 >

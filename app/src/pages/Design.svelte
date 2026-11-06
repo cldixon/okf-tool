@@ -8,6 +8,7 @@
     CommentMark,
     ComposeDialog,
     Dialog,
+    Disclosure,
     Field,
     type Glyph,
     ICONS,
@@ -51,6 +52,8 @@
       compose: false,
       clicks: 0,
       who: "everyone",
+      tip: null as string | null,
+      more: false,
     },
     dark: {
       tab: "open",
@@ -60,8 +63,17 @@
       compose: false,
       clicks: 0,
       who: "everyone",
+      tip: null as string | null,
+      more: false,
     },
   });
+  /** A press's tip (TEMPRA-312), shown 1.5 s as Copy page's: Copied, or Couldn't copy. */
+  function showTip(theme: Theme, text: string) {
+    state[theme].tip = text;
+    setTimeout(() => {
+      if (state[theme].tip === text) state[theme].tip = null;
+    }, 1500);
+  }
 </script>
 
 {#snippet item(name: string, body: import("svelte").Snippet)}
@@ -113,14 +125,34 @@
   {@render item("IconButton", iconButtons)}
 
   {#snippet splitButtons()}
-    <SplitButton icon="copy" label="Copy page" menuLabel="More copy options">
+    <SplitButton
+      icon="copy"
+      label="Copy page"
+      menuLabel="More copy options"
+      tip={s.tip === "Copied" ? s.tip : null}
+      onclick={() => showTip(theme, "Copied")}
+    >
       {#snippet children()}
         <a class="menu-item" href="#m"><Icon name="markdown" />View Markdown</a>
         <a class="menu-item" href="#d"><Icon name="download" />Download .md</a>
       {/snippet}
     </SplitButton>
+    <IconButton
+      variant="outlined"
+      icon="copy"
+      label="Copy, failing"
+      tip={s.tip === "Couldn't copy" ? s.tip : null}
+      onclick={() => showTip(theme, "Couldn't copy")}
+    />
   {/snippet}
   {@render item("SplitButton", splitButtons)}
+
+  {#snippet disclosures()}
+    <Disclosure label="Earlier versions" count={7} bind:open={s.more} />
+    <Disclosure label="Open" count={3} open />
+    <Disclosure label="No count" />
+  {/snippet}
+  {@render item("Disclosure", disclosures)}
 
   {#snippet search()}<SearchButton shortcut="Ctrl K" />{/snippet}
   {@render item("SearchButton", search)}

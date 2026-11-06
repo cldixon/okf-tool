@@ -333,6 +333,8 @@
   --tempra-motion-quick: 0.15s; /* a chevron or a + turning */
   --tempra-motion-pulse: 1.6s; /* the change dot's pulse while an agent writes */
   --tempra-motion-shimmer: 2s; /* one pass of the shimmer over a name an agent is at now (TEMPRA-219) */
+  --tempra-motion-press: 0.12s; /* a button pressed coming back to its size (TEMPRA-312) */
+  --tempra-scale-press: 0.96; /* a button while pressed: a slight scale-down (TEMPRA-312) */
 }
 
 /* The account's theme (take 4): the shell puts it on the root; the tokens above follow. */

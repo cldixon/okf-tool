@@ -713,6 +713,12 @@ const NEVER_BY_A_PERSON = unverified(true, "never");
 
 /** The most pages one write's notice names (TEMPRA-116). */
 const NOTICE_PAGES = 500;
+/**
+ * GET /changed (TEMPRA-302): pages read from `paths` per round, and the most it walks, so a
+ * library where many pages were checked after their last change still costs a bounded read.
+ */
+const CHANGED_BATCH = 20;
+const CHANGED_WALK = 500;
 
 const MARK_OPEN = "\u0002";
 const MARK_CLOSE = "\u0003";
@@ -4095,6 +4101,48 @@ export class LibraryStore {
       id,
       rows.map((e) => ({ ...e, meta: e.meta ? (JSON.parse(e.meta) as JsonObject) : null })),
     );
+  }
+
+  /**
+   * GET /changed: the pages whose text changed last (a write, an import, a move or a revert),
+   * newest first, each once at its path now, with that change's event: the home's Recently
+   * changed (TEMPRA-302). Comments, checks, deletes and attachments take no place in it, however
+   * many came since. Bounded and indexed: pages are walked by `paths.last_seq` (paths_last),
+   * which is a page's last change or a later check, never earlier, so the walk stops at the first
+   * page whose last_seq is older than the limit-th change found; each page's last change is one
+   * lookup on events_content.
+   */
+  changed(opts: { limit?: number } = {}) {
+    const limit = Math.min(Math.max(opts.limit ?? 5, 1), 20);
+    const found: (EventRow & { path: string; by: RequestRow["by"] })[] = [];
+    let below = Number.MAX_SAFE_INTEGER;
+    let walked = 0;
+    walk: while (walked < CHANGED_WALK) {
+      const rows = this.sql.all<{ path: string; page_id: string; last_seq: number }>(
+        `SELECT path, page_id, last_seq FROM paths WHERE last_seq < ? AND kind = 'page'
+         ORDER BY last_seq DESC LIMIT ?`,
+        below,
+        CHANGED_BATCH,
+      );
+      for (const p of rows) {
+        walked++;
+        if (found.length === limit && p.last_seq < (found.at(-1)?.seq ?? 0)) break walk;
+        const e = this.sql.all<EventRow & { meta: string | null }>(
+          `SELECT * FROM events WHERE page_id = ? AND op != 'comment'
+             AND op IN ('put', 'import', 'move', 'revert')
+           ORDER BY seq DESC LIMIT 1`,
+          p.page_id,
+        )[0];
+        if (!e) continue;
+        const meta = e.meta ? (JSON.parse(e.meta) as JsonObject) : null;
+        found.push({ ...e, meta, path: p.path, by: (meta?.by as RequestRow["by"]) ?? null });
+        found.sort((a, b) => b.seq - a.seq);
+        if (found.length > limit) found.pop();
+      }
+      if (rows.length < CHANGED_BATCH) break;
+      below = rows.at(-1)?.last_seq ?? 0;
+    }
+    return { seq: this.headSeq(), pages: found };
   }
 
   /** GET /history: every event for the path's page, across moves. */
