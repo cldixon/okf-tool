@@ -29,6 +29,7 @@ import { type FetchFn, fetchBlob } from "./fetch-source";
 import { splitFrontmatter } from "./format/page";
 import { normalizePath, underPrefix } from "./format/paths";
 import type { JsonObject } from "./format/types";
+import { hostsFrom, ownHostnames } from "./hosts";
 import type { Images } from "./images";
 import { registerInboxApi } from "./inbox-api";
 import { registerLegalRoutes, type SiteService } from "./legal";
@@ -384,7 +385,7 @@ async function attachFromUrl(c: C, path: string): Promise<Response> {
     {
       fetch: d.fetch ?? ((u, i) => fetch(u, i)),
       blobs: d.blobs,
-      selfHosts: [new URL(c.req.url).hostname],
+      selfHosts: ownHostnames(new URL(c.req.url).hostname, hostsFrom(c.env ?? {})),
     },
     from,
     clean,

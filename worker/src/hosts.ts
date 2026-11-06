@@ -85,3 +85,34 @@ export function hostRedirect(req: Request, hosts: Hosts | null): Response | null
     headers: { Location: url.toString(), "Cache-Control": "no-store" },
   });
 }
+
+/**
+ * The origin people are sent to from a request that came in on `origin` (TEMPRA-289): an alias or
+ * redirect host's links name the app's own host, so an agent on a connection made before the move
+ * (`app.tempra.dev/mcp`) hands people `https://tempra.dev/…`. Any other origin (staging, a
+ * preview, localhost) links to itself.
+ */
+export function linkOrigin(origin: string, hosts: Hosts | null): string {
+  if (!hosts) return origin;
+  let host: string;
+  try {
+    host = new URL(origin).host.toLowerCase();
+  } catch {
+    return origin;
+  }
+  return hosts.aliases.has(host) || hosts.redirects.has(host) ? `https://${hosts.primary}` : origin;
+}
+
+/**
+ * Every hostname this deployment answers on, the request's own first: what a `source_url` must
+ * never name (fetch-source.ts), whichever host the request came in on.
+ */
+export function ownHostnames(requestHost: string, hosts: Hosts | null): string[] {
+  const names = [
+    requestHost,
+    ...(hosts ? [hosts.primary, ...hosts.aliases, ...hosts.redirects] : []),
+  ]
+    .map((h) => h.toLowerCase().replace(/:\d+$/, ""))
+    .filter(Boolean);
+  return [...new Set(names)];
+}

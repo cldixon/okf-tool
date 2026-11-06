@@ -1,7 +1,7 @@
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { type AgentKey, agentName, connectionAgent, tokenAgent } from "./agents";
 import { actedBy, createApp, type Deps } from "./app";
-import { hostRedirect, hostsFrom } from "./hosts";
+import { hostRedirect, hostsFrom, linkOrigin, ownHostnames } from "./hosts";
 import { imagesService } from "./images";
 import { handleMcp, type McpContext } from "./mcp/server";
 import { notifying, postComment } from "./notify";
@@ -165,7 +165,10 @@ export function createWorker(deps: (env: Cloudflare.Env) => Deps): {
                   : Promise.resolve({ error: RENDER_UNAVAILABLE }),
               allowRender: async () =>
                 (await d.rateLimit?.("render", `render:${who.account}`)) ?? true,
-              origin,
+              // People are sent to the app's own host, even from a connection made on the
+              // former one (TEMPRA-289); a source_url names none of the deployment's hosts.
+              origin: linkOrigin(origin, hostsFrom(env)),
+              selfHosts: ownHostnames(new URL(origin).hostname, hostsFrom(env)),
             }),
           );
           if (cost.calls > 0) {

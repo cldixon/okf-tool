@@ -110,8 +110,13 @@ export interface McpContext {
   poster?(req: { url: string; time: number }, library?: string): Promise<PosterResult>;
   /** One render against the account's per-minute cap (RENDERS_PER_MINUTE); false when over it. */
   allowRender?(): Promise<boolean>;
-  /** The Worker's origin, for download URLs. */
+  /**
+   * The origin links name: the app's pages, downloads, uploads and panels (TEMPRA-289: the app's
+   * own host, also for a request on an alias such as app.tempra.dev).
+   */
   origin: string;
+  /** Every hostname of this deployment, which a `source_url` never names; else `origin`'s. */
+  selfHosts?: string[];
 }
 
 /** Name the MCP server reports; provisional until the product is named (spec: Open questions). */
@@ -1258,7 +1263,7 @@ export function buildServer(ctx: McpContext): McpServer {
         {
           fetch: ctx.fetch ?? ((u, i) => fetch(u, i)),
           blobs: ctx.blobs,
-          selfHosts: selfHosts(ctx.origin),
+          selfHosts: ctx.selfHosts ?? selfHosts(ctx.origin),
         },
         source_url,
         clean,
