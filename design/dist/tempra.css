@@ -4512,31 +4512,33 @@ ul.events {
 
 /* Room for the text and the contents, not a panel's width as well (a laptop window, about 964
    to 1364px with the sidebar shown; TEMPRA-150): the contents keep a column of their own, the
-   contents' width and a gutter, as Linear's docs do, and the page's padding tightens a little. An
-   open panel still takes the column from 960px and overlays below that (the rules around this),
-   and the text moves over for it. */
+   contents' width and a gutter, as Linear's docs do, and the page's padding tightens a little.
+   Whether the contents have a column is the page's width alone, never whether a panel is open
+   (TEMPRA-301): an open panel takes the column from 960px (the rules below; the text moves over
+   for it) and overlays the page under that, the column kept empty beneath it, so On this page
+   never appears under the byline as a panel opens and the text never moves down. */
 @container page (700px <= width < 1100px) {
-  .page-view:not(.panel-open):not(.markdown-on) {
+  .page-view:not(.markdown-on) {
     --page-side: max(
       calc(var(--tempra-size-contents) + var(--tempra-space-24)),
       var(--page-centred)
     );
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .page-grid {
+  .page-view:not(.markdown-on) .page-grid {
     grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .page-side {
+  .page-view:not(.markdown-on) .page-side {
     display: block;
   }
 
-  .page-view:not(.panel-open) .page-contents {
+  .page-contents {
     display: block;
     padding-right: var(--tempra-space-24);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .toc-inline {
+  .page-view:not(.markdown-on) .toc-inline {
     display: none;
   }
 
@@ -4544,7 +4546,7 @@ ul.events {
     --doc-pad: var(--tempra-space-32);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .doc {
+  .page-view:not(.markdown-on) .doc {
     --doc-end: var(--tempra-space-56);
     --doc-align: 1;
     justify-self: end;
@@ -4561,8 +4563,8 @@ ul.events {
 }
 
 /* Room for the text and a panel, not the contents as well (a laptop of about 1280px with the
-   sidebar shown): an open panel takes a column again and the text moves over for it, so nothing
-   (On this page included) runs under it. Narrower than this, it overlays. */
+   sidebar shown): an open panel takes the contents' column at a panel's width and the text moves
+   over for it, so nothing runs under it. Narrower than this, it overlays. */
 @container page (960px <= width < 1100px) {
   .page-view.panel-open {
     --page-side: var(--tempra-size-panel);
