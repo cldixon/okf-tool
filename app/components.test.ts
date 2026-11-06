@@ -372,6 +372,7 @@ describe("marks and labels", () => {
     expect(b.getAttribute("aria-label")).toBe("1 comment");
     expect(b.getAttribute("title")).toBe("1 open comment");
     expect(b.textContent).toBe("1");
+    expect(one(b, "svg").getAttribute("class")).toContain("lucide-message-circle");
     b.click();
     expect(opened).toBe(1);
     d.destroy();
