@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   AvatarMark,
   Badge,
@@ -162,7 +164,61 @@ describe("buttons", () => {
     flushSync();
     expect(more.getAttribute("aria-expanded")).toBe("true");
     expect(one(wrap, ".menu-list.end .menu-item").textContent).toBe("View Markdown");
+    // No tip asked for: no live region either.
+    expect(wrap.querySelector("[aria-live]")).toBeNull();
     d.destroy();
+  });
+
+  test("a tip (TEMPRA-312): the glyph stays, the words show under the button and are said", () => {
+    const drawn = (which: "split" | "icon", tip: string | null) => {
+      const props = { icon: "copy" as const, label: "Copy page", tip };
+      const d =
+        which === "split"
+          ? draw(SplitButton, {
+              ...props,
+              menuLabel: "More copy options",
+              children: createRawSnippet(() => ({ render: () => "<span></span>" })),
+            })
+          : draw(IconButton, { ...props, variant: "outlined" as const });
+      const main = one(d.host, which === "split" ? "button.split-main" : "button.icon-button");
+      const live = one(d.host, "[aria-live='polite']");
+      expect(live.className).toBe("visually-hidden");
+      expect(one(main, "svg").getAttribute("class")).toContain("lucide-copy");
+      expect(main.getAttribute("title")).toBe("Copy page");
+      return { d, main, live };
+    };
+    for (const which of ["split", "icon"] as const) {
+      const idle = drawn(which, null);
+      expect(idle.main.getAttribute("aria-label")).toBe("Copy page");
+      expect(idle.live.textContent).toBe("");
+      expect(idle.d.host.querySelector(".button-tip")).toBeNull();
+      idle.d.destroy();
+      for (const words of ["Copied", "Couldn't copy"]) {
+        const shown = drawn(which, words);
+        expect(shown.main.getAttribute("aria-label")).toBe(words);
+        const tip = one(shown.d.host, ".button-tip");
+        expect(tip.textContent).toBe(words);
+        expect(tip.getAttribute("popover")).toBe("manual");
+        expect(tip.getAttribute("aria-hidden")).toBe("true");
+        expect(shown.live.textContent).toBe(words);
+        shown.d.destroy();
+      }
+    }
+  });
+
+  test("a press (TEMPRA-312): buttons scale down while pressed, not under reduced motion", () => {
+    const sheet = readFileSync(
+      join(import.meta.dir, "..", "design", "src", "workspace.css"),
+      "utf8",
+    );
+    expect(sheet).toContain(
+      ".icon-button:active:not(:disabled),\n.split-button:has(> .split-main:active, > .menu > .split-more:active),\n.pill-button:active:not(:disabled) {\n  transform: scale(var(--tempra-scale-press));",
+    );
+    expect(sheet).toContain("transition: transform var(--tempra-motion-press) ease-out;");
+    const reduced = sheet.split("@media (prefers-reduced-motion: reduce)").slice(1);
+    expect(
+      reduced.some((b) => /\.pill-button:active:not\(:disabled\) \{\s*transform: none;/.test(b)),
+    ).toBe(true);
   });
 
   test("Disclosure (TEMPRA-309): a chevron, the label and its count; aria-expanded follows a press", () => {

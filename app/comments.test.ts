@@ -204,15 +204,15 @@ describe("the page's corner tools (TEMPRA-283)", () => {
     r.d.destroy();
   });
 
-  test("Copy page shows a check once copied, a × if it could not", async () => {
+  test("Copy page keeps its glyph and says Copied in a tip, Couldn't copy if it could not", async () => {
     const clipboard = navigator.clipboard;
     const fetched = globalThis.fetch;
     globalThis.fetch = (async () => new Response("# A page\n")) as unknown as typeof fetch;
     const glyph = (r: ReturnType<typeof row>) =>
       r.d.host.querySelector("button.split-main svg")?.getAttribute("class") ?? "";
-    for (const [works, name, icon] of [
-      [true, "Copied", "lucide-check"],
-      [false, "Could not copy", "lucide-x"],
+    for (const [works, name] of [
+      [true, "Copied"],
+      [false, "Couldn't copy"],
     ] as const) {
       Object.defineProperty(navigator, "clipboard", {
         configurable: true,
@@ -222,11 +222,25 @@ describe("the page's corner tools (TEMPRA-283)", () => {
       });
       const r = row();
       expect(glyph(r)).toContain("lucide-copy");
+      expect(r.d.host.querySelector(".button-tip")).toBeNull();
+      const live = r.d.host.querySelector(".split-button [aria-live='polite']");
+      expect(live?.textContent).toBe("");
       r.button("Copy page")?.click();
       await settle(20);
       flushSync();
       expect(r.button(name)).not.toBeNull();
-      expect(glyph(r)).toContain(icon);
+      expect(glyph(r)).toContain("lucide-copy");
+      const tip = r.d.host.querySelector(".button-tip");
+      expect(tip?.textContent).toBe(name);
+      expect(tip?.getAttribute("popover")).toBe("manual");
+      expect(tip?.getAttribute("aria-hidden")).toBe("true");
+      expect(live?.textContent).toBe(name);
+      // Gone after a moment, the button named Copy page again.
+      await settle(1600);
+      flushSync();
+      expect(r.d.host.querySelector(".button-tip")).toBeNull();
+      expect(r.button("Copy page")).not.toBeNull();
+      expect(live?.textContent).toBe("");
       r.d.destroy();
     }
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: clipboard });

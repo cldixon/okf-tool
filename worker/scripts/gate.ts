@@ -3427,6 +3427,7 @@ async function browserRenders(
           await b.context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
           await copyButton().click();
           await headRow.getByRole("button", { name: "Copied" }).waitFor({ timeout: 5000 });
+          await page.locator(".button-tip:popover-open", { hasText: "Copied" }).waitFor();
           const copied = await page.evaluate<string>("navigator.clipboard.readText()");
           if (!copied.startsWith("---\n"))
             throw new Error(`Copy page copied: ${copied.slice(0, 60)}`);
@@ -4380,8 +4381,34 @@ async function browserRenders(
         throw new Error("Copy page is still in the top bar");
       }
       await b.context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
-      await copyButton().click();
+      // A press (TEMPRA-312): the pill scales down while held and comes back; its glyph never
+      // changes; a "Copied" tip shows under it a moment, the button named so too.
+      const pill = main.locator(".page-tools-side .split-button");
+      const copyBox = await copyButton().boundingBox();
+      if (!copyBox) throw new Error("Copy page has no box");
+      await page.mouse.move(copyBox.x + copyBox.width / 2, copyBox.y + copyBox.height / 2);
+      await page.mouse.down();
+      await page.waitForTimeout(250);
+      const held = await pill.evaluate(
+        (el) => el.ownerDocument.defaultView?.getComputedStyle(el).transform ?? "",
+      );
+      if (!held.startsWith("matrix(0.96")) throw new Error(`Copy page held: transform ${held}`);
+      if (shots) await page.screenshot({ path: `${shots}/copy-pressed.png` });
+      await page.mouse.up();
       await main.locator('.page-tools-side button[aria-label="Copied"]').waitFor({ timeout: 5000 });
+      const tip = page.locator(".button-tip:popover-open", { hasText: "Copied" });
+      await tip.waitFor({ timeout: 5000 });
+      const glyph = await copyButton().locator("svg").getAttribute("class");
+      if (!glyph?.includes("lucide-copy")) throw new Error(`Copy page's glyph changed: ${glyph}`);
+      const [tipBox, pillBox] = [await tip.boundingBox(), await pill.boundingBox()];
+      if (!tipBox || !pillBox || tipBox.y < pillBox.y + pillBox.height) {
+        throw new Error("the Copied tip is not under Copy page");
+      }
+      if (shots) await page.screenshot({ path: `${shots}/copy-copied.png` });
+      await tip.waitFor({ state: "detached", timeout: 5000 });
+      await main
+        .locator('.page-tools-side button[aria-label="Copy page"]')
+        .waitFor({ timeout: 5000 });
       const copied = await page.evaluate<string>("navigator.clipboard.readText()");
       if (!copied.startsWith("---\ntype: Note\ntitle: Gate panels")) {
         throw new Error(`Copy page copied: ${copied.slice(0, 80)}`);

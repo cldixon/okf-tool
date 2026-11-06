@@ -52,6 +52,7 @@
       compose: false,
       clicks: 0,
       who: "everyone",
+      tip: null as string | null,
       more: false,
     },
     dark: {
@@ -62,9 +63,17 @@
       compose: false,
       clicks: 0,
       who: "everyone",
+      tip: null as string | null,
       more: false,
     },
   });
+  /** A press's tip (TEMPRA-312), shown 1.5 s as Copy page's: Copied, or Couldn't copy. */
+  function showTip(theme: Theme, text: string) {
+    state[theme].tip = text;
+    setTimeout(() => {
+      if (state[theme].tip === text) state[theme].tip = null;
+    }, 1500);
+  }
 </script>
 
 {#snippet item(name: string, body: import("svelte").Snippet)}
@@ -116,12 +125,25 @@
   {@render item("IconButton", iconButtons)}
 
   {#snippet splitButtons()}
-    <SplitButton icon="copy" label="Copy page" menuLabel="More copy options">
+    <SplitButton
+      icon="copy"
+      label="Copy page"
+      menuLabel="More copy options"
+      tip={s.tip === "Copied" ? s.tip : null}
+      onclick={() => showTip(theme, "Copied")}
+    >
       {#snippet children()}
         <a class="menu-item" href="#m"><Icon name="markdown" />View Markdown</a>
         <a class="menu-item" href="#d"><Icon name="download" />Download .md</a>
       {/snippet}
     </SplitButton>
+    <IconButton
+      variant="outlined"
+      icon="copy"
+      label="Copy, failing"
+      tip={s.tip === "Couldn't copy" ? s.tip : null}
+      onclick={() => showTip(theme, "Couldn't copy")}
+    />
   {/snippet}
   {@render item("SplitButton", splitButtons)}
 

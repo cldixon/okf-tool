@@ -11,9 +11,10 @@
    * (the stylesheet's call: the page draws it in both places). Comments with its open count, Page
    * info with the agent dot while a newer version waits, and Copy page with a ⌄ for View Markdown
    * and Download .md. The open panel's button shows pressed; pressing it again closes it. Copy page
-   * says what happened where it was pressed: a check for two seconds once copied (a × if it could
-   * not), as CopyField does. The library's home draws the same row with Comments alone (no
-   * `path`): its threads are the library's, and Page info and Copy page are a page's.
+   * keeps its glyph (TEMPRA-312): a press, then a "Copied" tip under it for a moment ("Couldn't
+   * copy" if it could not), said in a polite live region too, as CopyField does. The library's
+   * home draws the same row with Comments alone (no `path`): its threads are the library's, and
+   * Page info and Copy page are a page's.
    */
   let props: {
     urls: Urls;
@@ -31,9 +32,6 @@
     place: "side" | "head";
   } = $props();
   const page = useCopy();
-  const copyLabel = $derived(
-    page.state === "copied" ? "Copied" : page.state === "failed" ? "Could not copy" : "Copy page",
-  );
   const comments = $derived(props.openCount > 0 ? `Comments, ${props.openCount} open` : "Comments");
 </script>
 
@@ -60,13 +58,14 @@
     onclick={() => props.onPanel("info")}
   /><SplitButton
     touch
-    icon={page.state === "copied" ? "check" : page.state === "failed" ? "x" : "copy"}
-    label={copyLabel}
+    icon="copy"
+    label="Copy page"
+    tip={page.tip}
     menuLabel="More copy options"
     onclick={() => page.copy(() => storedFile(props.urls, path))}
     >{#snippet children()}<button type="button" class="menu-item" aria-pressed={props.markdown} onclick={() => props.onMarkdown?.(!props.markdown)}
         ><Icon name="markdown" /> {props.markdown ? "Back to page" : "View Markdown"}</button
       ><a class="menu-item" href={props.urls.raw(path)} download={baseName(path)}><Icon name="download" /> Download <span class="menu-hint">.md</span></a
       >{/snippet}</SplitButton
-  ><span class="visually-hidden" aria-live="polite">{page.state === "copied" ? "Copied" : page.state === "failed" ? "Could not copy" : ""}</span>{/if}</div
+  >{/if}</div
 >
