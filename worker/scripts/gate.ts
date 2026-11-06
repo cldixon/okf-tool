@@ -4217,10 +4217,10 @@ async function browserRenders(
       await back("a plain reload");
       // Under 1100px of page the contents keep a narrower column of their own down to 700px
       // (TEMPRA-150), as Linear's docs do: at 1280px and at a 1000px window they are beside the
-      // text, not On this page. Below that they hide (On this page under the byline). At 1280px a
-      // panel takes their column and the text moves over for it: nothing runs under it
-      // (TEMPRA-128, C-5). Whether On this page shows is the page's width alone: opening a panel
-      // never brings it in under the byline, so the text never moves down (TEMPRA-301).
+      // text, not On this page. Below that they hide (On this page under the byline). From 960px
+      // of page the right column is a panel's width, open or not: at 1280px a panel takes it and
+      // nothing runs under it (TEMPRA-128, C-5). Opening a panel never moves the text, across,
+      // down or in width, and never brings On this page in under the byline (TEMPRA-301).
       const inline = main.locator(".toc-inline");
       const besideText = async (where: string) => {
         await contentsNav.waitFor({ timeout: 5000 });
@@ -4231,15 +4231,20 @@ async function browserRenders(
           throw new Error(`the contents are not beside the text ${where}`);
         }
       };
-      const firstTop = () =>
-        page.evaluate<number>(
-          `document.querySelector(".page-view .body .prose p").getBoundingClientRect().top`,
-        );
-      /** Each panel opened and closed again: the first paragraph stays where it was. */
+      /** The first paragraph's box: where it starts across and down, and how wide it is. */
+      const firstBox = () =>
+        page.evaluate<string>(`(() => {
+          const r = document.querySelector(".page-view .body .prose p").getBoundingClientRect();
+          return JSON.stringify({ left: r.left, top: r.top, width: r.width });
+        })()`);
+      /**
+       * Each panel opened and closed again: the first paragraph keeps its box exactly, across,
+       * down and wide (TEMPRA-301).
+       */
       const textStays = async (where: string) => {
         await contentsNav.waitFor({ timeout: 5000 });
         await page.waitForTimeout(200);
-        const before = await firstTop();
+        const before = await firstBox();
         const inlineBefore = await inline.isVisible();
         for (const [name, open, panelBox] of [
           ["Comments", openComments, comments],
@@ -4248,8 +4253,8 @@ async function browserRenders(
           await open();
           await panelBox.waitFor({ timeout: 5000 });
           await page.waitForTimeout(200);
-          const after = await firstTop();
-          if (Math.abs(after - before) > 1) {
+          const after = await firstBox();
+          if (after !== before) {
             throw new Error(`opening ${name} ${where} moved the text from ${before} to ${after}`);
           }
           if ((await inline.isVisible()) !== inlineBefore) {
