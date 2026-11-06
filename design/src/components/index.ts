@@ -16,6 +16,7 @@ import ChipC from "./Chip.svelte";
 import CommentMarkC from "./CommentMark.svelte";
 import ComposeDialogC from "./ComposeDialog.svelte";
 import DialogC from "./Dialog.svelte";
+import DisclosureC from "./Disclosure.svelte";
 import FieldC from "./Field.svelte";
 import IconC from "./Icon.svelte";
 import IconButtonC from "./IconButton.svelte";
@@ -41,6 +42,7 @@ import type {
   CommentMarkProps,
   ComposeDialogProps,
   DialogProps,
+  DisclosureProps,
   FieldProps,
   IconButtonProps,
   IconProps,
@@ -75,6 +77,7 @@ export const Chip = ChipC as Component<ChipProps>;
 export const CommentMark = CommentMarkC as Component<CommentMarkProps>;
 export const ComposeDialog = ComposeDialogC as Component<ComposeDialogProps>;
 export const Dialog = DialogC as Component<DialogProps>;
+export const Disclosure = DisclosureC as Component<DisclosureProps, NoExports, "open">;
 export const Field = FieldC as Component<FieldProps>;
 export const Icon = IconC as Component<IconProps>;
 export const IconButton = IconButtonC as Component<IconButtonProps>;

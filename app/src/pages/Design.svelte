@@ -8,6 +8,7 @@
     CommentMark,
     ComposeDialog,
     Dialog,
+    Disclosure,
     Field,
     type Glyph,
     ICONS,
@@ -52,6 +53,7 @@
       clicks: 0,
       who: "everyone",
       tip: null as string | null,
+      more: false,
     },
     dark: {
       tab: "open",
@@ -62,6 +64,7 @@
       clicks: 0,
       who: "everyone",
       tip: null as string | null,
+      more: false,
     },
   });
   /** A press's tip (TEMPRA-312), shown 1.5 s as Copy page's: Copied, or Couldn't copy. */
@@ -143,6 +146,13 @@
     />
   {/snippet}
   {@render item("SplitButton", splitButtons)}
+
+  {#snippet disclosures()}
+    <Disclosure label="Earlier versions" count={7} bind:open={s.more} />
+    <Disclosure label="Open" count={3} open />
+    <Disclosure label="No count" />
+  {/snippet}
+  {@render item("Disclosure", disclosures)}
 
   {#snippet search()}<SearchButton shortcut="Ctrl K" />{/snippet}
   {@render item("SearchButton", search)}

@@ -75,6 +75,19 @@ export type SplitButtonProps = {
   children: Snippet<[() => void]>;
 } & Rest;
 
+export type DisclosureProps = {
+  /** What it shows ("Earlier versions"); with the count, its accessible name. */
+  label: string;
+  /** Whether what it controls shows; binds, and is told as `aria-expanded`. */
+  open?: boolean;
+  /** How many things it holds, beside the label in the muted grey; none at 0 or null. */
+  count?: number | null;
+  /** The id of the region it shows and hides (`aria-controls`). */
+  controls?: string;
+  /** Told the new state after each press. */
+  onchange?: (open: boolean) => void;
+} & Rest;
+
 export type SearchButtonProps = {
   /** The shortcut told in the title ("Ctrl K", "⌘K"). */
   shortcut: string;

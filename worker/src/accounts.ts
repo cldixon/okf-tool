@@ -59,6 +59,8 @@ export interface Invitation {
   /** The library, as {owner}/{slug}. */
   owner: string;
   slug: string;
+  /** The library's title, in the invitee's view (`invitations`); absent in the owner's. */
+  title?: string | null;
   role: MemberRole;
   /** The invited person's handle (the owner's view) or the inviter's (the invitee's view). */
   handle: string;
@@ -829,7 +831,7 @@ export function d1Accounts(db: D1Database): Accounts {
     async invitations(userId) {
       const r = await db
         .prepare(
-          `SELECT i.id, o.handle AS owner, l.slug, i.role, b.handle, i.created, i.expires
+          `SELECT i.id, o.handle AS owner, l.slug, l.title, i.role, b.handle, i.created, i.expires
            FROM library_invitations i JOIN libraries l ON l.id = i.library
            JOIN users o ON o.id = l.owner LEFT JOIN users b ON b.id = i.invited_by
            WHERE i.user = ? AND i.status = 'pending' AND i.expires > ? AND o.suspended IS NULL

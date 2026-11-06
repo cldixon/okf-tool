@@ -5,9 +5,10 @@
  * panel in their place (Comments, History, Properties). The text and the contents are centred
  * together in the page, as Linear's docs are: the right column takes half the spare room, so
  * the text never drifts right with all of it on its left. The page's width decides what fits
- * (container queries on `page`, the page's scroller): under 1100px the contents keep a narrower
- * column of their own down to 700px (TEMPRA-150), and hide below that (On this page under the
- * byline); a panel takes the column down to 960px and overlays the page below that; on a phone (900px and under, the window's call) a panel is a sheet from the bottom. The
+ * (container queries on `page`, the page's scroller): from 960px the right column is at least a
+ * panel's width, open or not, so a panel opening never moves the text (TEMPRA-301); under 960px
+ * the contents keep a narrower column of their own down to 700px (TEMPRA-150), and hide below
+ * that (On this page under the byline); a panel overlays the page under 960px; on a phone (900px and under, the window's call) a panel is a sheet from the bottom. The
  * library's home is laid out the same way (its head for the title, no contents; TEMPRA-283).
  */
 
@@ -670,33 +671,35 @@
   }
 }
 
-/* Room for the text and the contents, not a panel's width as well (a laptop window, about 964
-   to 1364px with the sidebar shown; TEMPRA-150): the contents keep a column of their own, the
-   contents' width and a gutter, as Linear's docs do, and the page's padding tightens a little. An
-   open panel still takes the column from 960px and overlays below that (the rules around this),
-   and the text moves over for it. */
+/* Room for the text and the contents (TEMPRA-150): under 1100px the page's padding tightens a
+   little, and under 960px, where a panel overlays the page rather than sitting beside the text,
+   the contents keep a narrower column of their own, the contents' width and a gutter, as
+   Linear's docs do (from 960px the column is a panel's width, the rules below). Whether the
+   contents have a column is the page's width alone, never whether a panel is open (TEMPRA-301):
+   an overlaid panel leaves the column beneath it, so On this page never appears under the byline
+   as a panel opens and the text never moves. */
 @container page (700px <= width < 1100px) {
-  .page-view:not(.panel-open):not(.markdown-on) {
+  .page-view:not(.markdown-on) {
     --page-side: max(
       calc(var(--tempra-size-contents) + var(--tempra-space-24)),
       var(--page-centred)
     );
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .page-grid {
+  .page-view:not(.markdown-on) .page-grid {
     grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .page-side {
+  .page-view:not(.markdown-on) .page-side {
     display: block;
   }
 
-  .page-view:not(.panel-open) .page-contents {
+  .page-contents {
     display: block;
     padding-right: var(--tempra-space-24);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .toc-inline {
+  .page-view:not(.markdown-on) .toc-inline {
     display: none;
   }
 
@@ -704,7 +707,7 @@
     --doc-pad: var(--tempra-space-32);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .doc {
+  .page-view:not(.markdown-on) .doc {
     --doc-end: var(--tempra-space-56);
     --doc-align: 1;
     justify-self: end;
@@ -720,16 +723,17 @@
   background: var(--tempra-color-scrim);
 }
 
-/* Room for the text and a panel, not the contents as well (a laptop of about 1280px with the
-   sidebar shown): an open panel takes a column again and the text moves over for it, so nothing
-   (On this page included) runs under it. Narrower than this, it overlays. */
+/* Room for the text and a panel beside it (a laptop of about 1280px with the sidebar shown): the
+   right column is a panel's width whether a panel is open or not, as it is wider than this, the
+   contents pushed in at its start as there, so opening a panel only swaps what the column holds
+   and the text never moves, across or down (TEMPRA-301). Narrower than this, a panel overlays. */
 @container page (960px <= width < 1100px) {
-  .page-view.panel-open {
-    --page-side: var(--tempra-size-panel);
+  .page-view:not(.markdown-on) {
+    --page-side: max(var(--tempra-size-panel), var(--page-centred));
   }
 
   .page-view.panel-open .page-grid {
-    grid-template-columns: [text] minmax(0, 1fr) [side] var(--tempra-size-panel);
+    grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   }
 
   .page-view.panel-open .page-side {
@@ -977,6 +981,32 @@
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
   font-weight: var(--tempra-weight-regular);
+}
+
+/* Current version (TEMPRA-309): the latest version's whole note, up to three lines; then Earlier
+   versions, a disclosure listing the rest (one line each, as before). */
+.page-info-versions .latest-version .version-note {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.page-info-versions .earlier-toggle {
+  margin-top: var(--tempra-space-04);
+}
+
+.page-info-versions .earlier-versions {
+  margin-top: var(--tempra-space-04);
+}
+
+@media (max-width: 900px) {
+  .page-info-versions .earlier-toggle {
+    min-height: var(--tempra-size-touch);
+  }
 }
 
 .menu-list .menu-count {

@@ -649,6 +649,43 @@ button.ghost {
   color: var(--tempra-color-muted);
 }
 
+/* A disclosure (TEMPRA-309): a quiet text button that shows what follows it. A chevron that turns
+   a quarter while open, the label in ink, a count beside it in the muted grey; a row's radius, no
+   ring until hovered. */
+button.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tempra-space-06);
+  padding: var(--tempra-space-06) var(--tempra-space-10);
+  border-color: transparent;
+  border-radius: var(--tempra-radius-row);
+  background: transparent;
+  color: var(--tempra-color-text);
+  font-size: var(--tempra-text-meta);
+  line-height: var(--tempra-leading-base);
+}
+
+button.disclosure svg {
+  flex: none;
+  color: var(--tempra-color-faint);
+  transition: transform var(--tempra-motion-quick) ease;
+}
+
+button.disclosure[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.disclosure-count {
+  color: var(--tempra-color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.disclosure svg {
+    transition: none;
+  }
+}
+
 input:not([type="checkbox"], [type="radio"], [type="file"]),
 select,
 textarea {
@@ -3289,7 +3326,9 @@ a.button.pill-button {
   gap: var(--tempra-space-02);
 }
 
-/* A row in the sidebar: a glyph, a name, a count or mark at the end. */
+/* A row in the sidebar: a glyph, a name, a count or mark at the end. As the tree's rows, it is
+   marked by its text, not a fill (TEMPRA-310): muted at rest, the text colour when current or
+   hovered, its glyph with it. */
 .nav-row {
   display: flex;
   align-items: center;
@@ -3300,26 +3339,21 @@ a.button.pill-button {
   border: 0;
   border-radius: var(--tempra-radius-row);
   background: transparent;
-  color: var(--tempra-color-text);
+  color: var(--tempra-color-muted);
   font-size: var(--tempra-text-ui);
   text-align: left;
   text-decoration: none;
 }
 
 .nav-row:visited {
-  color: var(--tempra-color-text);
+  color: var(--tempra-color-muted);
 }
 
 .nav-row:hover,
-.nav-row:hover:not(:disabled) {
-  background: var(--tempra-color-hover);
-  color: var(--tempra-color-text);
-}
-
+.nav-row:hover:not(:disabled),
 .nav-row[aria-current="page"],
 .nav-row[aria-current="location"] {
-  background: var(--tempra-color-selected);
-  font-weight: var(--tempra-weight-medium);
+  color: var(--tempra-color-text);
 }
 
 .nav-row svg {
@@ -3337,7 +3371,9 @@ a.button.pill-button {
 /* The tree: nested lists, one row per folder or file, indented a step a level. A folder's row is
    one button that opens and closes it (TEMPRA-138): its name as a section's label and its chevron
    (turning) at the row's end, as Linear's docs draw it (TEMPRA-277), no count; a page's or a
-   file's row is a link, a file's with a small icon. */
+   file's row is a link, a file's with a small icon. A row is marked by its text, not a fill, as
+   Linear's docs do (TEMPRA-310): a page's or a file's name rests muted, and the current page's,
+   or a hovered one's, is the text colour, in the same weight. */
 .tree,
 .tree ul {
   margin: 0;
@@ -3365,10 +3401,6 @@ a.button.pill-button {
   white-space: nowrap;
 }
 
-.tree-row:hover {
-  background: var(--tempra-color-hover);
-}
-
 /* The whole row takes a click or a tap (P-2, TEMPRA-133): a file's link, or a folder's button,
    reaches over the row. */
 .tree-row {
@@ -3391,9 +3423,10 @@ a.button.pill-button {
   align-items: center;
   justify-content: center;
   width: var(--tempra-size-icon);
-  color: var(--tempra-color-faint);
+  color: var(--tempra-color-muted);
 }
 
+.tree-row:hover > button.tree-name,
 .tree-row:hover .tree-chevron {
   color: var(--tempra-color-text);
 }
@@ -3421,14 +3454,15 @@ a.button.pill-button {
   text-overflow: ellipsis;
 }
 
-/* A folder's row is one button: it opens and closes the folder, and is never the current row. */
+/* A folder's row is one button: it opens and closes the folder, and is never the current row. Its
+   name rests muted in the rows' weight, as Linear's docs draw a section's label (TEMPRA-310), so
+   only the current page is ever in the text colour; a hover brings it up, as any row's. */
 button.tree-name {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--tempra-color-text);
+  color: var(--tempra-color-muted);
   font: inherit;
-  font-weight: var(--tempra-weight-medium);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
@@ -3443,13 +3477,15 @@ button.tree-name {
   text-overflow: ellipsis;
 }
 
-.tree-row:has(> [aria-current="page"]) {
-  background: var(--tempra-color-selected);
-}
-
+.tree-row:hover > a,
 .tree-row > a[aria-current="page"] {
   color: var(--tempra-color-text);
-  font-weight: var(--tempra-weight-medium);
+}
+
+/* A file's icon follows its name. */
+.tree-row:hover > .tree-leaf,
+.tree-row:has(> a[aria-current="page"]) > .tree-leaf {
+  color: var(--tempra-color-text);
 }
 
 .tree-leaf {
@@ -3901,9 +3937,10 @@ ul.events {
  * panel in their place (Comments, History, Properties). The text and the contents are centred
  * together in the page, as Linear's docs are: the right column takes half the spare room, so
  * the text never drifts right with all of it on its left. The page's width decides what fits
- * (container queries on `page`, the page's scroller): under 1100px the contents keep a narrower
- * column of their own down to 700px (TEMPRA-150), and hide below that (On this page under the
- * byline); a panel takes the column down to 960px and overlays the page below that; on a phone (900px and under, the window's call) a panel is a sheet from the bottom. The
+ * (container queries on `page`, the page's scroller): from 960px the right column is at least a
+ * panel's width, open or not, so a panel opening never moves the text (TEMPRA-301); under 960px
+ * the contents keep a narrower column of their own down to 700px (TEMPRA-150), and hide below
+ * that (On this page under the byline); a panel overlays the page under 960px; on a phone (900px and under, the window's call) a panel is a sheet from the bottom. The
  * library's home is laid out the same way (its head for the title, no contents; TEMPRA-283).
  */
 
@@ -4566,33 +4603,35 @@ ul.events {
   }
 }
 
-/* Room for the text and the contents, not a panel's width as well (a laptop window, about 964
-   to 1364px with the sidebar shown; TEMPRA-150): the contents keep a column of their own, the
-   contents' width and a gutter, as Linear's docs do, and the page's padding tightens a little. An
-   open panel still takes the column from 960px and overlays below that (the rules around this),
-   and the text moves over for it. */
+/* Room for the text and the contents (TEMPRA-150): under 1100px the page's padding tightens a
+   little, and under 960px, where a panel overlays the page rather than sitting beside the text,
+   the contents keep a narrower column of their own, the contents' width and a gutter, as
+   Linear's docs do (from 960px the column is a panel's width, the rules below). Whether the
+   contents have a column is the page's width alone, never whether a panel is open (TEMPRA-301):
+   an overlaid panel leaves the column beneath it, so On this page never appears under the byline
+   as a panel opens and the text never moves. */
 @container page (700px <= width < 1100px) {
-  .page-view:not(.panel-open):not(.markdown-on) {
+  .page-view:not(.markdown-on) {
     --page-side: max(
       calc(var(--tempra-size-contents) + var(--tempra-space-24)),
       var(--page-centred)
     );
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .page-grid {
+  .page-view:not(.markdown-on) .page-grid {
     grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .page-side {
+  .page-view:not(.markdown-on) .page-side {
     display: block;
   }
 
-  .page-view:not(.panel-open) .page-contents {
+  .page-contents {
     display: block;
     padding-right: var(--tempra-space-24);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .toc-inline {
+  .page-view:not(.markdown-on) .toc-inline {
     display: none;
   }
 
@@ -4600,7 +4639,7 @@ ul.events {
     --doc-pad: var(--tempra-space-32);
   }
 
-  .page-view:not(.panel-open):not(.markdown-on) .doc {
+  .page-view:not(.markdown-on) .doc {
     --doc-end: var(--tempra-space-56);
     --doc-align: 1;
     justify-self: end;
@@ -4616,16 +4655,17 @@ ul.events {
   background: var(--tempra-color-scrim);
 }
 
-/* Room for the text and a panel, not the contents as well (a laptop of about 1280px with the
-   sidebar shown): an open panel takes a column again and the text moves over for it, so nothing
-   (On this page included) runs under it. Narrower than this, it overlays. */
+/* Room for the text and a panel beside it (a laptop of about 1280px with the sidebar shown): the
+   right column is a panel's width whether a panel is open or not, as it is wider than this, the
+   contents pushed in at its start as there, so opening a panel only swaps what the column holds
+   and the text never moves, across or down (TEMPRA-301). Narrower than this, a panel overlays. */
 @container page (960px <= width < 1100px) {
-  .page-view.panel-open {
-    --page-side: var(--tempra-size-panel);
+  .page-view:not(.markdown-on) {
+    --page-side: max(var(--tempra-size-panel), var(--page-centred));
   }
 
   .page-view.panel-open .page-grid {
-    grid-template-columns: [text] minmax(0, 1fr) [side] var(--tempra-size-panel);
+    grid-template-columns: [text] minmax(0, 1fr) [side] var(--page-side);
   }
 
   .page-view.panel-open .page-side {
@@ -4873,6 +4913,32 @@ ul.events {
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
   font-weight: var(--tempra-weight-regular);
+}
+
+/* Current version (TEMPRA-309): the latest version's whole note, up to three lines; then Earlier
+   versions, a disclosure listing the rest (one line each, as before). */
+.page-info-versions .latest-version .version-note {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.page-info-versions .earlier-toggle {
+  margin-top: var(--tempra-space-04);
+}
+
+.page-info-versions .earlier-versions {
+  margin-top: var(--tempra-space-04);
+}
+
+@media (max-width: 900px) {
+  .page-info-versions .earlier-toggle {
+    min-height: var(--tempra-size-touch);
+  }
 }
 
 .menu-list .menu-count {
@@ -6048,6 +6114,72 @@ section.thread.open {
 .settings-section h3 {
   margin: var(--tempra-space-16) 0 var(--tempra-space-08);
 }
+
+/* ---------- Invitations (/invitations, TEMPRA-300) ---------- */
+
+/* One row per invitation between hairlines, as the bell's (workspace.css, .bell-item): the
+   library's tile, then its name, who invited and when, and the access offered; Accept and
+   Decline at the row's end, under the text on a phone. */
+.invitations {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--tempra-color-border);
+  list-style: none;
+}
+
+.invitation {
+  display: grid;
+  grid-template-columns: var(--tempra-size-tile) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tempra-space-08) var(--tempra-space-12);
+  padding: var(--tempra-space-16) 0;
+  border-bottom: 1px solid var(--tempra-color-border);
+}
+
+.invitation > .lib-tile {
+  align-self: start;
+  margin-top: var(--tempra-space-02);
+}
+
+.invitation-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tempra-space-02);
+  min-width: 0;
+}
+
+.invitation-library {
+  font-weight: var(--tempra-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.invitation-from,
+.invitation-access {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+.invitation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tempra-space-08);
+}
+
+@media (max-width: 900px) {
+  .invitation {
+    grid-template-columns: var(--tempra-size-tile) minmax(0, 1fr);
+  }
+
+  .invitation-actions {
+    grid-column: 2;
+  }
+
+  .invitation-actions button {
+    min-height: var(--tempra-size-touch);
+  }
+}
+
+/* ---------- End of Invitations ---------- */
 
 /* ---------- The components' catalogue (/_dev/design, local dev only; TEMPRA-252) ---------- */
 
