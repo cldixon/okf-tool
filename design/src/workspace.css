@@ -1196,7 +1196,9 @@ a.button.pill-button {
   gap: var(--tempra-space-02);
 }
 
-/* A row in the sidebar: a glyph, a name, a count or mark at the end. */
+/* A row in the sidebar: a glyph, a name, a count or mark at the end. As the tree's rows, it is
+   marked by its text, not a fill (TEMPRA-310): muted at rest, the text colour when current or
+   hovered, its glyph with it. */
 .nav-row {
   display: flex;
   align-items: center;
@@ -1207,26 +1209,21 @@ a.button.pill-button {
   border: 0;
   border-radius: var(--tempra-radius-row);
   background: transparent;
-  color: var(--tempra-color-text);
+  color: var(--tempra-color-muted);
   font-size: var(--tempra-text-ui);
   text-align: left;
   text-decoration: none;
 }
 
 .nav-row:visited {
-  color: var(--tempra-color-text);
+  color: var(--tempra-color-muted);
 }
 
 .nav-row:hover,
-.nav-row:hover:not(:disabled) {
-  background: var(--tempra-color-hover);
-  color: var(--tempra-color-text);
-}
-
+.nav-row:hover:not(:disabled),
 .nav-row[aria-current="page"],
 .nav-row[aria-current="location"] {
-  background: var(--tempra-color-selected);
-  font-weight: var(--tempra-weight-medium);
+  color: var(--tempra-color-text);
 }
 
 .nav-row svg {
@@ -1244,7 +1241,9 @@ a.button.pill-button {
 /* The tree: nested lists, one row per folder or file, indented a step a level. A folder's row is
    one button that opens and closes it (TEMPRA-138): its name as a section's label and its chevron
    (turning) at the row's end, as Linear's docs draw it (TEMPRA-277), no count; a page's or a
-   file's row is a link, a file's with a small icon. */
+   file's row is a link, a file's with a small icon. A row is marked by its text, not a fill, as
+   Linear's docs do (TEMPRA-310): a page's or a file's name rests muted, and the current page's,
+   or a hovered one's, is the text colour, in the same weight. */
 .tree,
 .tree ul {
   margin: 0;
@@ -1270,10 +1269,6 @@ a.button.pill-button {
   border-radius: var(--tempra-radius-row);
   font-size: var(--tempra-text-ui);
   white-space: nowrap;
-}
-
-.tree-row:hover {
-  background: var(--tempra-color-hover);
 }
 
 /* The whole row takes a click or a tap (P-2, TEMPRA-133): a file's link, or a folder's button,
@@ -1350,13 +1345,15 @@ button.tree-name {
   text-overflow: ellipsis;
 }
 
-.tree-row:has(> [aria-current="page"]) {
-  background: var(--tempra-color-selected);
-}
-
+.tree-row:hover > a,
 .tree-row > a[aria-current="page"] {
   color: var(--tempra-color-text);
-  font-weight: var(--tempra-weight-medium);
+}
+
+/* A file's icon follows its name. */
+.tree-row:hover > .tree-leaf,
+.tree-row:has(> a[aria-current="page"]) > .tree-leaf {
+  color: var(--tempra-color-text);
 }
 
 .tree-leaf {
