@@ -4217,9 +4217,10 @@ async function browserRenders(
       await back("a plain reload");
       // Under 1100px of page the contents keep a narrower column of their own down to 700px
       // (TEMPRA-150), as Linear's docs do: at 1280px and at a 1000px window they are beside the
-      // text, not On this page. Below that they hide (On this page under the byline). At 1280px a
-      // panel takes their column and the text moves over for it: nothing runs under it
-      // (TEMPRA-128, C-5).
+      // text, not On this page. Below that they hide (On this page under the byline). From 960px
+      // of page the right column is a panel's width, open or not: at 1280px a panel takes it and
+      // nothing runs under it (TEMPRA-128, C-5). Opening a panel never moves the text, across,
+      // down or in width, and never brings On this page in under the byline (TEMPRA-301).
       const inline = main.locator(".toc-inline");
       const besideText = async (where: string) => {
         await contentsNav.waitFor({ timeout: 5000 });
@@ -4230,9 +4231,43 @@ async function browserRenders(
           throw new Error(`the contents are not beside the text ${where}`);
         }
       };
+      /** The first paragraph's box: where it starts across and down, and how wide it is. */
+      const firstBox = () =>
+        page.evaluate<string>(`(() => {
+          const r = document.querySelector(".page-view .body .prose p").getBoundingClientRect();
+          return JSON.stringify({ left: r.left, top: r.top, width: r.width });
+        })()`);
+      /**
+       * Each panel opened and closed again: the first paragraph keeps its box exactly, across,
+       * down and wide (TEMPRA-301).
+       */
+      const textStays = async (where: string) => {
+        await contentsNav.waitFor({ timeout: 5000 });
+        await page.waitForTimeout(200);
+        const before = await firstBox();
+        const inlineBefore = await inline.isVisible();
+        for (const [name, open, panelBox] of [
+          ["Comments", openComments, comments],
+          ["Page info", openInfo, infoPanel],
+        ] as const) {
+          await open();
+          await panelBox.waitFor({ timeout: 5000 });
+          await page.waitForTimeout(200);
+          const after = await firstBox();
+          if (after !== before) {
+            throw new Error(`opening ${name} ${where} moved the text from ${before} to ${after}`);
+          }
+          if ((await inline.isVisible()) !== inlineBefore) {
+            throw new Error(`opening ${name} ${where} changed whether On this page shows`);
+          }
+          await page.keyboard.press("Escape");
+          await panelBox.waitFor({ state: "detached", timeout: 5000 });
+        }
+      };
       await page.setViewportSize({ width: 1000, height: 720 });
       try {
         await besideText("at a 1000px window");
+        await textStays("at a 1000px window");
         if (shots) await page.screenshot({ path: `${shots}/contents-1000.png` });
         await page.setViewportSize({ width: 940, height: 720 });
         await contentsNav.waitFor({ state: "hidden", timeout: 5000 });
@@ -4240,9 +4275,11 @@ async function browserRenders(
       } finally {
         await wide();
       }
+      await textStays("at 1600px");
       await usual();
       try {
         await besideText("at 1280px");
+        await textStays("at 1280px");
         await openComments();
         await comments.waitFor({ timeout: 5000 });
         const position = () =>
@@ -4251,10 +4288,12 @@ async function browserRenders(
           );
         if ((await position()) === "fixed") throw new Error("the panel overlays at 1280px");
         await page.waitForTimeout(200);
-        const box = await inline.boundingBox();
+        if (await inline.isVisible())
+          throw new Error("On this page shows beside a panel at 1280px");
+        const text = await main.locator(".page-view .body .prose").boundingBox();
         const side = await comments.boundingBox();
-        if (!box || !side || box.x + box.width > side.x + 1) {
-          throw new Error(`On this page runs under the panel: ${JSON.stringify({ box, side })}`);
+        if (!text || !side || text.x + text.width > side.x + 1) {
+          throw new Error(`the text runs under the panel: ${JSON.stringify({ text, side })}`);
         }
         if (shots) await page.screenshot({ path: `${shots}/panel-1280.png` });
         // Narrower still, the panel overlays the page.
@@ -4267,6 +4306,18 @@ async function browserRenders(
         if (shots) await page.screenshot({ path: `${shots}/panel-narrow.png` });
         await page.keyboard.press("Escape");
         await comments.waitFor({ state: "detached", timeout: 5000 });
+        await textStays("at 1180px");
+        // The sidebar hidden, a 1000px window is a 1000px page: the same (TEMPRA-301).
+        await page.setViewportSize({ width: 1000, height: 720 });
+        await page.keyboard.press("Control+\\");
+        await sidebar.waitFor({ state: "hidden", timeout: 5000 });
+        try {
+          await besideText("at a 1000px window with the sidebar hidden");
+          await textStays("at a 1000px window with the sidebar hidden");
+        } finally {
+          await page.keyboard.press("Control+\\");
+          await sidebar.waitFor({ state: "visible", timeout: 5000 });
+        }
       } finally {
         await wide();
       }
