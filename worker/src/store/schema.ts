@@ -67,6 +67,18 @@ export const DIAGRAM_RENDERS = `
 CREATE TABLE IF NOT EXISTS diagram_renders (key TEXT PRIMARY KEY, error TEXT);
 `;
 
+/**
+ * Partial indexes for queries every write or every `start` runs (TEMPRA-293), so they read only
+ * the rows they count: the library's attachments in R2 for its storage size (checked before a
+ * write and reported after it), and the links with an anchor for the missing-heading lint.
+ * Run on every open, as DIAGRAM_RENDERS is, so older libraries get them.
+ */
+export const COST_INDEXES = `
+CREATE INDEX IF NOT EXISTS blobs_r2_size ON blobs(size) WHERE location = 'r2';
+CREATE INDEX IF NOT EXISTS links_anchored ON links(from_id)
+  WHERE kind = 'body' AND anchor IS NOT NULL AND anchor <> '#';
+`;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
@@ -211,6 +223,7 @@ CREATE INDEX IF NOT EXISTS comments_thread ON comments(thread_id, seq);
 -- Historical snapshots look for each page's last content event; with op in it, this index
 -- covers that query, so it never reads event rows.
 CREATE INDEX IF NOT EXISTS events_content ON events(page_id, seq, op) WHERE op != 'comment';
+${COST_INDEXES}
 ${LEDGER_COUNTS}`;
 
 /** Lint codes no longer reported (tempra-dev: decisions/pages-not-okf), dropped from stored lint. */

@@ -111,8 +111,8 @@ import {
   type ReadSurface,
   readHistory,
 } from "./reads";
-import { DIAGRAM_RENDERS, LEDGER_COUNTS, migrate } from "./schema";
-import type { SqlHandle, SqlValue } from "./sql";
+import { COST_INDEXES, DIAGRAM_RENDERS, LEDGER_COUNTS, migrate } from "./schema";
+import type { SqlHandle, Row as SqlRow, SqlValue } from "./sql";
 
 /** Pages over this many bytes of rendered markdown are refused (spec: the page format). */
 export const DEFAULT_PAGE_CAP = 100 * 1024;
@@ -814,6 +814,7 @@ export class LibraryStore {
     this.stemSearch();
     this.addBlobDimensions();
     this.sql.script(DIAGRAM_RENDERS);
+    this.sql.script(COST_INDEXES);
     this.addExternalImageFlags();
     this.addReadHistory();
     this.addThreadKinds();
@@ -985,10 +986,16 @@ export class LibraryStore {
    * definition, so a new library (created stemmed) does nothing.
    */
   private stemSearch() {
+    // Known once (TEMPRA-293): reading sqlite_master on every open reads its every row.
+    if (this.sql.all("SELECT 1 FROM meta WHERE key = 'fts_stemmed'").length > 0) return;
     const def = this.sql.all<{ sql: string }>(
       "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'fts'",
     )[0]?.sql;
-    if (!def || /porter/i.test(def)) return;
+    if (!def) return;
+    if (/porter/i.test(def)) {
+      this.sql.run("INSERT OR IGNORE INTO meta (key, value) VALUES ('fts_stemmed', '1')");
+      return;
+    }
     try {
       this.sql.transaction(() => {
         this.sql.script(
@@ -1000,6 +1007,7 @@ export class LibraryStore {
         this.sql.script("DROP TABLE fts; ALTER TABLE fts_stemmed RENAME TO fts;");
         this.sql.run("DELETE FROM fts_rows");
         this.sql.run("INSERT INTO fts_rows (page_id, fts_rowid) SELECT page_id, rowid FROM fts");
+        this.sql.run("INSERT OR IGNORE INTO meta (key, value) VALUES ('fts_stemmed', '1')");
       });
     } catch (e) {
       // Rolled back: the library keeps its unstemmed search, which still works, rather than
@@ -1113,6 +1121,9 @@ export class LibraryStore {
 
   /** How many files the library holds now (pages and attachments), for the DO's timing line. */
   fileCount(): number {
+    // The head snapshot the call just used, when there is one (TEMPRA-293): a count reads every path.
+    const snap = this.snapshots.get(this.headSeq());
+    if (snap) return snap.byPath.size;
     return this.sql.all<{ n: number }>("SELECT COUNT(*) AS n FROM paths")[0]?.n ?? 0;
   }
 
@@ -1423,52 +1434,55 @@ export class LibraryStore {
    * committed, in the same call, so the Worker needs no second trip (TEMPRA-116).
    */
   private writeNotice(before: number): WriteNotice {
-    const changed = this.sql
-      .all<{ page_id: string; path: string }>(
-        `SELECT page_id, path FROM events WHERE seq IN (
-           SELECT MAX(seq) FROM events WHERE seq > ? AND ${CONTENT_EVENT} GROUP BY page_id)
-         ORDER BY seq LIMIT ${NOTICE_PAGES}`,
-        before,
-      )
-      .flatMap((e) => {
-        const row = this.sql.all<{ path: string; kind: string }>(
-          "SELECT path, kind FROM paths WHERE page_id = ?",
-          e.page_id,
-        )[0];
-        if (row && row.kind !== "page") return [];
-        if (!row && !e.path.endsWith(".md")) return [];
-        const c = this.sql.all<{ title: string | null }>(
-          "SELECT title FROM pages WHERE page_id = ?",
-          e.page_id,
-        )[0];
-        const verifiers = row
-          ? this.sql
-              .all<{ person: string | null; actor: string; seq: number }>(
-                `SELECT json_extract(e.meta, '$.by.person') AS person, v.by AS actor, MAX(v.seq) AS seq
+    // Only the write's own events, by their seq (TEMPRA-293): grouping by page in SQL walked an
+    // index over every event in the library. Each page's last one, in seq order.
+    const last = new Map<string, { page_id: string; path: string }>();
+    for (const e of this.sql.all<{ page_id: string; path: string }>(
+      `SELECT page_id, path FROM events WHERE seq > ? AND ${CONTENT_EVENT} ORDER BY seq`,
+      before,
+    )) {
+      last.delete(e.page_id);
+      last.set(e.page_id, e);
+    }
+    const changed = [...last.values()].slice(0, NOTICE_PAGES).flatMap((e) => {
+      const row = this.sql.all<{ path: string; kind: string }>(
+        "SELECT path, kind FROM paths WHERE page_id = ?",
+        e.page_id,
+      )[0];
+      if (row && row.kind !== "page") return [];
+      if (!row && !e.path.endsWith(".md")) return [];
+      const c = this.sql.all<{ title: string | null }>(
+        "SELECT title FROM pages WHERE page_id = ?",
+        e.page_id,
+      )[0];
+      const verifiers = row
+        ? this.sql
+            .all<{ person: string | null; actor: string; seq: number }>(
+              `SELECT json_extract(e.meta, '$.by.person') AS person, v.by AS actor, MAX(v.seq) AS seq
                  FROM verifications v JOIN events e ON e.seq = v.seq
                  WHERE v.page_id = ? AND v.by LIKE 'human:%'
                  GROUP BY COALESCE(json_extract(e.meta, '$.by.person'), v.by)`,
-                e.page_id,
-              )
-              .flatMap((v) => {
-                const changes =
-                  this.sql.all<{ n: number }>(
-                    `SELECT COUNT(*) AS n FROM events WHERE page_id = ? AND seq > ? AND ${CONTENT_EVENT}`,
-                    e.page_id,
-                    v.seq,
-                  )[0]?.n ?? 0;
-                return changes > 0 ? [{ person: v.person, actor: v.actor, changes }] : [];
-              })
-          : [];
-        return [
-          {
-            path: row?.path ?? e.path,
-            title: c?.title ?? null,
-            deleted: !row,
-            verifiers,
-          },
-        ];
-      });
+              e.page_id,
+            )
+            .flatMap((v) => {
+              const changes =
+                this.sql.all<{ n: number }>(
+                  `SELECT COUNT(*) AS n FROM events WHERE page_id = ? AND seq > ? AND ${CONTENT_EVENT}`,
+                  e.page_id,
+                  v.seq,
+                )[0]?.n ?? 0;
+              return changes > 0 ? [{ person: v.person, actor: v.actor, changes }] : [];
+            })
+        : [];
+      return [
+        {
+          path: row?.path ?? e.path,
+          title: c?.title ?? null,
+          deleted: !row,
+          verifiers,
+        },
+      ];
+    });
     const verified = this.sql.all<{ path: string; person: string | null; actor: string }>(
       `SELECT COALESCE(p.path, e.path) AS path, json_extract(e.meta, '$.by.person') AS person,
               e.actor
@@ -1747,9 +1761,12 @@ export class LibraryStore {
     const stored = new Map(
       this.sql
         .all<{ page_id: string; detail: string }>(
-          `SELECT page_id, detail FROM flags WHERE kind = 'structure'${
-            keys ? " AND page_id IN (SELECT value FROM json_each(?))" : ""
-          }`,
+          // In scope, each key is looked up by the flags' primary key (TEMPRA-293); the kind's
+          // index would walk every structure flag in the library.
+          keys
+            ? `SELECT f.page_id, f.detail FROM json_each(?) j
+               CROSS JOIN flags f ON f.page_id = j.value AND f.kind = 'structure'`
+            : "SELECT page_id, detail FROM flags WHERE kind = 'structure'",
           ...(keys ? [JSON.stringify(keys)] : []),
         )
         .map((f) => [f.page_id, f.detail]),
@@ -1884,7 +1901,9 @@ export class LibraryStore {
       });
       this.setPath(path, pageId, hash, "page", seq, cur?.created_seq ?? seq);
       this.indexPage(pageId, path, built.record, built.lint, seq);
-      this.healLinksTo(w, path, pageId);
+      // Only a path that is new here can mend links to it (TEMPRA-293): a new version at the same
+      // path leaves every inbound link's target as it was, so their pages need no refresh.
+      if (!cur) this.healLinksTo(w, path, pageId);
     }
     if (w.mode === "import") {
       for (const v of built.verified) {
@@ -2660,27 +2679,25 @@ export class LibraryStore {
       JSON.stringify(extra),
       JSON.stringify(lint),
     );
+    // Tags, links and sources: only the rows that changed are written (TEMPRA-293). Deleting and
+    // inserting them all rewrote a page's every source and link on a one-word edit.
     const tags = tagsOf(r);
-    this.sql.run("DELETE FROM tags WHERE page_id = ?", id);
-    for (const t of new Set(tags))
-      this.sql.run("INSERT INTO tags (page_id, tag) VALUES (?, ?)", id, t);
-
-    this.sql.run("DELETE FROM links WHERE from_id = ?", id);
-    for (const [l, kind] of linkGraph(r)) {
-      this.sql.run(
-        "INSERT INTO links (from_id, to_id, to_path, anchor, form, raw, kind) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        id,
-        l.target,
-        l.path,
-        l.anchor,
-        l.form,
-        l.raw,
-        kind,
-      );
-    }
-
-    this.sql.run("DELETE FROM sources WHERE page_id = ?", id);
+    this.syncRows(
+      "tags",
+      "page_id",
+      id,
+      ["tag"],
+      [...new Set(tags)].map((t) => [t]),
+    );
+    this.syncRows(
+      "links",
+      "from_id",
+      id,
+      ["to_id", "to_path", "anchor", "form", "raw", "kind"],
+      linkGraph(r).map(([l, kind]) => [l.target, l.path, l.anchor, l.form, l.raw, kind]),
+    );
     const sources = field(r, "sources");
+    const sourceRows: SqlValue[][] = [];
     if (Array.isArray(sources)) {
       const counts = scanDoc(r.doc, path).footnoteCounts;
       sources.forEach((s, i) => {
@@ -2688,16 +2705,15 @@ export class LibraryStore {
         const resource = str(s.resource);
         if (!resource) return;
         const sid = str(s.id);
-        this.sql.run(
-          "INSERT INTO sources (page_id, id, resource, internal_id, cited) VALUES (?, ?, ?, ?, ?)",
-          id,
+        sourceRows.push([
           sid,
           resource,
           r.sources?.find((x) => x.index === i)?.target ?? null,
           sid ? (counts.get(sid) ?? 0) : 0,
-        );
+        ]);
       });
     }
+    this.syncRows("sources", "page_id", id, ["id", "resource", "internal_id", "cited"], sourceRows);
 
     this.dropSearchRow(id);
     this.sql.run(
@@ -2714,6 +2730,41 @@ export class LibraryStore {
     // Only a new stale_after moves the clock (TEMPRA-63): any other write leaves the flags as
     // the staleness process last set them.
     if (!before || before.stale_after !== staleAfter) this.setStaleFlag(id, staleAfter, seq);
+  }
+
+  /**
+   * Makes a page's rows in `table` (keyed by `key` = `id`) the given `rows` of `cols`, writing
+   * only the difference (TEMPRA-293): rows already there stay, missing ones are inserted and
+   * extra ones deleted, matched as a multiset. Order is not kept, and nothing reads these
+   * tables in insertion order.
+   */
+  private syncRows(table: string, key: string, id: string, cols: string[], rows: SqlValue[][]) {
+    const sig = (r: SqlValue[]) => JSON.stringify(r);
+    const want = new Map<string, SqlValue[][]>();
+    for (const r of rows) {
+      const k = sig(r);
+      const list = want.get(k);
+      if (list) list.push(r);
+      else want.set(k, [r]);
+    }
+    const stale: number[] = [];
+    for (const have of this.sql.all<SqlRow>(
+      `SELECT rowid AS rid, ${cols.join(", ")} FROM ${table} WHERE ${key} = ?`,
+      id,
+    )) {
+      const k = sig(cols.map((c) => have[c] ?? null));
+      const list = want.get(k);
+      if (list && list.length > 0) list.pop();
+      else stale.push(Number(have.rid));
+    }
+    if (stale.length > 0) {
+      this.sql.run(
+        `DELETE FROM ${table} WHERE rowid IN (SELECT value FROM json_each(?))`,
+        JSON.stringify(stale),
+      );
+    }
+    const insert = `INSERT INTO ${table} (${key}, ${cols.join(", ")}) VALUES (${["?", ...cols.map(() => "?")].join(", ")})`;
+    for (const list of want.values()) for (const r of list) this.sql.run(insert, id, ...r);
   }
 
   /** Sets a page's stale or stale_soon flag from its `stale_after`, clearing the other. */
@@ -2786,26 +2837,32 @@ export class LibraryStore {
       "SELECT lint FROM pages WHERE page_id = ?",
       id,
     )[0];
+    // Written only when it changed (TEMPRA-293): a write refreshes every page linking to it.
     if (stored) {
       const others = (JSON.parse(stored.lint ?? "[]") as LintWarning[]).filter(
         (l) => l.code !== "broken_link",
       );
-      this.sql.run(
-        "UPDATE pages SET lint = ? WHERE page_id = ?",
-        JSON.stringify([...others, ...lint]),
-        id,
-      );
+      const next = JSON.stringify([...others, ...lint]);
+      if (next !== (stored.lint ?? "[]")) {
+        this.sql.run("UPDATE pages SET lint = ? WHERE page_id = ?", next, id);
+      }
     }
+    const flag = this.sql.all<{ detail: string | null }>(
+      "SELECT detail FROM flags WHERE page_id = ? AND kind = 'broken_link'",
+      id,
+    )[0];
     if (lint.length === 0) {
-      this.sql.run("DELETE FROM flags WHERE page_id = ? AND kind = 'broken_link'", id);
+      if (flag) this.sql.run("DELETE FROM flags WHERE page_id = ? AND kind = 'broken_link'", id);
       return [];
     }
+    const detail = JSON.stringify(broken.map((b) => b.to_path));
+    if (flag?.detail === detail) return lint;
     this.sql.run(
       `INSERT INTO flags (page_id, kind, since_seq, detail) VALUES (?, 'broken_link', ?, ?)
        ON CONFLICT(page_id, kind) DO UPDATE SET detail = excluded.detail`,
       id,
       this.headSeq(),
-      JSON.stringify(broken.map((b) => b.to_path)),
+      detail,
     );
     return lint;
   }
@@ -5361,7 +5418,8 @@ export class LibraryStore {
   /** Maintainer bookkeeping (last run, cursors) kept in the meta table under `maint:`. */
   maintenance(): Record<string, string> {
     const rows = this.sql.all<{ key: string; value: string }>(
-      "SELECT key, value FROM meta WHERE key LIKE 'maint:%'",
+      // A range on the key, which its index serves; LIKE would read every meta row (TEMPRA-293).
+      "SELECT key, value FROM meta WHERE key >= 'maint:' AND key < 'maint;'",
     );
     return Object.fromEntries(rows.map((r) => [r.key.slice(6), r.value]));
   }

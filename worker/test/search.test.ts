@@ -77,6 +77,8 @@ describe("search (TEMPRA-17)", () => {
     lib.db.run("ALTER TABLE fts_old RENAME TO fts");
     lib.db.run("DELETE FROM fts_rows");
     lib.db.run("INSERT INTO fts_rows (page_id, fts_rowid) SELECT page_id, rowid FROM fts");
+    // A library from before has no marker that its search is stemmed (TEMPRA-293).
+    lib.db.run("DELETE FROM meta WHERE key = 'fts_stemmed'");
     // Unstemmed, "commenting" matches nothing (opening a store would upgrade it, so ask SQL).
     const before = lib.db
       .query("SELECT COUNT(*) AS n FROM fts WHERE fts MATCH 'commenting'")
