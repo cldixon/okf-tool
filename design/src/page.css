@@ -983,6 +983,32 @@
   font-weight: var(--tempra-weight-regular);
 }
 
+/* Current version (TEMPRA-309): the latest version's whole note, up to three lines; then Earlier
+   versions, a disclosure listing the rest (one line each, as before). */
+.page-info-versions .latest-version .version-note {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.page-info-versions .earlier-toggle {
+  margin-top: var(--tempra-space-04);
+}
+
+.page-info-versions .earlier-versions {
+  margin-top: var(--tempra-space-04);
+}
+
+@media (max-width: 900px) {
+  .page-info-versions .earlier-toggle {
+    min-height: var(--tempra-size-touch);
+  }
+}
+
 .menu-list .menu-count {
   margin-left: auto;
   padding-left: var(--tempra-space-12);

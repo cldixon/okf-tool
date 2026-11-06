@@ -2828,6 +2828,24 @@ async function browserRenders(
         // an earlier one at ?at=<it>&since=<the one before>, the latest at ?since=<the one before>.
         const changed = historyPanel.locator('a.version[href*="since="]');
         await changed.first().waitFor({ timeout: 10_000 });
+        // Current version alone at first (TEMPRA-309); Earlier versions (n) opens the rest.
+        const earlier = historyPanel.getByRole("button", { name: /^Earlier versions/ });
+        if ((await earlier.count()) > 0) {
+          if ((await earlier.getAttribute("aria-expanded")) !== "false") {
+            throw new Error("Earlier versions starts open on the latest version");
+          }
+          if ((await historyPanel.locator("#page-info-earlier").count()) > 0) {
+            throw new Error("earlier versions show before they are asked for");
+          }
+          await earlier.click();
+          await historyPanel
+            .locator("#page-info-earlier a.version")
+            .first()
+            .waitFor({ timeout: 5000 });
+          if ((await earlier.getAttribute("aria-expanded")) !== "true") {
+            throw new Error("Earlier versions does not say it is open");
+          }
+        }
         if ((await historyPanel.getByText(/verif/i).count()) > 0) {
           throw new Error("Page info's versions show verification");
         }
@@ -4182,7 +4200,7 @@ async function browserRenders(
         .first()
         .waitFor();
       const heads = await infoPanel.locator(".page-info-section > h3").allInnerTexts();
-      if (JSON.stringify(heads) !== JSON.stringify(["About this page", "Versions"])) {
+      if (JSON.stringify(heads) !== JSON.stringify(["About this page", "Current version"])) {
         throw new Error(`Page info's sections: ${JSON.stringify(heads)}`);
       }
       const said = await infoPanel.innerText();

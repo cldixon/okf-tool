@@ -8,6 +8,7 @@
     CommentMark,
     ComposeDialog,
     Dialog,
+    Disclosure,
     Field,
     type Glyph,
     ICONS,
@@ -51,6 +52,7 @@
       compose: false,
       clicks: 0,
       who: "everyone",
+      more: false,
     },
     dark: {
       tab: "open",
@@ -60,6 +62,7 @@
       compose: false,
       clicks: 0,
       who: "everyone",
+      more: false,
     },
   });
 </script>
@@ -121,6 +124,13 @@
     </SplitButton>
   {/snippet}
   {@render item("SplitButton", splitButtons)}
+
+  {#snippet disclosures()}
+    <Disclosure label="Earlier versions" count={7} bind:open={s.more} />
+    <Disclosure label="Open" count={3} open />
+    <Disclosure label="No count" />
+  {/snippet}
+  {@render item("Disclosure", disclosures)}
 
   {#snippet search()}<SearchButton shortcut="Ctrl K" />{/snippet}
   {@render item("SearchButton", search)}

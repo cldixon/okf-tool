@@ -7,6 +7,7 @@ import {
   Chip,
   CommentMark,
   Dialog,
+  Disclosure,
   Field,
   Icon,
   IconButton,
@@ -162,6 +163,39 @@ describe("buttons", () => {
     expect(more.getAttribute("aria-expanded")).toBe("true");
     expect(one(wrap, ".menu-list.end .menu-item").textContent).toBe("View Markdown");
     d.destroy();
+  });
+
+  test("Disclosure (TEMPRA-309): a chevron, the label and its count; aria-expanded follows a press", () => {
+    const told: boolean[] = [];
+    const d = draw(Disclosure, {
+      label: "Earlier versions",
+      count: 7,
+      controls: "earlier",
+      class: "earlier-toggle",
+      onchange: (open: boolean) => told.push(open),
+    });
+    const b = one(d.host, "button.disclosure") as HTMLButtonElement;
+    expect(b.classList.contains("earlier-toggle")).toBe(true);
+    expect(b.getAttribute("type")).toBe("button");
+    expect(b.getAttribute("aria-expanded")).toBe("false");
+    expect(b.getAttribute("aria-controls")).toBe("earlier");
+    expect(b.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(one(b, ".disclosure-label").textContent).toBe("Earlier versions");
+    expect(one(b, ".disclosure-count").textContent).toBe("7");
+    b.click();
+    flushSync();
+    expect(b.getAttribute("aria-expanded")).toBe("true");
+    b.click();
+    flushSync();
+    expect(b.getAttribute("aria-expanded")).toBe("false");
+    expect(told).toEqual([true, false]);
+    d.destroy();
+    // No count at 0; open from the start when asked.
+    const none = draw(Disclosure, { label: "More", count: 0, open: true });
+    const n = one(none.host, "button.disclosure");
+    expect(n.querySelector(".disclosure-count")).toBeNull();
+    expect(n.getAttribute("aria-expanded")).toBe("true");
+    none.destroy();
   });
 
   test("IconButton: named by its label, a toggle when pressed, a touch area", () => {
@@ -542,6 +576,7 @@ describe("the catalogue (/_dev/design)", () => {
         "ToolPill",
         "IconButton",
         "SplitButton",
+        "Disclosure",
         "SearchButton",
         "Field and TextInput",
         "SearchField",
