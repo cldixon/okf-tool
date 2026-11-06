@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Segmented } from "@tempra/design/components";
+  import { Button, Segmented } from "@tempra/design/components";
   import { api, field, post } from "../api";
   import { useAction, useLoad } from "../load.svelte.ts";
   import { useRole } from "../role.svelte.ts";
@@ -79,9 +79,7 @@
   <p>Every page and file as they are now, as one .tar bundle.</p>
   <!-- A plain link: the browser downloads the signed export link it redirects to. -->
   <p><Segmented label="Format" options={formats} bind:value={format} /></p>
-  <a class="button primary" href={urls.exportTar(undefined, format === "okf" ? "okf" : undefined)}
-    >Download .tar</a
-  >
+  <Button variant="primary" href={urls.exportTar(undefined, format === "okf" ? "okf" : undefined)}>Download .tar</Button>
 </div>
 <div class="panel-box">
   <h3>Import</h3>
@@ -105,7 +103,7 @@
     <p>
       <input type="text" name="note" aria-label="Note" placeholder="Note (optional)" />
     </p>
-    <button class="primary" type="submit" disabled={action.busy}>Import</button>
+    <Button variant="primary" type="submit" disabled={action.busy}>Import</Button>
   </form>
 </div>
 <Status loaded={loaded.current}>
@@ -141,7 +139,7 @@
           </table>
         </div>
       {/if}
-      <button type="button" disabled={action.busy} onclick={() => void exportNow()}>Export now</button>
+      <Button disabled={action.busy} onclick={() => void exportNow()}>Export now</Button>
     </div>
   {/snippet}
 </Status>

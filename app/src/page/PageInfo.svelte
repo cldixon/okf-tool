@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { useAgentNames } from "../agents.svelte.ts";
   import { day } from "../ui";
   import type { Urls } from "../urls";
@@ -62,15 +63,12 @@
 
 {#if props.live || checkSays}<ul class="page-info-now">
     {#if props.live}<li class="page-info-newer"
-        ><span class="agent-dot" aria-hidden="true"></span><span class="grow" title={newerNote || undefined}>A newer version{newerBy ? ` by ${newerBy}` : ""}</span><button
-          type="button"
-          onclick={() => props.live?.onSwap()}>Show it</button
-        ></li
+        ><span class="agent-dot" aria-hidden="true"></span><span class="grow" title={newerNote || undefined}>A newer version{newerBy ? ` by ${newerBy}` : ""}</span><Button onclick={() => props.live?.onSwap()}>Show it</Button></li
       >{/if}{#if props.current}{#if s.verified && s.since > 0}<li class="page-info-check"
-          ><span class="grow">{changesSince(s, props.name)}</span>{#if !props.reviewing}<a class="button" href={props.urls.review(props.page.path)}>Show changes</a>{/if}</li
+          ><span class="grow">{changesSince(s, props.name)}</span>{#if !props.reviewing}<Button href={props.urls.review(props.page.path)}>Show changes</Button>{/if}</li
         >{:else if s.verified && who}<li class="page-info-check muted">Checked by {who}, {day(s.verified.event.ts)}</li
         >{:else if !s.verified && props.mayVerify && !props.reviewing}<li class="page-info-check"
-          ><span class="grow muted">Nobody has checked this page</span><button type="button" disabled={check.busy} onclick={() => check.check()}>Mark as checked</button></li
+          ><span class="grow muted">Nobody has checked this page</span><Button disabled={check.busy} onclick={() => check.check()}>Mark as checked</Button></li
         >{/if}{#if check.error}<li class="small warn">{check.error}</li>{/if}{/if}
   </ul>{/if}<section class="page-info-section" aria-labelledby="page-info-about"
   ><h3 id="page-info-about">About this page</h3

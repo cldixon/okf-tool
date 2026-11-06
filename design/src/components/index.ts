@@ -11,6 +11,7 @@ import type { Component } from "svelte";
 import AvatarMarkC from "./AvatarMark.svelte";
 import BadgeC from "./Badge.svelte";
 import ButtonC from "./Button.svelte";
+import ChangeRowC from "./ChangeRow.svelte";
 import ChipC from "./Chip.svelte";
 import CommentMarkC from "./CommentMark.svelte";
 import ComposeDialogC from "./ComposeDialog.svelte";
@@ -26,6 +27,7 @@ import PillButtonC from "./PillButton.svelte";
 import SearchButtonC from "./SearchButton.svelte";
 import SearchFieldC from "./SearchField.svelte";
 import SegmentedC from "./Segmented.svelte";
+import SelectC from "./Select.svelte";
 import SplitButtonC from "./SplitButton.svelte";
 import TextInputC from "./TextInput.svelte";
 import TileC from "./Tile.svelte";
@@ -34,6 +36,7 @@ import type {
   AvatarMarkProps,
   BadgeProps,
   ButtonProps,
+  ChangeRowProps,
   ChipProps,
   CommentMarkProps,
   ComposeDialogProps,
@@ -49,6 +52,7 @@ import type {
   SearchButtonProps,
   SearchFieldProps,
   SegmentedProps,
+  SelectProps,
   SplitButtonProps,
   TextInputProps,
   TileProps,
@@ -66,6 +70,7 @@ export type * from "./types";
 export const AvatarMark = AvatarMarkC as Component<AvatarMarkProps>;
 export const Badge = BadgeC as Component<BadgeProps>;
 export const Button = ButtonC as Component<ButtonProps>;
+export const ChangeRow = ChangeRowC as Component<ChangeRowProps>;
 export const Chip = ChipC as Component<ChipProps>;
 export const CommentMark = CommentMarkC as Component<CommentMarkProps>;
 export const ComposeDialog = ComposeDialogC as Component<ComposeDialogProps>;
@@ -86,3 +91,4 @@ export const Tile = TileC as Component<TileProps>;
 export const ToolPill = ToolPillC as Component<ToolPillProps>;
 
 export const Segmented = SegmentedC as Component<SegmentedProps, NoExports, "value">;
+export const Select = SelectC as Component<SelectProps, NoExports, "value">;

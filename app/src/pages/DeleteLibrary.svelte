@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { field, post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import type { Urls } from "../urls";
@@ -35,6 +36,6 @@
     </label>
   </p>
   <p>
-    <button type="submit" disabled={action.busy}>Delete library</button>
+    <Button type="submit" disabled={action.busy}>Delete library</Button>
   </p>
 </form>

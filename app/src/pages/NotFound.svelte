@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from "@tempra/design/components";
+  import { Button, Icon } from "@tempra/design/components";
   import { actorText } from "../agents";
   import { useActors } from "../agents.svelte.ts";
   import { ApiError, api } from "../api";
@@ -53,7 +53,7 @@
       >{/if}{#if f?.kind === "deleted"}<p class="not-found-fate"
         ><span>Deleted by {who}, <Moment ts={f.ts} /></span><a href={urls.activity({ view: "events", q: path })}>In Activity</a></p
       >{/if}<p class="not-found-ways"
-      ><a class="button" href={urls.tree("")}>Home</a><button type="button" onclick={() => frame.search()}><Icon name="search" /> Search</button></p
+      ><Button href={urls.tree("")}>Home</Button><Button onclick={() => frame.search()}><Icon name="search" /> Search</Button></p
     ></div
   ></PageColumn
 >

@@ -18,6 +18,8 @@ export type IconProps = { name: Glyph; size?: number };
 export type ButtonProps = {
   variant?: "default" | "primary" | "ghost";
   type?: "button" | "submit" | "reset";
+  /** A link drawn as a button (`a.button`); `type` and `disabled` are a button's only. */
+  href?: string;
   disabled?: boolean;
   onclick?: (e: MouseEvent) => void;
   children: Snippet;
@@ -174,4 +176,35 @@ export type PanelHeadProps = {
 export type CommentMarkProps = {
   count: number;
   onclick?: (e: MouseEvent) => void;
+} & Rest;
+
+export type SelectOption<V extends string = string> = { value: V; label: string };
+
+export type SelectProps<V extends string = string> = {
+  /** The choices, in order; a `group` is an `<optgroup>` of its own. */
+  options: readonly (SelectOption<V> | { group: string; options: readonly SelectOption<V>[] })[];
+  value?: V;
+  /** The accessible name, when no visible label names it. */
+  label?: string;
+  /** `pill` for a filter row (the default), `plain` for a form's field. */
+  variant?: "pill" | "plain";
+  name?: string;
+  disabled?: boolean;
+  /** Hears a choice; putting `e.currentTarget.value` back keeps the value (a change to confirm). */
+  onchange?: (value: V, e: Event & { currentTarget: HTMLSelectElement }) => void;
+} & Rest;
+
+export type ChangeRowProps = {
+  /** At the left: the avatar of who changed it. */
+  lead?: Snippet;
+  /** The line: who did what. */
+  children: Snippet;
+  /** Under the line: a note, the pages touched, where and by whom. */
+  detail?: Snippet;
+  /** At the right: when. */
+  when?: Snippet;
+  /** A further row of the same person's run: no lead, no rule above. */
+  continued?: boolean;
+  /** An agent writing now. */
+  live?: boolean;
 } & Rest;

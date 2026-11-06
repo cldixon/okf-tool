@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import type { Snippet } from "svelte";
   import { type LedgerRequest, REQUESTS_PAGE, type RequestPage } from "../activity";
   import { api } from "../api";
@@ -45,6 +46,6 @@
 {@render children(older.items, older.next !== null)}
 {#if older.next !== null}
   <p class="view-more">
-    <button type="button" onclick={older.loadOlder} disabled={older.paging}>{older.paging ? "Loading…" : "Older"}</button>
+    <Button onclick={older.loadOlder} disabled={older.paging}>{older.paging ? "Loading…" : "Older"}</Button>
   </p>
 {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { ApiError, api, field, post } from "../api";
   import { useTitleOf } from "../frame.svelte.ts";
   import { useAction, useLoad } from "../load.svelte.ts";
@@ -61,10 +62,7 @@
             Note <input type="text" name="note" defaultValue={`Restore version ${v.n}`} />
           </label>
           <p class="actions">
-            <button class="primary" type="submit" disabled={action.busy}>Restore</button><a
-              class="button"
-              href={props.urls.pinned(undefined).file(props.path)}>Cancel</a
-            >
+            <Button variant="primary" type="submit" disabled={action.busy}>Restore</Button><Button href={props.urls.pinned(undefined).file(props.path)}>Cancel</Button>
           </p>
         </form>
       </div>

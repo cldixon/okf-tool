@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon, Notice, Segmented } from "@tempra/design/components";
+  import { Notice, PillButton, Segmented } from "@tempra/design/components";
   import { activityKey, loadActivity } from "../activity";
   import { useLiveWrites } from "../activity.svelte.ts";
   import { useFeed, useTrailing } from "../live.svelte.ts";
@@ -76,7 +76,8 @@
   );
 </script>
 
-<PageColumn>
+<!-- Every event is a table, so it takes the wide column (TEMPRA-288). -->
+<PageColumn wide={view === "events"}>
   <header class="view-head">
     <div class="view-head-main">
       <h1 class="view-title">Activity</h1>
@@ -104,7 +105,7 @@
     />
     {#if view === "events"}
       <EventFilters kind={filters.kind ?? ""} q={filters.q ?? ""} onChange={(change) => go(change)} />
-      <a class="button activity-download" href={urls.ledgerJsonl()} download><Icon name="download" />Download</a>
+      <PillButton class="activity-download" icon="download" label="Download" href={urls.ledgerJsonl()} download />
     {/if}
   </div>
   <Status loaded={loaded.current}>

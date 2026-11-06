@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { field, post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import { librariesChanged } from "../role";
@@ -64,7 +65,7 @@
         </p>
         <p class="small muted">The library's address stays {urls.owner}/{urls.slug}.</p>
         <p>
-          <button type="submit" class="primary" disabled={action.busy}>Save</button>
+          <Button variant="primary" type="submit" disabled={action.busy}>Save</Button>
         </p>
       </form>
     {/key}

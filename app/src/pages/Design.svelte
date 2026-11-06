@@ -3,6 +3,7 @@
     AvatarMark,
     Badge,
     Button,
+    ChangeRow,
     Chip,
     CommentMark,
     ComposeDialog,
@@ -20,6 +21,7 @@
     SearchButton,
     SearchField,
     Segmented,
+    Select,
     SplitButton,
     TextInput,
     Tile,
@@ -41,8 +43,24 @@
   type Theme = "light" | "dark";
   const GLYPHS = Object.keys(ICONS) as Glyph[];
   const state = $state({
-    light: { tab: "open", text: "", search: "", dialog: false, compose: false, clicks: 0 },
-    dark: { tab: "open", text: "", search: "", dialog: false, compose: false, clicks: 0 },
+    light: {
+      tab: "open",
+      text: "",
+      search: "",
+      dialog: false,
+      compose: false,
+      clicks: 0,
+      who: "everyone",
+    },
+    dark: {
+      tab: "open",
+      text: "",
+      search: "",
+      dialog: false,
+      compose: false,
+      clicks: 0,
+      who: "everyone",
+    },
   });
 </script>
 
@@ -134,6 +152,43 @@
     />
   {/snippet}
   {@render item("Segmented", segmented)}
+
+  {#snippet selects()}
+    <Select
+      label="Who"
+      bind:value={s.who}
+      options={[
+        { value: "everyone", label: "Anyone" },
+        { value: "agents", label: "Agents" },
+        { group: "Who worked here", options: [{ value: "actor:x", label: "Claude Code for @dev" }] },
+      ]}
+    />
+    <Select variant="plain" label="Access" value="read" options={[{ value: "read", label: "Read and comment" }]} />
+    <Select label="Disabled" value="a" disabled options={[{ value: "a", label: "Disabled" }]} />
+  {/snippet}
+  {@render item("Select", selects)}
+
+  {#snippet changeRows()}
+    <div class="activity-day">
+      <ChangeRow>
+        {#snippet lead()}<AvatarMark kind="agent" initials="C" />{/snippet}
+        Claude Code for @dev edited <a href="#change-row">Revenue</a>
+        {#snippet detail()}<q class="entry-note">Tightened the definition</q>{/snippet}
+        {#snippet when()}14 min ago{/snippet}
+      </ChangeRow>
+      <ChangeRow continued>
+        {#snippet lead()}<AvatarMark kind="agent" initials="C" />{/snippet}
+        Added <a href="#change-row">Gross margin</a>
+        {#snippet when()}20 min ago{/snippet}
+      </ChangeRow>
+      <ChangeRow live>
+        {#snippet lead()}<AvatarMark kind="agent" initials="C" />{/snippet}
+        Claude Code for @dev is editing <a href="#change-row">Revenue</a>
+        {#snippet when()}<span class="entry-now"><span class="change-dot live" aria-hidden="true"></span>now</span>{/snippet}
+      </ChangeRow>
+    </div>
+  {/snippet}
+  {@render item("ChangeRow", changeRows)}
 
   {#snippet notices()}
     <Notice>Could not save: the server answered 500.</Notice>

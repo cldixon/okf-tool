@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import type { Compare } from "../router";
   import { day } from "../ui";
   import type { Urls } from "../urls";
@@ -61,10 +62,7 @@
           lead={since.fromBefore || !since.base ? `Changes in v${version.n}` : `Changes since v${since.base.n}`}
         />{/if}</span
     >{#if props.error}<span class="warn">{props.error}</span>{/if}<span class="review-actions"
-      ><!-- Reached from History, which stays open. -->{#if version && !since.latest}<a
-          class="button"
-          href={`${props.urls.pinned(version.event.seq).file(props.page.path)}&panel=info`}>v{version.n} as it was</a
-        >{/if}<a class="button" href={plain}>Back to latest</a></span
+      ><!-- Reached from History, which stays open. -->{#if version && !since.latest}<Button href={`${props.urls.pinned(version.event.seq).file(props.page.path)}&panel=info`}>v{version.n} as it was</Button>{/if}<Button href={plain}>Back to latest</Button></span
     ></section
   >
 {:else}
@@ -75,7 +73,7 @@
           urls={props.urls}
           path={props.page.path}
           onVerified={props.onVerified}
-        />{/if}<a class="button" href={plain}>Done</a></span
+        />{/if}<Button href={plain}>Done</Button></span
     ></section
   >
 {/if}

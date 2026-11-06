@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ChangeRow } from "@tempra/design/components";
   import AgentName from "./AgentName.svelte";
   import Avatar from "./Avatar.svelte";
   import type { LiveWrite } from "./activity";
@@ -17,10 +18,8 @@
   }: { write: LiveWrite; urls: Urls; actor: ActorView; title: string } = $props();
 </script>
 
-<article class="entry live" aria-live="polite">
-  <Avatar name={actor.mark} fullName={actor.fullName} agent={actor.agent} tempra={actor.tempra} />
-  <div class="entry-body">
-    <p class="entry-line"><AgentName who={actor} /> is editing <a href={urls.file(w.path)}>{title}</a></p>
-  </div>
-  <span class="entry-side entry-now"><span class="change-dot live" aria-hidden="true"></span>now</span>
-</article>
+<ChangeRow live aria-live="polite">
+  {#snippet lead()}<Avatar name={actor.mark} fullName={actor.fullName} agent={actor.agent} tempra={actor.tempra} />{/snippet}
+  <AgentName who={actor} /> is editing <a href={urls.file(w.path)}>{title}</a>
+  {#snippet when()}<span class="entry-now"><span class="change-dot live" aria-hidden="true"></span>now</span>{/snippet}
+</ChangeRow>

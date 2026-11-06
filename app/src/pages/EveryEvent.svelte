@@ -60,6 +60,7 @@
           <th scope="col">Who</th>
           <th scope="col">Kind</th>
           <th scope="col">Path and note</th>
+          <th scope="col"><span class="visually-hidden">Links</span></th>
         </tr>
       </thead>
       <tbody>

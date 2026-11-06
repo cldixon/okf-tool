@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import type { LedgerRequest } from "../activity";
   import { useAgentNames } from "../agents.svelte.ts";
   import { api, field, post } from "../api";
@@ -121,7 +122,7 @@
             <input type="datetime-local" name="to" step={1} required />
           </label>
         </p>
-        <button class="primary" type="submit" disabled={action.busy}>Restore…</button>
+        <Button variant="primary" type="submit" disabled={action.busy}>Restore…</Button>
       </form>
       {#if recent.length > 0}
         <h3>Latest changes</h3>
@@ -164,7 +165,7 @@
                     Before it: {@render nightlyLinks(r.export.split("/").at(-2) ?? "")}
                   </td>
                   <td>
-                    <button type="button" disabled={action.busy} onclick={() => undo(r)}>Undo…</button>
+                    <Button disabled={action.busy} onclick={() => undo(r)}>Undo…</Button>
                   </td>
                 </tr>
               {/each}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button, Select } from "@tempra/design/components";
   import { agentLabel, type Contributor } from "../agents";
   import { api, field, post } from "../api";
   import ConfirmDialog from "../ConfirmDialog.svelte";
@@ -9,6 +10,11 @@
   import { day, plural } from "../ui";
   import type { Urls } from "../urls";
   import { type MembersData, ROLE_WORDS } from "./manage";
+
+  const ROLE_OPTIONS = [
+    { value: "read", label: ROLE_WORDS.read },
+    { value: "write", label: ROLE_WORDS.write },
+  ] as const;
 
   /**
    * Who is in the library (tempra-dev: v2/sharing): the owner, members with their access, and the
@@ -157,29 +163,27 @@
               <td class="name">@{m.handle}</td>
               <td>
                 {#if owner}
-                  <select
-                    aria-label={`Access for @${m.handle}`}
+                  <Select
+                    variant="plain"
+                    label={`Access for @${m.handle}`}
                     value={m.role}
+                    options={ROLE_OPTIONS}
                     disabled={action.busy}
-                    onchange={(e) => {
+                    onchange={(role, e) => {
                       // The select shows the saved access until the change is confirmed and saved.
-                      const role = e.currentTarget.value as "read" | "write";
                       e.currentTarget.value = m.role;
-                      setRole(m.handle, role);
+                      setRole(m.handle, role as "read" | "write");
                     }}
-                  >
-                    <option value="read">{ROLE_WORDS.read}</option>
-                    <option value="write">{ROLE_WORDS.write}</option>
-                  </select>
+                  />
                 {:else}
                   {ROLE_WORDS[m.role]}
                 {/if}
               </td>
               <td>
                 {#if owner}
-                  <button type="button" disabled={action.busy} onclick={() => remove(m.handle)}>Remove…</button>
+                  <Button disabled={action.busy} onclick={() => remove(m.handle)}>Remove…</Button>
                 {:else if m.handle === me}
-                  <button type="button" disabled={action.busy} onclick={() => leave(m.handle)}>Leave…</button>
+                  <Button disabled={action.busy} onclick={() => leave(m.handle)}>Leave…</Button>
                 {/if}
               </td>
             </tr>
@@ -198,12 +202,9 @@
           </label>
           <label>
             Access
-            <select name="role">
-              <option value="read" selected>{ROLE_WORDS.read}</option>
-              <option value="write">{ROLE_WORDS.write}</option>
-            </select>
+            <Select variant="plain" name="role" value="read" options={ROLE_OPTIONS} />
           </label>
-          <button class="primary" type="submit" disabled={action.busy}>Invite</button>
+          <Button variant="primary" type="submit" disabled={action.busy}>Invite</Button>
         </p>
         <p class="small muted">
           Only people with a Tempra account. Their agents reach this library at most at their access.
@@ -215,7 +216,7 @@
           {#each d.invitations ?? [] as i (i.id)}
             <li>
               @{i.handle}, {ROLE_WORDS[i.role].toLowerCase()}, open until {day(i.expires)}
-              <button type="button" disabled={action.busy} onclick={() => withdraw(i.id, i.handle)}>Withdraw…</button>
+              <Button disabled={action.busy} onclick={() => withdraw(i.id, i.handle)}>Withdraw…</Button>
             </li>
           {/each}
         </ul>

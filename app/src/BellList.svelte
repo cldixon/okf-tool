@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Tile } from "@tempra/design/components";
+  import { Button, Tile } from "@tempra/design/components";
   import { api, post } from "./api";
   import {
     INBOX_EVENT,
@@ -84,8 +84,7 @@
       <div class="bell-item">
         {@render about()}
         <span class="bell-item-actions"
-          ><button type="button" class="primary" data-stay disabled={action.busy} onclick={() => accept(i)}>Accept</button
-          ><button type="button" data-stay disabled={action.busy} onclick={() => decline(i)}>Decline</button></span
+          ><Button variant="primary" data-stay disabled={action.busy} onclick={() => accept(i)}>Accept</Button><Button data-stay disabled={action.busy} onclick={() => decline(i)}>Decline</Button></span
         >
       </div>
     {:else}

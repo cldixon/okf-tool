@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Tile } from "@tempra/design/components";
+  import { Button, Tile } from "@tempra/design/components";
   import Avatar from "../Avatar.svelte";
   import { api, post } from "../api";
   import { useAction, useLoad } from "../load.svelte.ts";
@@ -55,9 +55,7 @@
               <span>Your access</span>{i.role === "write" ? "Can read and write" : "Can read and comment"}
             </p>
             <p class="actions">
-              <button type="button" class="primary" disabled={action.busy} onclick={() => void answer(i, true)}
-                >Accept</button
-              ><button type="button" disabled={action.busy} onclick={() => void answer(i, false)}>Decline</button>
+              <Button variant="primary" disabled={action.busy} onclick={() => void answer(i, true)}>Accept</Button><Button disabled={action.busy} onclick={() => void answer(i, false)}>Decline</Button>
             </p>
           </li>
         {/each}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Dialog } from "@tempra/design/components";
+  import { Button, Dialog } from "@tempra/design/components";
   import type { Confirming } from "./confirm.svelte.ts";
 
   let { asking }: { asking: Confirming } = $props();
@@ -12,16 +12,12 @@
       {#if typeof ask.body === "string"}{ask.body}{:else}{@render ask.body()}{/if}
     </div>
     <p class="actions">
-      <button
-        type="button"
-        class="primary"
-        onclick={() => {
+      <Button variant="primary" onclick={() => {
           const run = ask.run;
           asking.close();
           run();
-        }}>{ask.action}</button
-      >
-      <button type="button" onclick={() => asking.close()}>Cancel</button>
+        }}>{ask.action}</Button>
+      <Button onclick={() => asking.close()}>Cancel</Button>
     </p>
   {/if}
 </Dialog>

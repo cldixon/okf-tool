@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from "@tempra/design/components";
+  import { Button, Icon } from "@tempra/design/components";
   import AgentName from "../AgentName.svelte";
   import AtNotice from "../AtNotice.svelte";
   import { useActors } from "../agents.svelte.ts";
@@ -111,12 +111,7 @@
           >{described.text}{#if described.fromAlt}<span class="muted">{" (the alt text where it is used)"}</span>{/if}</p
         >{/if}</div
     ><p class="attachment-actions"
-      ><a class="button primary" {href} download={baseName(file.path)}><Icon name="download" /> Download</a
-      ><button
-        type="button"
-        onclick={() => void copied.copy(new URL(urls.pinned(undefined).file(file.path), location.href).href)}
-        >{copied.state === "copied" ? "Copied" : copied.state === "failed" ? "Couldn't copy" : "Copy link"}</button
-      ></p
+      ><Button variant="primary" {href} download={baseName(file.path)}><Icon name="download" /> Download</Button><Button onclick={() => void copied.copy(new URL(urls.pinned(undefined).file(file.path), location.href).href)}>{copied.state === "copied" ? "Copied" : copied.state === "failed" ? "Couldn't copy" : "Copy link"}</Button></p
     ><dl class="attachment-facts"
       ><div><dt>Type</dt><dd>{typeName(file.media, file.path)}</dd></div
       ><div><dt>Size</dt><dd>{sizeFact(file, natural)}</dd></div

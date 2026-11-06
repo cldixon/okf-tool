@@ -3,6 +3,7 @@ import {
   AvatarMark,
   Badge,
   Button,
+  ChangeRow,
   Chip,
   CommentMark,
   Dialog,
@@ -17,6 +18,7 @@ import {
   SearchButton,
   SearchField,
   Segmented,
+  Select,
   SplitButton,
   TextInput,
   Tile,
@@ -236,6 +238,24 @@ describe("fields", () => {
     expect(box.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
     d.destroy();
   });
+
+  test("Button with href: a link drawn as a button, its variant beside .button (TEMPRA-288)", () => {
+    const d = draw(Button, {
+      href: "/x.md",
+      variant: "primary",
+      download: "x.md",
+      children: text("Download"),
+    });
+    const a = one(d.host, "a") as HTMLAnchorElement;
+    expect(a.className).toBe("button primary");
+    expect(a.getAttribute("href")).toBe("/x.md");
+    expect(a.getAttribute("download")).toBe("x.md");
+    expect(d.host.querySelector("button")).toBeNull();
+    d.destroy();
+    const plain = draw(Button, { href: "/y", children: text("Back") });
+    expect(one(plain.host, "a").className).toBe("button");
+    plain.destroy();
+  });
 });
 
 describe("marks and labels", () => {
@@ -388,6 +408,82 @@ describe("choices and panels", () => {
     d.destroy();
   });
 
+  test("Select: a native select named by its label, a pill by default, groups, a choice", () => {
+    const changes: string[] = [];
+    const d = draw(Select, {
+      label: "Who",
+      value: "agents",
+      options: [
+        { value: "everyone", label: "Anyone" },
+        { value: "agents", label: "Agents" },
+        { group: "Who worked here", options: [{ value: "actor:a", label: "Claude" }] },
+      ],
+      onchange: (v: string) => changes.push(v),
+    });
+    const sel = one(d.host, "select") as HTMLSelectElement;
+    expect(sel.classList.contains("pill-select")).toBe(true);
+    expect(sel.getAttribute("aria-label")).toBe("Who");
+    expect(sel.value).toBe("agents");
+    expect(one(sel, "optgroup").getAttribute("label")).toBe("Who worked here");
+    expect([...sel.options].map((o) => o.textContent)).toEqual(["Anyone", "Agents", "Claude"]);
+    sel.value = "actor:a";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+    expect(changes).toEqual(["actor:a"]);
+    d.destroy();
+    // plain is a form's field; a consumer putting the value back keeps it (a change to confirm).
+    const kept: string[] = [];
+    const p = draw(Select, {
+      variant: "plain",
+      name: "role",
+      value: "read",
+      options: [
+        { value: "read", label: "Read" },
+        { value: "write", label: "Write" },
+      ],
+      onchange: (v: string, e: Event & { currentTarget: HTMLSelectElement }) => {
+        kept.push(v);
+        e.currentTarget.value = "read";
+      },
+    });
+    const ps = one(p.host, "select") as HTMLSelectElement;
+    expect(ps.className).toBe("");
+    expect(ps.name).toBe("role");
+    ps.value = "write";
+    ps.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+    expect(kept).toEqual(["write"]);
+    expect(ps.value).toBe("read");
+    p.destroy();
+  });
+
+  test("ChangeRow: lead, line, detail and when; continued drops the lead; live", () => {
+    const d = draw(ChangeRow, {
+      lead: text("AV"),
+      children: text("Claude edited Revenue"),
+      detail: text("a note"),
+      when: text("just now"),
+    });
+    const row = one(d.host, "article.change-row");
+    expect(one(row, ".change-row-lead").textContent).toBe("AV");
+    expect(one(row, "p.change-row-line").textContent).toBe("Claude edited Revenue");
+    expect(one(row, ".change-row-body").textContent).toContain("a note");
+    expect(one(row, ".change-row-when").textContent).toBe("just now");
+    d.destroy();
+    const c = draw(ChangeRow, {
+      lead: text("AV"),
+      children: text("Added X"),
+      continued: true,
+      live: true,
+    });
+    const crow = one(c.host, "article.change-row");
+    expect(crow.classList.contains("continued")).toBe(true);
+    expect(crow.classList.contains("live")).toBe(true);
+    expect(one(crow, ".change-row-lead").textContent).toBe("");
+    expect(crow.querySelector(".change-row-when")).toBeNull();
+    c.destroy();
+  });
+
   test("PanelHead: its title as a focusable h2, the count, × named for the panel", () => {
     let closed = 0;
     const d = draw(PanelHead, { title: "Comments", count: "3 open", onClose: () => closed++ });
@@ -451,6 +547,8 @@ describe("the catalogue (/_dev/design)", () => {
         "SearchField",
         "Chip",
         "Segmented",
+        "Select",
+        "ChangeRow",
         "Notice",
         "AvatarMark",
         "Tile",

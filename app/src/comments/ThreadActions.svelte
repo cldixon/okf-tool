@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "@tempra/design/components";
   import { post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import MentionArea from "../MentionArea.svelte";
@@ -49,9 +50,7 @@
         onSend={() => act("reply")}
         placeholder="Reply…"
       />{/if}{#if action.error}<div class="notice">{action.error}</div>{/if}<div class="actions"
-      >{#if t.status === "open"}<button type="button" disabled={action.busy} onclick={() => act("resolve")}>Resolve</button
-        ><button type="submit" class="primary" disabled={action.busy || !reply.trim()}>Reply</button
-        >{:else}<button type="button" disabled={action.busy} onclick={() => act("reopen")}>Reopen</button>{/if}</div
+      >{#if t.status === "open"}<Button disabled={action.busy} onclick={() => act("resolve")}>Resolve</Button><Button variant="primary" type="submit" disabled={action.busy || !reply.trim()}>Reply</Button>{:else}<Button disabled={action.busy} onclick={() => act("reopen")}>Reopen</Button>{/if}</div
     ></form
   >
 {/if}

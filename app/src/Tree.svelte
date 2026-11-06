@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from "@tempra/design/components";
+  import { Button, Icon } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { actorText } from "./agents";
   import { useActors } from "./agents.svelte.ts";
@@ -140,7 +140,7 @@
 
 {#snippet rows(dir: string)}
   {#if dirs === null && props.failed}
-    <li class="tree-note">Could not load the files.{" "}<button type="button" onclick={props.onRetry}>Retry</button></li>
+    <li class="tree-note">Could not load the files.{" "}<Button onclick={props.onRetry}>Retry</Button></li>
   {:else if dirs === null}
     <li class="tree-note">Loading…</li>
   {:else if (dirs[dir] ?? []).length === 0 && dir === ""}

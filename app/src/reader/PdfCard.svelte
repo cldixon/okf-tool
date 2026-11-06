@@ -1,6 +1,6 @@
 <script lang="ts">
   /** A PDF's card: its name, type and size, Open and Download. Also the full-screen view's. */
-  import { Icon } from "@tempra/design/components";
+  import { Button, Icon } from "@tempra/design/components";
   import { formatSize } from "../ui";
   import { baseName } from "../urls";
   import BrokenImage from "./BrokenImage.svelte";
@@ -17,10 +17,6 @@
         >PDF document{source.size !== undefined ? ` · ${formatSize(source.size)}` : ""}</span
       ></span
     ><span class="figure-pdf-actions"
-      >{#if source.page}<a class="button" href={source.page}>Open</a>{/if}<a
-        class="button"
-        href={source.download ?? source.src}
-        download={name}><Icon name="download" /> Download</a
-      ></span
+      >{#if source.page}<Button href={source.page}>Open</Button>{/if}<Button href={source.download ?? source.src} download={name}><Icon name="download" /> Download</Button></span
     ></span
   >{/if}

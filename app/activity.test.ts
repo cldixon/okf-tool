@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  continuesRun,
   dayLabel,
   type Entry,
   entryTime,
@@ -13,6 +14,7 @@ import {
   LIVE_MS,
   toEntry,
   whoWorksHere,
+  withoutName,
   wordsText,
 } from "./src/activity";
 import Moment from "./src/Moment.svelte";
@@ -347,5 +349,26 @@ describe("Older (paging.ts)", () => {
     expect(ids(following(older, page(["a", "c", "d"], 2), id))).toEqual(["e"]);
     expect(following(older, page(["x", "y", "z"], 4), id)).toBeNull();
     expect(following(null, first, id)).toBeNull();
+  });
+});
+
+describe("runs on the Summary (TEMPRA-288)", () => {
+  const at = (min: number) => new Date(Date.UTC(2026, 10, 5, 12, min)).toISOString();
+  const claude = { actor: "claude-code/dev", by: { person: "u1" }, ts: at(30) };
+
+  test("the same actor for the same person within half an hour continues a run", () => {
+    expect(continuesRun(undefined, claude)).toBe(false);
+    expect(continuesRun(claude, { ...claude, ts: at(5) })).toBe(true);
+    expect(continuesRun(claude, { ...claude, ts: at(0) })).toBe(true);
+    expect(continuesRun({ ...claude, ts: at(59) }, { ...claude, ts: at(28) })).toBe(false);
+    expect(continuesRun(claude, { ...claude, actor: "human:ann" })).toBe(false);
+    expect(continuesRun(claude, { ...claude, by: { person: "u2" } })).toBe(false);
+  });
+
+  test("a sentence without the name starts with what was done", () => {
+    const page = { page: "a.md", title: "A", seq: 1, gone: false, words: null };
+    expect(withoutName([" deleted ", page])).toEqual(["Deleted ", page]);
+    expect(withoutName([page])).toEqual([page]);
+    expect(withoutName([])).toEqual([]);
   });
 });

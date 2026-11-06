@@ -1,21 +1,42 @@
 <script lang="ts">
+  import { ChangeRow } from "@tempra/design/components";
   import AgentName from "./AgentName.svelte";
   import Avatar from "./Avatar.svelte";
-  import { type Entry, entryTime, type Part, type Touched, wordsText } from "./activity";
+  import {
+    type Entry,
+    entryTime,
+    type Part,
+    type Touched,
+    withoutName,
+    wordsText,
+  } from "./activity";
   import type { ActorView } from "./agents";
   import { localTime } from "./ui";
   import { folderName, type Urls } from "./urls";
 
   /**
-   * One Activity entry: who (avatar, name, whom an agent acts for), what they did, the note, the
-   * pages touched, and when.
+   * One Activity entry (a ChangeRow, TEMPRA-288): who (avatar, name, whom an agent acts for), what
+   * they did, the note, the pages touched, and when. `continued` is a further entry of the same
+   * person's run: the name and avatar are the first entry's, and the sentence starts with what
+   * they did.
    */
   let {
     entry: e,
     urls,
     actor,
     now,
-  }: { entry: Entry; urls: Urls; actor: ActorView; now: number } = $props();
+    continued = false,
+    time = true,
+  }: {
+    entry: Entry;
+    urls: Urls;
+    actor: ActorView;
+    now: number;
+    continued?: boolean;
+    /** Whether it says when; a run's further entry does not repeat the time above it. */
+    time?: boolean;
+  } = $props();
+  const parts = $derived(continued ? withoutName(e.parts) : e.parts);
 
   /** How many touched pages an entry lists before "and n more". */
   const LISTED = 8;
@@ -41,18 +62,16 @@
   </ul>
 {/snippet}
 
-<article class="entry">
-  <Avatar name={actor.mark} fullName={actor.fullName} agent={actor.agent} tempra={actor.tempra} />
-  <div class="entry-body">
-    <p class="entry-line"><AgentName who={actor} /> {#each e.parts as p}{@render part(p)}{/each}</p>
+<ChangeRow {continued}>
+  {#snippet lead()}<Avatar name={actor.mark} fullName={actor.fullName} agent={actor.agent} tempra={actor.tempra} />{/snippet}
+  {#if continued}{#each parts as p}{@render part(p)}{/each}{:else}<AgentName who={actor} /> {#each parts as p}{@render part(p)}{/each}{/if}
+  {#snippet detail()}
     {#if e.quote}
       <q class="entry-note">{e.quote}</q>
     {/if}
     {#if !e.named}
       {@render touchedList(e.touched)}
     {/if}
-  </div>
-  <span class="entry-side">
-    <time datetime={e.ts} title={localTime(e.ts)}>{entryTime(e.ts, now)}</time>
-  </span>
-</article>
+  {/snippet}
+  {#snippet when()}{#if time}<time datetime={e.ts} title={localTime(e.ts)}>{entryTime(e.ts, now)}</time>{/if}{/snippet}
+</ChangeRow>

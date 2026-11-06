@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { Select, type SelectOption } from "@tempra/design/components";
   import { actorLabel, agentLabel } from "../agents";
   import { useActors } from "../agents.svelte.ts";
   import type { Urls, Who } from "../urls";
 
   /**
    * Who: Anyone, Agents or People, and in Every event each one who has worked here (one exact
-   * actor, filtered by the server). A native select, so it works by keyboard and on a phone.
+   * actor, filtered by the server). The design system's Select (TEMPRA-288).
    */
   let {
     urls,
@@ -25,25 +26,28 @@
   const value = $derived(actor ? `actor:${actor}` : who);
   const people = $derived(view === "events" ? actors.contributors : []);
 
-  function change(e: Event & { currentTarget: HTMLSelectElement }) {
-    const v = e.currentTarget.value;
+  const options = $derived.by(() => {
+    const out: (SelectOption | { group: string; options: SelectOption[] })[] = [
+      { value: "everyone", label: "Anyone" },
+      { value: "agents", label: "Agents" },
+      { value: "people", label: "People" },
+    ];
+    if (people.length > 0) {
+      out.push({
+        group: "Who worked here",
+        options: people.map((c) => ({ value: `actor:${c.actor}`, label: agentLabel(c) })),
+      });
+    }
+    if (actor && !people.some((c) => c.actor === actor)) {
+      out.push({ value: `actor:${actor}`, label: actorLabel(actor, null, {}) });
+    }
+    return out;
+  });
+
+  function change(v: string) {
     if (v.startsWith("actor:")) onChange("everyone", v.slice("actor:".length));
     else onChange(v as Who, "");
   }
 </script>
 
-<select class="pill-select" aria-label="Who" {value} onchange={change}>
-  <option value="everyone">Anyone</option>
-  <option value="agents">Agents</option>
-  <option value="people">People</option>
-  {#if people.length > 0}
-    <optgroup label="Who worked here">
-      {#each people as c (c.actor)}
-        <option value={`actor:${c.actor}`}>{agentLabel(c)}</option>
-      {/each}
-    </optgroup>
-  {/if}
-  {#if actor && !people.some((c) => c.actor === actor)}
-    <option value={`actor:${actor}`}>{actorLabel(actor, null, {})}</option>
-  {/if}
-</select>
+<Select label="Who" {value} {options} onchange={change} />
