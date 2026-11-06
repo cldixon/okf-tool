@@ -1,26 +1,19 @@
-<script lang="ts" module>
-  /** The floating actions' button: where the focus goes back to when the panel closes. */
-  /** The home's Comments button in its corner (TEMPRA-283): where the focus goes back to. */
-  const commentsButton = () =>
-    document.querySelector<HTMLElement>(".home-head .page-tools [data-panel]");
-</script>
-
 <script lang="ts">
   import { tick, untrack } from "svelte";
   import { whoWorksHere } from "../activity";
+  import { useActors } from "../agents.svelte.ts";
   import CommentsList from "../comments/CommentsList.svelte";
   import { LIBRARY_THREADS, type Placed } from "../comments/data";
   import { useThreads } from "../comments/data.svelte.ts";
-  import { IconButton } from "@tempra/design/components";
-  import Panel from "../page/Panel.svelte";
-  import { panelInUrl, threadInHash } from "../page/panel";
-  import { here } from "../location.svelte.ts";
-  import { useActors } from "../agents.svelte.ts";
   import { useFrame } from "../frame.svelte.ts";
   import { useFeed, useTrailing } from "../live.svelte.ts";
   import { useLoad } from "../load.svelte.ts";
+  import { here } from "../location.svelte.ts";
   import { useMentionable } from "../mentions.svelte.ts";
-  import PageColumn from "../PageColumn.svelte";
+  import PageFrame from "../page/PageFrame.svelte";
+  import PageTools from "../page/PageTools.svelte";
+  import Panel from "../page/Panel.svelte";
+  import { cornerButton, panelInUrl, threadInHash } from "../page/panel";
   import { libraryLabel } from "../role";
   import { useLibrary, useRole } from "../role.svelte.ts";
   import Status from "../Status.svelte";
@@ -38,8 +31,11 @@
    * which is the agents' (TEMPRA-144); no notifications, which are the Inbox's, and no "since you
    * last looked", which is Activity's to show when asked (TEMPRA-173). An empty library shows how to
    * connect an agent instead (to those who can). Each part loads on its own, so one that fails
-   * leaves the rest (H-7). Comments on the library itself (TEMPRA-222) open from the page's
-   * actions, a "+" with Comment alone, in a Comments panel over the page's right edge.
+   * leaves the rest (H-7). It is laid out as a page is (TEMPRA-283, TEMPRA-294, `PageFrame`): the text in its
+   * column and the side column on the right, whose corner row holds Comments alone (a default the
+   * owner may change), the library's own threads (TEMPRA-222); its panel floats there as a page's
+   * does, overlays the page under 960px of page and is the sheet on a phone, and the row moves
+   * under the head where the column is gone.
    */
   let { urls }: { urls: Urls } = $props();
 
@@ -79,15 +75,15 @@
   const placed = $derived<Placed[]>((threads.data?.threads ?? []).map((t) => ({ ...t, at: null })));
   const openCount = $derived(placed.filter((t) => t.status === "open").length);
 
-  // The Comments panel: opened by the person (Comment, a link to a thread, `?panel=comments`),
-  // never by itself; it overlays the page, so it is modal while open (as a page's is there).
+  // The Comments panel: opened by the person (Comments, a link to a thread, `?panel=comments`),
+  // never by itself; where it overlays the page it is modal (PageFrame's call).
   let panel = $state<boolean>(untrack(() => panelInUrl() === "comments"));
   let active = $state<string | null>(untrack(() => threadInHash()));
   let panelBox: HTMLDivElement | undefined = $state();
   function focusAfterDraw(to: "heading" | "opener") {
     void tick().then(() => {
       if (to === "heading") panelBox?.querySelector<HTMLElement>(".panel-head h2")?.focus();
-      else commentsButton()?.focus();
+      else cornerButton("comments")?.focus();
     });
   }
   function openPanel() {
@@ -110,10 +106,6 @@
       if (id) active = id;
       panel = true;
     });
-  });
-  $effect(() => {
-    frame.setModal(panel);
-    return () => frame.setModal(false);
   });
   $effect(() => {
     if (!panel) return;
@@ -141,7 +133,15 @@
   const canWrite = $derived(role.current === "owner" || role.current === "write");
 </script>
 
-<PageColumn inert={panel}>
+{#snippet tools(place: "side" | "head")}<PageTools
+    {urls}
+    {openCount}
+    panel={panel ? "comments" : null}
+    onPanel={() => (panel ? closePanel() : openPanel())}
+    {place}
+  />{/snippet}
+<PageFrame open={panel} onScrim={closePanel} bind:sideBox={panelBox}>
+  {#snippet text()}
   <Status loaded={loaded.current}>
     {#snippet children(home)}
       {@const empty = files === null ? home.pages === 0 : files.length === 0}
@@ -155,21 +155,8 @@
           {#if !empty && (meta.length > 0 || guide)}
             <p class="view-meta home-who">{meta.join(" · ")}{#if guide}{meta.length > 0 ? " · " : ""}<a href={urls.file("guide.md")}>Start with the guide</a>{/if}</p>
           {/if}
-        </div>
-        <!-- The home's corner (TEMPRA-283): the library's own threads, as a page's Comments
-             (a default the owner may change). -->
-        <div class="page-tools" role="group" aria-label="Library tools">
-          <IconButton
-            variant="outlined"
-            touch
-            icon="comments"
-            label={openCount > 0 ? `Comments, ${openCount} open` : "Comments"}
-            title="Comments"
-            count={openCount}
-            pressed={panel}
-            data-panel="comments"
-            onclick={() => (panel ? closePanel() : openPanel())}
-          />
+          <!-- Where the side column is gone, the corner row sits under the head, as a page's. -->
+          {@render tools("head")}
         </div>
       </header>
       {#if empty}
@@ -200,25 +187,25 @@
       {/if}
     {/snippet}
   </Status>
-</PageColumn>
-{#if panel}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="panel-scrim" aria-hidden="true" onclick={closePanel}></div>
-  <div class="home-panel" bind:this={panelBox}>
-    <Panel name="comments" count={openCount > 0 ? `${openCount} open` : null} onClose={closePanel}>
-      <CommentsList
-        {urls}
-        path=""
-        {placed}
-        error={threads.error?.message ?? null}
-        loading={threads.data === undefined && !threads.error}
-        writable={role.current !== null}
-        draft={null}
-        onDraftDone={() => {}}
-        {active}
-        onActive={(id) => (active = id)}
-        onChanged={() => threads.reload()}
-      />
-    </Panel>
-  </div>
-{/if}
+  {/snippet}
+  {#snippet side()}
+    {@render tools("side")}
+    {#if panel}
+      <Panel name="comments" count={openCount > 0 ? `${openCount} open` : null} onClose={closePanel}>
+        <CommentsList
+          {urls}
+          path=""
+          {placed}
+          error={threads.error?.message ?? null}
+          loading={threads.data === undefined && !threads.error}
+          writable={role.current !== null}
+          draft={null}
+          onDraftDone={() => {}}
+          {active}
+          onActive={(id) => (active = id)}
+          onChanged={() => threads.reload()}
+        />
+      </Panel>
+    {/if}
+  {/snippet}
+</PageFrame>

@@ -12,19 +12,21 @@
    * info with the agent dot while a newer version waits, and Copy page with a ⌄ for View Markdown
    * and Download .md. The open panel's button shows pressed; pressing it again closes it. Copy page
    * says what happened where it was pressed: a check for two seconds once copied (a × if it could
-   * not), as CopyField does.
+   * not), as CopyField does. The library's home draws the same row with Comments alone (no
+   * `path`): its threads are the library's, and Page info and Copy page are a page's.
    */
   let props: {
     urls: Urls;
-    path: string;
+    /** The page's path; none on the library's home, whose row is Comments alone. */
+    path?: string;
     /** Open threads on the page, beside Comments. */
     openCount: number;
     panel: PanelName | null;
     /** A newer version waits (someone else's write on the feed). */
-    newer: boolean;
-    markdown: boolean;
+    newer?: boolean;
+    markdown?: boolean;
     onPanel(name: PanelName): void;
-    onMarkdown(on: boolean): void;
+    onMarkdown?(on: boolean): void;
     /** Where this row is: the right column's corner, or the head under the byline. */
     place: "side" | "head";
   } = $props();
@@ -35,7 +37,7 @@
   const comments = $derived(props.openCount > 0 ? `Comments, ${props.openCount} open` : "Comments");
 </script>
 
-<div class={`page-tools page-tools-${props.place}`} role="group" aria-label="Page tools"
+<div class={`page-tools page-tools-${props.place}`} role="group" aria-label={props.path === undefined ? "Library tools" : "Page tools"}
   ><IconButton
     variant="outlined"
     touch
@@ -46,7 +48,7 @@
     pressed={props.panel === "comments"}
     data-panel="comments"
     onclick={() => props.onPanel("comments")}
-  /><IconButton
+  />{#if props.path !== undefined}{@const path = props.path}<IconButton
     variant="outlined"
     touch
     icon="info"
@@ -61,10 +63,10 @@
     icon={page.state === "copied" ? "check" : page.state === "failed" ? "x" : "copy"}
     label={copyLabel}
     menuLabel="More copy options"
-    onclick={() => page.copy(() => storedFile(props.urls, props.path))}
-    >{#snippet children()}<button type="button" class="menu-item" aria-pressed={props.markdown} onclick={() => props.onMarkdown(!props.markdown)}
+    onclick={() => page.copy(() => storedFile(props.urls, path))}
+    >{#snippet children()}<button type="button" class="menu-item" aria-pressed={props.markdown} onclick={() => props.onMarkdown?.(!props.markdown)}
         ><Icon name="markdown" /> {props.markdown ? "Back to page" : "View Markdown"}</button
-      ><a class="menu-item" href={props.urls.raw(props.path)} download={baseName(props.path)}><Icon name="download" /> Download <span class="menu-hint">.md</span></a
+      ><a class="menu-item" href={props.urls.raw(path)} download={baseName(path)}><Icon name="download" /> Download <span class="menu-hint">.md</span></a
       >{/snippet}</SplitButton
-  ><span class="visually-hidden" aria-live="polite">{page.state === "copied" ? "Copied" : page.state === "failed" ? "Could not copy" : ""}</span></div
+  ><span class="visually-hidden" aria-live="polite">{page.state === "copied" ? "Copied" : page.state === "failed" ? "Could not copy" : ""}</span>{/if}</div
 >

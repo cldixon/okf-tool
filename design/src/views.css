@@ -780,23 +780,6 @@
   margin: var(--tempra-space-16) 0 var(--tempra-space-08);
 }
 
-/* The home's Comments panel (TEMPRA-222): the threads on the library itself, opened from the
-   page's actions. The home has no side column, so where a page's panel would sit beside the
-   text it overlays the page's right edge instead (narrower, and on a phone, page.css's rules
-   already make it an overlay and the sheet). */
-@container page (width >= 1100px) {
-  .home-panel .page-aside {
-    position: fixed;
-    top: var(--tempra-size-topbar);
-    right: 0;
-    bottom: 0;
-    z-index: 5;
-    width: var(--tempra-size-panel);
-    height: auto;
-    box-shadow: var(--tempra-shadow);
-  }
-}
-
 /* ---------- The components' catalogue (/_dev/design, local dev only; TEMPRA-252) ---------- */
 
 /* Each theme's column draws the same components; `.theme-light` and `.theme-dark` set the

@@ -4750,9 +4750,9 @@ async function uploadLink(owner: string, slug: string, token: string): Promise<s
  * (AGENT_MODEL=fake in the gate's .dev.vars; no network): the seeded account has it on. A mention
  * on a page goes through the agent's queue: the Comments panel says "Tempra is replying…", then
  * shows its reply, by Tempra's own round mark on the agent colour, and the thread stays open
- * (TEMPRA-223: people resolve threads); a library thread from the home's "+" asking for a new
- * page, sent with Enter, is answered and marked a request, which MCP `work` lists. The home's
- * Comments panel passes axe.
+ * (TEMPRA-223: people resolve threads); a library thread from the home's corner Comments (its
+ * row in the side column, as a page's, TEMPRA-283) asking for a new page, sent with Enter, is
+ * answered and marked a request, which MCP `work` lists. The home's Comments panel passes axe.
  */
 async function managedAgent(owner: string, slug: string, token: string): Promise<string[]> {
   const shots = process.env.GATE_SCREENSHOTS;
@@ -4873,12 +4873,16 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
       async () => {
         await page.goto(`${base}/${owner}/${slug}/`);
         await page.locator(".home-head .view-title").waitFor({ timeout: 15_000 });
-        // The home's corner holds Comments alone (TEMPRA-283), and no +.
+        // The home's corner holds Comments alone (TEMPRA-283), and no +: the page's frame, its row
+        // in the side column's corner (the head's row hidden beside it).
         const tools = await page
-          .locator(".home-head .page-tools button")
+          .locator(".page-view .page-side > .page-tools-side button")
           .evaluateAll((els) => els.map((e) => e.getAttribute("data-panel")));
         if (JSON.stringify(tools) !== JSON.stringify(["comments"])) {
           throw new Error(`the home's corner holds ${JSON.stringify(tools)}`);
+        }
+        if (await page.locator(".home-head .page-tools-head").isVisible()) {
+          throw new Error("the home's head row shows beside its side column");
         }
         if ((await page.locator(".page-actions").count()) > 0)
           throw new Error("the home's + is back");
