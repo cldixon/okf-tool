@@ -70,13 +70,15 @@ CREATE TABLE IF NOT EXISTS diagram_renders (key TEXT PRIMARY KEY, error TEXT);
 /**
  * Partial indexes for queries every write or every `start` runs (TEMPRA-293), so they read only
  * the rows they count: the library's attachments in R2 for its storage size (checked before a
- * write and reported after it), and the links with an anchor for the missing-heading lint.
+ * write and reported after it), and the links with an anchor for the missing-heading lint. And
+ * paths by last_seq, for the home's Recently changed (`changed`, TEMPRA-302).
  * Run on every open, as DIAGRAM_RENDERS is, so older libraries get them.
  */
 export const COST_INDEXES = `
 CREATE INDEX IF NOT EXISTS blobs_r2_size ON blobs(size) WHERE location = 'r2';
 CREATE INDEX IF NOT EXISTS links_anchored ON links(from_id)
   WHERE kind = 'body' AND anchor IS NOT NULL AND anchor <> '#';
+CREATE INDEX IF NOT EXISTS paths_last ON paths(last_seq);
 `;
 
 const SCHEMA = `

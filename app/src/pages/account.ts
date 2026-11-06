@@ -67,6 +67,8 @@ export interface PendingInvitation {
   id: string;
   owner: string;
   slug: string;
+  /** The library's title, if it has one. */
+  title?: string | null;
   role: "read" | "write";
   /** Who invited. */
   handle: string;

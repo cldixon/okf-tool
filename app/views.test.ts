@@ -11,7 +11,7 @@ import { describedAs, figureUse, hostOf, sizeText, versionsOf } from "./src/page
 import EmptyLibrary from "./src/pages/EmptyLibrary.svelte";
 import FileHistory from "./src/pages/FileHistory.svelte";
 import { fateOf, sizeFact, typeName } from "./src/pages/file";
-import { recentlyChanged } from "./src/pages/home";
+import { loadHome, recentlyChanged } from "./src/pages/home";
 import SourceFact from "./src/pages/SourceFact.svelte";
 import UsedIn from "./src/pages/UsedIn.svelte";
 import { factsLine } from "./src/reader/lightbox";
@@ -122,26 +122,63 @@ describe("the library's home (take 4)", () => {
   });
 
   test("recently changed: the newest pages still here, each once, with who and when", () => {
-    const request = (id: string, events: LedgerEvent[]): LedgerRequest => ({
-      request_id: id,
-      ts: events.at(-1)?.ts ?? hour(1),
-      actor: "claude-code/dev",
-      note: null,
-      by: { person: "cl_dixon", agent: "a1" },
-      events,
-    });
     const changed = recentlyChanged(
       [
-        request("r3", [event(30, { path: "app/reader.md" }), event(31, { op: "comment" })]),
-        request("r2", [event(20, { path: "gone.md" }), event(21, { path: "decisions/a.md" })]),
-        request("r1", [event(10, { path: "app/reader.md" })]),
+        { ...event(30, { path: "app/reader.md" }), by: { person: "u1", agent: "a1" } },
+        { ...event(21, { path: "gone.md" }), by: null },
+        { ...event(20, { path: "decisions/a.md", actor: "human:ann" }), by: null },
       ],
       files,
     );
-    expect(changed.map((c) => [c.path, c.title])).toEqual([
-      ["app/reader.md", "Reader"],
-      ["decisions/a.md", "A"],
+    expect(changed.map((c) => [c.path, c.title, c.actor])).toEqual([
+      ["app/reader.md", "Reader", "claude-code/dev"],
+      ["decisions/a.md", "A", "human:ann"],
     ]);
+    expect(changed[0]?.by).toEqual({ person: "u1", agent: "a1" });
+  });
+
+  test("recently changed reads the pages changed last, not the newest requests (TEMPRA-302)", async () => {
+    // The newest 20 requests are all comments: the five pages edited before them still list.
+    const comment = (i: number): LedgerRequest => ({
+      request_id: `c${i}`,
+      ts: hour(1),
+      actor: "human:ann",
+      note: null,
+      by: null,
+      events: [event(100 + i, { op: "comment", path: "app/reader.md" })],
+    });
+    const five = ["app/reader.md", "decisions/a.md", "app/p3.md", "app/p2.md", "app/p1.md"];
+    const asked: string[] = [];
+    const answer = (url: string): unknown => {
+      asked.push(url.replace(/\?.*/, ""));
+      if (url.includes("/summary")) return { seq: 120, pages: 5 };
+      if (url.includes("/requests"))
+        return { requests: Array.from({ length: 20 }, (_, i) => comment(i)) };
+      if (url.includes("/changed"))
+        return {
+          seq: 120,
+          pages: five.map((path, i) => ({ ...event(50 - i, { path }), by: null })),
+        };
+      throw new Error(`unexpected ${url}`);
+    };
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) =>
+      new Response(JSON.stringify(answer(String(input))), {
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+    try {
+      const home = await loadHome(new Urls("owner", "lib"));
+      const here: OutlineFile[] = five.map((path, i) => ({
+        path,
+        kind: "page",
+        title: `T${i}`,
+        seq: 1,
+      }));
+      expect(recentlyChanged(home.changed, here).map((c) => c.path)).toEqual(five);
+      expect(asked.some((u) => u.endsWith("/changed"))).toBe(true);
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 });
 

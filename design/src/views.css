@@ -780,22 +780,71 @@
   margin: var(--tempra-space-16) 0 var(--tempra-space-08);
 }
 
-/* The home's Comments panel (TEMPRA-222): the threads on the library itself, opened from the
-   page's actions. The home has no side column, so where a page's panel would sit beside the
-   text it overlays the page's right edge instead (narrower, and on a phone, page.css's rules
-   already make it an overlay and the sheet). */
-@container page (width >= 1100px) {
-  .home-panel .page-aside {
-    position: fixed;
-    top: var(--tempra-size-topbar);
-    right: 0;
-    bottom: 0;
-    z-index: 5;
-    width: var(--tempra-size-panel);
-    height: auto;
-    box-shadow: var(--tempra-shadow);
+/* ---------- Invitations (/invitations, TEMPRA-300) ---------- */
+
+/* One row per invitation between hairlines, as the bell's (workspace.css, .bell-item): the
+   library's tile, then its name, who invited and when, and the access offered; Accept and
+   Decline at the row's end, under the text on a phone. */
+.invitations {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--tempra-color-border);
+  list-style: none;
+}
+
+.invitation {
+  display: grid;
+  grid-template-columns: var(--tempra-size-tile) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tempra-space-08) var(--tempra-space-12);
+  padding: var(--tempra-space-16) 0;
+  border-bottom: 1px solid var(--tempra-color-border);
+}
+
+.invitation > .lib-tile {
+  align-self: start;
+  margin-top: var(--tempra-space-02);
+}
+
+.invitation-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tempra-space-02);
+  min-width: 0;
+}
+
+.invitation-library {
+  font-weight: var(--tempra-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.invitation-from,
+.invitation-access {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+.invitation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tempra-space-08);
+}
+
+@media (max-width: 900px) {
+  .invitation {
+    grid-template-columns: var(--tempra-size-tile) minmax(0, 1fr);
+  }
+
+  .invitation-actions {
+    grid-column: 2;
+  }
+
+  .invitation-actions button {
+    min-height: var(--tempra-size-touch);
   }
 }
+
+/* ---------- End of Invitations ---------- */
 
 /* ---------- The components' catalogue (/_dev/design, local dev only; TEMPRA-252) ---------- */
 

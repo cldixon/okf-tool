@@ -2856,6 +2856,24 @@ async function browserRenders(
         // an earlier one at ?at=<it>&since=<the one before>, the latest at ?since=<the one before>.
         const changed = historyPanel.locator('a.version[href*="since="]');
         await changed.first().waitFor({ timeout: 10_000 });
+        // Current version alone at first (TEMPRA-309); Earlier versions (n) opens the rest.
+        const earlier = historyPanel.getByRole("button", { name: /^Earlier versions/ });
+        if ((await earlier.count()) > 0) {
+          if ((await earlier.getAttribute("aria-expanded")) !== "false") {
+            throw new Error("Earlier versions starts open on the latest version");
+          }
+          if ((await historyPanel.locator("#page-info-earlier").count()) > 0) {
+            throw new Error("earlier versions show before they are asked for");
+          }
+          await earlier.click();
+          await historyPanel
+            .locator("#page-info-earlier a.version")
+            .first()
+            .waitFor({ timeout: 5000 });
+          if ((await earlier.getAttribute("aria-expanded")) !== "true") {
+            throw new Error("Earlier versions does not say it is open");
+          }
+        }
         if ((await historyPanel.getByText(/verif/i).count()) > 0) {
           throw new Error("Page info's versions show verification");
         }
@@ -4210,7 +4228,7 @@ async function browserRenders(
         .first()
         .waitFor();
       const heads = await infoPanel.locator(".page-info-section > h3").allInnerTexts();
-      if (JSON.stringify(heads) !== JSON.stringify(["About this page", "Versions"])) {
+      if (JSON.stringify(heads) !== JSON.stringify(["About this page", "Current version"])) {
         throw new Error(`Page info's sections: ${JSON.stringify(heads)}`);
       }
       const said = await infoPanel.innerText();
@@ -4245,9 +4263,10 @@ async function browserRenders(
       await back("a plain reload");
       // Under 1100px of page the contents keep a narrower column of their own down to 700px
       // (TEMPRA-150), as Linear's docs do: at 1280px and at a 1000px window they are beside the
-      // text, not On this page. Below that they hide (On this page under the byline). At 1280px a
-      // panel takes their column and the text moves over for it: nothing runs under it
-      // (TEMPRA-128, C-5).
+      // text, not On this page. Below that they hide (On this page under the byline). From 960px
+      // of page the right column is a panel's width, open or not: at 1280px a panel takes it and
+      // nothing runs under it (TEMPRA-128, C-5). Opening a panel never moves the text, across,
+      // down or in width, and never brings On this page in under the byline (TEMPRA-301).
       const inline = main.locator(".toc-inline");
       const besideText = async (where: string) => {
         await contentsNav.waitFor({ timeout: 5000 });
@@ -4258,9 +4277,43 @@ async function browserRenders(
           throw new Error(`the contents are not beside the text ${where}`);
         }
       };
+      /** The first paragraph's box: where it starts across and down, and how wide it is. */
+      const firstBox = () =>
+        page.evaluate<string>(`(() => {
+          const r = document.querySelector(".page-view .body .prose p").getBoundingClientRect();
+          return JSON.stringify({ left: r.left, top: r.top, width: r.width });
+        })()`);
+      /**
+       * Each panel opened and closed again: the first paragraph keeps its box exactly, across,
+       * down and wide (TEMPRA-301).
+       */
+      const textStays = async (where: string) => {
+        await contentsNav.waitFor({ timeout: 5000 });
+        await page.waitForTimeout(200);
+        const before = await firstBox();
+        const inlineBefore = await inline.isVisible();
+        for (const [name, open, panelBox] of [
+          ["Comments", openComments, comments],
+          ["Page info", openInfo, infoPanel],
+        ] as const) {
+          await open();
+          await panelBox.waitFor({ timeout: 5000 });
+          await page.waitForTimeout(200);
+          const after = await firstBox();
+          if (after !== before) {
+            throw new Error(`opening ${name} ${where} moved the text from ${before} to ${after}`);
+          }
+          if ((await inline.isVisible()) !== inlineBefore) {
+            throw new Error(`opening ${name} ${where} changed whether On this page shows`);
+          }
+          await page.keyboard.press("Escape");
+          await panelBox.waitFor({ state: "detached", timeout: 5000 });
+        }
+      };
       await page.setViewportSize({ width: 1000, height: 720 });
       try {
         await besideText("at a 1000px window");
+        await textStays("at a 1000px window");
         if (shots) await page.screenshot({ path: `${shots}/contents-1000.png` });
         await page.setViewportSize({ width: 940, height: 720 });
         await contentsNav.waitFor({ state: "hidden", timeout: 5000 });
@@ -4268,9 +4321,11 @@ async function browserRenders(
       } finally {
         await wide();
       }
+      await textStays("at 1600px");
       await usual();
       try {
         await besideText("at 1280px");
+        await textStays("at 1280px");
         await openComments();
         await comments.waitFor({ timeout: 5000 });
         const position = () =>
@@ -4279,10 +4334,12 @@ async function browserRenders(
           );
         if ((await position()) === "fixed") throw new Error("the panel overlays at 1280px");
         await page.waitForTimeout(200);
-        const box = await inline.boundingBox();
+        if (await inline.isVisible())
+          throw new Error("On this page shows beside a panel at 1280px");
+        const text = await main.locator(".page-view .body .prose").boundingBox();
         const side = await comments.boundingBox();
-        if (!box || !side || box.x + box.width > side.x + 1) {
-          throw new Error(`On this page runs under the panel: ${JSON.stringify({ box, side })}`);
+        if (!text || !side || text.x + text.width > side.x + 1) {
+          throw new Error(`the text runs under the panel: ${JSON.stringify({ text, side })}`);
         }
         if (shots) await page.screenshot({ path: `${shots}/panel-1280.png` });
         // Narrower still, the panel overlays the page.
@@ -4295,6 +4352,18 @@ async function browserRenders(
         if (shots) await page.screenshot({ path: `${shots}/panel-narrow.png` });
         await page.keyboard.press("Escape");
         await comments.waitFor({ state: "detached", timeout: 5000 });
+        await textStays("at 1180px");
+        // The sidebar hidden, a 1000px window is a 1000px page: the same (TEMPRA-301).
+        await page.setViewportSize({ width: 1000, height: 720 });
+        await page.keyboard.press("Control+\\");
+        await sidebar.waitFor({ state: "hidden", timeout: 5000 });
+        try {
+          await besideText("at a 1000px window with the sidebar hidden");
+          await textStays("at a 1000px window with the sidebar hidden");
+        } finally {
+          await page.keyboard.press("Control+\\");
+          await sidebar.waitFor({ state: "visible", timeout: 5000 });
+        }
       } finally {
         await wide();
       }
@@ -4778,9 +4847,9 @@ async function uploadLink(owner: string, slug: string, token: string): Promise<s
  * (AGENT_MODEL=fake in the gate's .dev.vars; no network): the seeded account has it on. A mention
  * on a page goes through the agent's queue: the Comments panel says "Tempra is replying…", then
  * shows its reply, by Tempra's own round mark on the agent colour, and the thread stays open
- * (TEMPRA-223: people resolve threads); a library thread from the home's "+" asking for a new
- * page, sent with Enter, is answered and marked a request, which MCP `work` lists. The home's
- * Comments panel passes axe.
+ * (TEMPRA-223: people resolve threads); a library thread from the home's corner Comments (its
+ * row in the side column, as a page's, TEMPRA-283) asking for a new page, sent with Enter, is
+ * answered and marked a request, which MCP `work` lists. The home's Comments panel passes axe.
  */
 async function managedAgent(owner: string, slug: string, token: string): Promise<string[]> {
   const shots = process.env.GATE_SCREENSHOTS;
@@ -4901,12 +4970,16 @@ async function managedAgent(owner: string, slug: string, token: string): Promise
       async () => {
         await page.goto(`${base}/${owner}/${slug}/`);
         await page.locator(".home-head .view-title").waitFor({ timeout: 15_000 });
-        // The home's corner holds Comments alone (TEMPRA-283), and no +.
+        // The home's corner holds Comments alone (TEMPRA-283), and no +: the page's frame, its row
+        // in the side column's corner (the head's row hidden beside it).
         const tools = await page
-          .locator(".home-head .page-tools button")
+          .locator(".page-view .page-side > .page-tools-side button")
           .evaluateAll((els) => els.map((e) => e.getAttribute("data-panel")));
         if (JSON.stringify(tools) !== JSON.stringify(["comments"])) {
           throw new Error(`the home's corner holds ${JSON.stringify(tools)}`);
+        }
+        if (await page.locator(".home-head .page-tools-head").isVisible()) {
+          throw new Error("the home's head row shows beside its side column");
         }
         if ((await page.locator(".page-actions").count()) > 0)
           throw new Error("the home's + is back");
