@@ -28,6 +28,7 @@ export const LIBRARY_METHODS = [
   "events",
   "requests",
   "request",
+  "changed",
   "history",
   "exportBundle",
   "headSeq",

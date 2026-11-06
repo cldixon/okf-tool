@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { Button, Tile } from "@tempra/design/components";
-  import Avatar from "../Avatar.svelte";
+  import { Button, Notice, Tile } from "@tempra/design/components";
   import { api, post } from "../api";
   import { useAction, useLoad } from "../load.svelte.ts";
   import Moment from "../Moment.svelte";
+  import { libraryLabel } from "../role";
   import Status from "../Status.svelte";
   import { day, tileLetter } from "../ui";
   import { useTitle } from "../ui.svelte.ts";
@@ -32,31 +32,30 @@
 </script>
 
 <h1>Invitations</h1>
-{#if action.error}<div class="notice">{action.error}</div>{/if}
+{#if action.error}<Notice>{action.error}</Notice>{/if}
 <Status loaded={loaded.current}>
   {#snippet children({ invitations })}
     {#if invitations.length === 0}
-      <p>None waiting.</p>
+      <p class="view-empty">No invitations</p>
     {:else}
+      <!-- One row each, as the bell's: the library's tile and name, who invited and when, the
+           access offered, then Accept and Decline in place. -->
       <ul class="invitations">
         {#each invitations as i (i.id)}
           <li class="invitation">
-            <p class="invitation-from">
-              <Avatar name={i.handle} /><span
-                >@{i.handle} invited you{#if i.created}{" · "}<Moment ts={i.created} />{/if}</span
+            <Tile letter={tileLetter(i.title || i.slug)} shared /><div class="invitation-about">
+              <strong class="invitation-library">{libraryLabel(i)}</strong><span
+                class="invitation-from">@{i.handle} invited you{#if i.created}{" · "}<Moment ts={i.created} />{/if}</span
+              ><span class="invitation-access"
+                >{i.role === "write" ? "Can read and write" : "Can read and comment"}{` · open until ${day(i.expires)}`}</span
               >
-            </p>
-            <div class="invitation-card">
-              <Tile letter={tileLetter(i.slug)} shared /><div class="invitation-library">
-                <strong>{i.owner}/{i.slug}</strong><span>Open until {day(i.expires)}</span>
-              </div>
             </div>
-            <p class="invitation-access">
-              <span>Your access</span>{i.role === "write" ? "Can read and write" : "Can read and comment"}
-            </p>
-            <p class="actions">
-              <Button variant="primary" disabled={action.busy} onclick={() => void answer(i, true)}>Accept</Button><Button disabled={action.busy} onclick={() => void answer(i, false)}>Decline</Button>
-            </p>
+            <span class="invitation-actions"
+              ><Button variant="primary" disabled={action.busy} onclick={() => void answer(i, true)}>Accept</Button><Button
+                disabled={action.busy}
+                onclick={() => void answer(i, false)}>Decline</Button
+              ></span
+            >
           </li>
         {/each}
       </ul>
