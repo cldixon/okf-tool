@@ -22,6 +22,7 @@ if (args[i + 1]) process.env.TEMPRA_MODE = args[i + 1];
 const {
   accountsDb,
   applyMigrations,
+  ensureEdgeRules,
   ensureEmailRouting,
   ensureQueues,
   ensureReadReplication,
@@ -39,6 +40,8 @@ if (!args.includes("--dry-run")) {
   await ensureReadReplication();
   // Incoming mail on the zone, as the config sets it (hello@tempra.dev to the operator).
   await ensureEmailRouting();
+  // The zone's rule against scanners' probes, as the config sets it (TEMPRA-290).
+  await ensureEdgeRules();
 }
 /** Runs `cf deploy` once in `cwd`, streaming its output to the log; resolves to its exit code and output. */
 async function deployOnce(cwd: string): Promise<{ code: number; output: string }> {
