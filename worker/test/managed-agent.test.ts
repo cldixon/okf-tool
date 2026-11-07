@@ -26,12 +26,13 @@ import {
   REPLY_MAX_WORDS,
   runTurn,
   SAY,
-  SERVER_ITEMS,
+  SERVER_SECTIONS,
   SYSTEM_PROMPT,
   serverInstructions,
   type TurnDeps,
 } from "../src/managed/turn";
 import { INSTRUCTIONS } from "../src/mcp/server";
+import { instructionsSection } from "../src/prompts";
 import { bunD1 } from "./d1";
 import { API, LIB, ORIGIN, OWNER, setup } from "./harness";
 
@@ -923,8 +924,10 @@ describe("what a reply costs (TEMPRA-231)", () => {
 
   test("the server's instructions as far as they apply to a reply, and no further", () => {
     const kept = serverInstructions();
-    // Each item it keeps is still in the server's instructions (a rename there fails here).
-    for (const item of SERVER_ITEMS) expect(INSTRUCTIONS).toContain(`. ${item}`);
+    // Each section it keeps is in the server's instructions as they send it, by name (TEMPRA-314):
+    // instructionsSection throws on a missing section, and the markers never reach agents.
+    for (const name of SERVER_SECTIONS) expect(INSTRUCTIONS).toContain(instructionsSection(name));
+    expect(INSTRUCTIONS).not.toContain("<!--");
     expect(kept).toContain("This server holds Tempra libraries");
     expect(kept).toContain("Prefer `edit`");
     // Not what it never does, or does the other way.

@@ -29,6 +29,7 @@ import {
   toBase64,
 } from "../images";
 import { imageInfo } from "../media";
+import { INSTRUCTIONS, toolDescription } from "../prompts";
 import {
   drawerOf,
   isRenderLang,
@@ -58,7 +59,6 @@ import { requireOwner } from "../tenancy";
 import { Urls } from "../ui/urls";
 import { kindOf, prepareUpload } from "../uploads";
 import { pagePayload, pageUrl } from "./page";
-import { INSTRUCTIONS, toolDescription } from "./prompts";
 
 export interface McpContext {
   /** The ledger actor, access and tool tier: the same in every library the caller reaches. */
@@ -127,7 +127,7 @@ export const URI_SCHEME = "tempra";
 
 const BEYOND = "Beyond files: ";
 
-/** The server's instructions (prompts/instructions.md), which the managed agent quotes from. */
+/** The server's instructions (prompts/mcp/instructions.md), which the managed agent quotes from. */
 export { INSTRUCTIONS };
 
 const text = (t: string): CallToolResult => ({ content: [{ type: "text", text: t }] });
