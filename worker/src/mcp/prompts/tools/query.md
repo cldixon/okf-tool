@@ -1,0 +1,1 @@
+Beyond files: list pages by frontmatter: tag, status, trust tier, staleness, directory. Faster and exact where grep over YAML is not. Find hot or cold pages by their reads over 30 days (each reader once a day): `sort: "reads"` (most read first), `min_reads`, `max_reads` (`max_reads: 0` for pages nobody read).

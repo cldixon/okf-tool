@@ -58,6 +58,7 @@ import { requireOwner } from "../tenancy";
 import { Urls } from "../ui/urls";
 import { kindOf, prepareUpload } from "../uploads";
 import { pagePayload, pageUrl } from "./page";
+import { INSTRUCTIONS, toolDescription } from "./prompts";
 
 export interface McpContext {
   /** The ledger actor, access and tool tier: the same in every library the caller reaches. */
@@ -126,20 +127,8 @@ export const URI_SCHEME = "tempra";
 
 const BEYOND = "Beyond files: ";
 
-/** Compressed workflow guidance, sent as the server's instructions (most clients never load a skill). */
-export const INSTRUCTIONS = `This server holds Tempra libraries: folders of markdown pages, each with YAML frontmatter, plus attachments. Every change is attributed to your actor and recorded in the library's ledger.
-
-How to work:
-1. Call \`start\` first. It opens your library, or lists the libraries you can reach when there are several; then pass \`library\` (owner/slug) on every call. When the person asks for a new library, \`create_library\` makes one they own and opens it (only on a connection they allowed to). Then \`browse\` a directory before reading, follow links, and \`read\` what you need. Check a page's trust tier and staleness before relying on it.
-2. Write pages people and agents can find their way through: a \`title\` and a one-line \`description\` (indexes and search show it), absolute links like [x](/dir/x.md), footnotes [^id] keyed to \`sources[].id\` (an entry is \`id\`, \`title\` and \`resource\`: a URL or a path in this library). Shape folders and pages to the content: a long page is fine when it reads as one, and a library may say how it likes to be written in a \`guide.md\` at its root, which you read first when there is one. Other frontmatter is yours to add as a page needs it; \`tags\` let \`query\` find pages of a kind.
-3. Media, where a figure helps: a screenshot of what the page describes, a chart of data it discusses, a diagram of an architecture or a flow. Prefer rendered media, code in the page that the app draws: a chart as a Vega-Lite spec in a \`vega-lite\` fence (\`\`\`vega-lite alt="what it shows" title="Caption"\`; its data inline in \`values\`, or a CSV, TSV or JSON file in this library named by \`data.url\`; never a picture of a chart), a Mermaid diagram in a \`mermaid\` fence, or a drawing in an \`svg\` fence (\`\`\`svg alt="what it shows" title="Caption"\`; plain shapes and text, \`currentColor\` for ink, no scripts, style elements, images or links). It is text, diffs like text and needs no upload (preview a non-trivial one with \`render\`). A file (an image, video, audio or PDF) comes in only two ways, and never as bytes you type into a call: on the public web, \`attach\` with \`source_url\` (the server fetches it; never hotlink); one you made or the person has, \`prepare_upload\`: run its curl line when your shell reaches this server, else the person sends it from their browser (in a chat that shows apps an upload panel appears with the call; give them its upload link too). A file you made where you cannot reach this server (a chart in a chat's sandbox): give it to the person in the chat, call \`prepare_upload\` with \`origin: "agent"\`, and tell them in a sentence why: you cannot send files to Tempra yourself, so they upload the one you gave them. Put a file beside the page that uses it, named for what it shows (\`dir/x.md\` uses \`dir/x-architecture.png\`). Write \`![what it shows](/dir/x-architecture.png "Caption")\` (alt says what it shows, the title is the caption), in a \`:::figure\` block for size, placement or a group (\`write\` says how), and cite a work taken from elsewhere (a web image) in \`sources\`, its footnote right after the image (\`![…](/dir/x.jpg "Caption")[^src]\`, still a figure); a file the person gave you or you made carries its own \`credit\` and \`licence\` instead, with no \`sources\` entry. To change a stored image (resize, crop, convert, a thumbnail) or make a video's poster, use \`transform\`: the server does it, since you cannot fetch the file. Before changing a figure or answering a comment on one, \`read\` with \`images: true\` (\`diagrams: true\` for diagrams).
-4. Prefer \`edit\` for small changes, \`write\` for new pages or rewrites, \`batch\` for related changes so they land as one request. Pass \`if_match\` (the hash from your last read); on a conflict, re-read and reapply. Bodies are stored in a canonical form (\`-\` bullets, \`*\` emphasis, padded tables): what you write reads back normalized, so \`edit\` the text as \`read\` shows it.
-5. Put a one-line \`note\` on every write. Read the \`lint\` in every write result and fix what it reports (figure and diagram lint too: \`image_*\`, \`figure_invalid\`, \`diagram_invalid\`, \`diagram_unrendered\`, \`svg_invalid\`, \`svg_unsafe\`, \`chart_invalid\` mean fix the image or the fence; a fence's lint names it by its number in \`read\`'s Figures list, the number \`render\` and \`read\` take); the result's notes say what else to know (ignored fields, the stored form, open comments). A page with no frontmatter or invalid YAML is refused. Keep pages under 100 KB; split big ones into linked pages.
-6. Never write index.md or log.md (the server synthesizes them). Never set \`generated\` (the server stamps it) or \`verified\` (not yours to claim). \`status\` is optional: \`draft\` while a page is unfinished, \`deprecated\` once it is retired; it is not a review, which only people give. Set \`stale_after\` only when something the page relies on will change. Timestamps are full ISO 8601 datetimes with an offset (\`stale_after: 2026-12-31T00:00:00Z\`); a plain date is flagged.
-7. Use \`work\` to find what needs doing: open comments, stale pages, broken links, lint, hotlinked images (\`external_image\`), and structure (a directory's index.md made poor by its pages: missing, long or title-repeating descriptions, titles that read the same, over 50 pages in one directory); \`work\` with kind stale_soon lists what goes stale within 14 days. Only a new \`stale_after\` resets a page's clock; other edits leave it stale.
-8. Comments are how people ask you for changes. Before editing a page, read its open threads with \`comments\`; make the change a comment asks for, then answer it with \`comment\` (reply, and resolve what you fixed). Ask with a reply when unsure; never resolve a thread you did not address. A page with open threads cannot be deleted until they are resolved. A thread may be on the whole library rather than a page (no path). A thread marked a \`request\` (\`work\` lists it as a \`request\` item) is a bigger ask someone left for people's agents: do the work it asks for, reply with what you did, then resolve it.
-9. When the person asks to see a page, or you want them to read one (e.g. one you just wrote), \`show\` it: a chat that shows apps draws it in a panel as the Tempra app does. Do not \`show\` what you only read for yourself.
-10. When you tell the person about a page, link it by its URL, never its bare path: \`read\` gives a page's \`url\`, a write's result names each written page's, \`search\` gives one per result, and \`start\` gives the library's (a page opens at its path after it).`;
+/** The server's instructions (prompts/instructions.md), which the managed agent quotes from. */
+export { INSTRUCTIONS };
 
 const text = (t: string): CallToolResult => ({ content: [{ type: "text", text: t }] });
 
@@ -652,8 +641,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "start",
     {
       title: "Start here",
-      description:
-        "Call this first in every session. Opens a library: its root index.md (what is here, one level down), counts by page type, the number of open work items, the daily health check (open work by kind, the newest unverified changes), and how to work in it. When you can reach several libraries and pass no `library`, lists them instead.",
+      description: toolDescription("start"),
       inputSchema: libArg,
       annotations: readOnly,
     },
@@ -681,8 +669,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "create_library",
     {
       title: "Create a library",
-      description:
-        "Creates a new library owned by the person you act for, exactly as if they made it in the app, and opens it as `start` does; then pass its owner/slug as `library` on every call. Only when the person asks for a new library. Needs a read-and-write connection the person allowed to create libraries at consent; it counts against their library limit. You cannot invite members, share, transfer or delete it: the person does that in the app.",
+      description: toolDescription("create_library"),
       inputSchema: {
         slug: z
           .string()
@@ -726,8 +713,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "browse",
     {
       title: "Browse a directory",
-      description:
-        "One directory level, like `ls` plus `cat index.md`: subdirectories with page counts, and pages with their titles and descriptions. The index is synthesized by the server from the pages' frontmatter. Omit `dir` for the root.",
+      description: toolDescription("browse"),
       inputSchema: {
         dir: z.string().optional().describe("Directory path, e.g. `tables`. Omit for the root."),
         ...libArg,
@@ -918,7 +904,11 @@ export function buildServer(ctx: McpContext): McpServer {
     "read",
     {
       title: "Read a file",
-      description: `Read a page as markdown (frontmatter and body), with its hash, sequence, trust tier, staleness, lint, inbound link count and its figures above it (one line each, numbered as the app numbers them: path or URL, alt, caption, dimensions, size, and ok, missing or external; diagrams by type). Pass the hash as \`if_match\` when you edit, replace or delete. Check trust tier and \`stale\` before relying on the content. Ask for the figures' images with \`images: true\`, for the Mermaid diagrams drawn as people see them with \`diagrams: true\`, or for some figures of either kind with \`figures: [n]\`, when you review the page, change a figure or its caption, or answer a comment on one; they come after the markdown, each after a line naming it, at most ${IMAGES_PER_CALL} and ${IMAGE_BYTES_PER_CALL / 1048576} MB a call in all, what was left out listed with the reason (for a diagram that does not draw, Pele's error); external images are not fetched. Also reads index.md and log.md (the latest 200 requests; \`log\` pages back further); for an attachment returns its size and a short-lived download URL, and for an image (PNG, JPEG, GIF, WebP) the image itself, scaled to at most 1568 px (SVG as its text); for a PDF up to ${sizeText(PDF_RESOURCE_BYTES)}, the PDF as an embedded resource.`,
+      description: toolDescription("read", {
+        IMAGES_PER_CALL,
+        IMAGE_MB_PER_CALL: IMAGE_BYTES_PER_CALL / 1048576,
+        PDF_RESOURCE_SIZE: sizeText(PDF_RESOURCE_BYTES),
+      }),
       inputSchema: readSchema,
       annotations: readOnly,
     },
@@ -1032,8 +1022,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "show",
     {
       title: "Show a page to the person",
-      description:
-        "Show one page to the person you work for, drawn as the Tempra app draws it, in a panel in the chat (in a chat that shows apps; elsewhere give them the link this returns). Use it when they ask to see a page, or when you want them to read one, e.g. after you wrote it. It is for reading only. Writes nothing.",
+      description: toolDescription("show"),
       _meta: { ui: { resourceUri: PAGE_PANEL_URI } },
       inputSchema: {
         path: z.string().describe("The page, e.g. `v2/limits.md`."),
@@ -1060,8 +1049,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "write",
     {
       title: "Create or replace a page",
-      description:
-        'Write a whole page as markdown: a YAML frontmatter block with a `title` and a one-line `description` (plus, as the page needs them, `tags`, `sources`, `status`, `stale_after`, `resource`, or fields of your own), then a markdown body. Each `sources` entry is `id`, `title` and `resource` (a URL, or a path in this library such as `/dir/x.md`); `url` is taken as `resource`. `stale_after` and other timestamps are full ISO 8601 datetimes with an offset, e.g. 2026-12-31T00:00:00Z (a plain date is flagged). Prefer absolute links like [orders](/tables/orders.md); cite sources with footnotes: [^id] in the text, matching a `sources[].id`, plus a `[^id]: …` definition line at the end of the body. Diagrams and charts are best as rendered media, code the app draws, rather than a picture: a chart as a Vega-Lite spec in a ```vega-lite fence, Mermaid in a ```mermaid fence, or SVG in a ```svg fence (preview a non-trivial one with `render`); a fence with an unknown type, nothing after its header, or a bracket or quote left open is saved, shown as its source, and reported as `diagram_invalid` lint with the line and column inside the fence; `diagram_unrendered` lint (in the result when the renderer answers quickly, else in `work` and the next `read`) means Pele could not draw the fence, with its message, line and column: fix the fence. An SVG fence (```svg alt="what it shows" title="Caption"; up to 50 KB; `currentColor` takes the text colour in light and dark) is sanitized when drawn: `svg_invalid` lint means it does not parse (line and column given), `svg_unsafe` names what was taken out (scripts, event handlers, `<style>`, images, links, animation, references outside the SVG), and a missing alt (no `alt="…"` nor a `<title>`) is `image_no_alt`. A Vega-Lite fence (```vega-lite alt="what it shows" title="Caption"; a JSON spec, Vega-Lite 6) is drawn in the reader\'s greys in light and dark; its data is inline (`values`, rows or CSV text with `format`) or a CSV, TSV or JSON file in this library (`data.url`, a path such as `/data/sales.csv`, put there with `attach` or `prepare_upload`), nothing else is fetched; `chart_invalid` lint means it is not JSON, names data from elsewhere, does not fit the Vega-Lite schema (said at its path in the spec, e.g. `encoding.x.type: "bogus" is not one of …`), or Vega could not draw it (with its message); no alt (`alt="…"` or the spec\'s `description`) is `image_no_alt`. Images are `![what it shows](/dir/x-architecture.png "Caption")`, the file put beside the page by `attach` with `source_url` (on the web) or `prepare_upload` (one you made or the person has; never type its bytes); for a width, a placement or a group, wrap one to four images, one to a line, in `:::figure[group caption]{width=480|60% layout=column|wide|full frame}` and a closing `:::` (`frame` is a hairline for screenshots; in a group each title is a small label). An image may carry its footnote right after it, e.g. `![…](/x.jpg "Caption")[^src]` for a web image cited in `sources`: it is still a figure, with the marker at its caption\'s end. Video, audio and PDF use the same spelling (a video\'s poster is `x.poster.png` beside `x.mp4`). Figures are lint, never refused: `image_no_alt` (say what it shows), `image_external` (hotlinked; `attach` it with `source_url`), `image_large` (over 2 MB or 4000 px; make a smaller one with `transform`), `image_not_image` (not an image, video, audio or PDF; link it instead), `figure_invalid` (the markup does not parse). A file with no frontmatter or frontmatter that is not valid YAML is refused (400) and nothing is written. Without `if_match` it creates and fails if the path exists; to replace, pass the hash from your last read. The server stamps `generated` from your token; `verified` is not yours to set. The page is stored in a canonical form (`-` bullets, `*` emphasis; `sources` entries one key per line, `tags: [a, b]` on one line); when that differs from what you sent, the result shows the diff, so `edit` the stored text. Prefer `edit` for small changes. Read the lint and notes in the result and fix the lint.',
+      description: toolDescription("write"),
       inputSchema: {
         path: z.string().describe("Where to write, e.g. `metrics/revenue.md`."),
         content: z.string().describe("The whole page: frontmatter and markdown."),
@@ -1083,8 +1071,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "edit",
     {
       title: "Edit a page",
-      description:
-        "Find-and-replace on the rendered document, frontmatter included, like an Edit tool. Each `old` must match exactly once; include enough surrounding text to make it unique; match the text as `read` shows it (stored in canonical form, which may differ from what was written). Edits apply in order. `if_match` is optional because the quoted text guards the edit. Preferred for small changes. On a mismatch the error includes the current document. The result names the page's open comment threads and any whose quote the edit removed.",
+      description: toolDescription("edit"),
       inputSchema: {
         path: z.string(),
         edits: z.array(EditSchema).min(1),
@@ -1106,8 +1093,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "grep",
     {
       title: "Search text",
-      description:
-        "Find lines matching a literal string (or a JavaScript regular expression with `regex: true`) across rendered pages, frontmatter included, like `grep -n`. Returns path:line: text.",
+      description: toolDescription("grep"),
       inputSchema: {
         pattern: z.string(),
         regex: z.boolean().optional(),
@@ -1132,8 +1118,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "move",
     {
       title: "Move or rename",
-      description:
-        "Move or rename a file, or a whole directory when `from` is a directory prefix (one request, one ledger event per file; the result lists each file moved). Links keep working: they are stored by identity, not path, and render with the new path. Fails if a destination is taken.",
+      description: toolDescription("move"),
       inputSchema: {
         from: z.string(),
         to: z.string(),
@@ -1154,8 +1139,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "delete",
     {
       title: "Delete a file",
-      description:
-        "Delete a page or attachment. Requires `if_match` with its current hash. A page with open comment threads is not deleted (409 `open_comments`): resolve them first. History is kept: the ledger records the delete and it can be reverted. Links pointing here become broken and show up in the work queue.",
+      description: toolDescription("delete"),
       inputSchema: {
         path: z.string(),
         if_match: z.string(),
@@ -1176,8 +1160,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "batch",
     {
       title: "Several changes as one",
-      description:
-        "Apply writes, edits, moves and deletes as one all-or-nothing request, like a commit: related changes land together in the ledger and one failure applies none (the error says which op, as `Op n of m`). Each op has its own path and, where needed, if_match.",
+      description: toolDescription("batch"),
       inputSchema: {
         ops: z.array(BatchOpSchema).min(1),
         note: z.string().optional().describe("One line for the ledger, for the whole request."),
@@ -1213,8 +1196,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "attach",
     {
       title: "Add an attachment from the web",
-      description:
-        "Store a file from the public web at a path: the server fetches `source_url` (https only, no credentials in the URL, at most 3 redirects, 10 s, up to 10 MB; images, video, audio and PDF only, judged by the bytes), so nothing passes through you, and records the URL and fetch time as the file's source; a refused fetch is `fetch_refused` naming the rule. Put a figure beside the page that uses it, named for what it shows (`dir/x.md` uses `dir/x-architecture.png`), and link it by absolute path. Never hotlink a web image in a page; bring it in this way, and cite the original in the page's `sources` (the fetch records where it came from but is not a citation). A file that is not on the web (one you made, or one the person has) goes in with `prepare_upload`. Images (PNG, JPEG, GIF, WebP, AVIF, SVG) are checked on write: a broken or truncated one is refused with `bad_image`, and the type is taken from the bytes, not the extension. `description` says in a line what the file shows (up to 500 characters); `credit` (who made it) and `licence` (free text) a line each, up to 200 characters; they show on the file's page. Replacing needs `if_match`; the same bytes with a new description, credit or licence is a write too. Reading it back with `read` returns its facts, a short-lived download URL and, for an image, the image.",
+      description: toolDescription("attach"),
       // Loose, so a call that still sends the removed `content_base64` reaches the handler and is
       // refused by name rather than having it silently dropped (TEMPRA-203).
       inputSchema: z.looseObject({
@@ -1285,8 +1267,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "prepare_upload",
     {
       title: "Upload a file",
-      description:
-        "The way to add a file that is not on the web, up to 10 MB: one you made (a screenshot, a processed image, a PDF) or one the person has (a photo they attached in the chat). Never type a file's bytes into a call, and for a chart, a flow or a drawing prefer rendered media in the page (a ```vega-lite, ```mermaid or ```svg fence) to a picture. Put it beside the page that uses it, named for what it shows (`dir/x-architecture.png`). Returns a URL good for one PUT within an hour, a ready `curl -T <file> '<url>'` line and an upload link for the person; in a chat that shows apps, an upload panel appears with the call. Then, by where the file is: (1) your shell reaches this server: run the curl line, and the server attaches the file at `path` as you, with your `note`; curl prints the write result as JSON (path, hash, seq, lint). (2) The person has it (you cannot pass on a chat's attachment): ask them to choose it in the panel, and give them the link in case the panel does not show. (3) You made it where you cannot reach this server (curl fails to connect, or a proxy refuses it, as in a chat's sandbox): give the file to the person in the chat, pass `origin` `agent`, and tell them in a sentence or two why they are asked: you cannot send files to Tempra yourself, so they upload the one you gave them (the panel and the link say the same). From their browser it is attached as your write, with your note, description, credit and licence, recorded as supplied by them; `read` the path to see when it has arrived. Whatever file arrives is the file; a transfer cut short is refused (`incomplete_upload`). The URL needs no token, so keep it to yourself; the link needs the person signed in with write access.",
+      description: toolDescription("prepare_upload"),
       _meta: { ui: { resourceUri: UPLOAD_PANEL_URI } },
       inputSchema: {
         path: z
@@ -1394,8 +1375,7 @@ export function buildServer(ctx: McpContext): McpServer {
     "transform",
     {
       title: "Make a file from an attachment",
-      description:
-        "Change an attachment on the server, since you cannot fetch it to change it yourself: `resize` an image to a long edge (`edge`, never enlarged; fixes `image_large`), `crop` it to a `box` in its pixels, `convert` it to `format` (webp, png or jpeg), make a `thumbnail` (a long edge of `edge`, default 320), or make a video's `poster`, its frame at `time` seconds as a PNG beside it, which the reader shows before the video plays (WebM for now: the server cannot decode MP4's H.264 yet). The result is an ordinary write as you, its source recorded as made from the original at its hash. Where it goes: `to`, or by default resize and crop replace the image itself (pass `if_match`, its hash from `read`), convert writes `x.<format>`, thumbnail `x.thumb.<ext>`, poster `x.poster.png`, beside the original. The description, credit and licence carry over unless you give new ones. `read` the original with `image: true` first to see what to change.",
+      description: toolDescription("transform"),
       inputSchema: {
         path: z.string().describe("The attachment to make from, e.g. `ops/latency.png`."),
         op: z.enum(["resize", "crop", "convert", "thumbnail", "poster"]),
@@ -1590,7 +1570,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "render",
       {
         title: "Draw a diagram",
-        description: `${BEYOND}draw rendered media as the app draws it and see it: a Mermaid diagram (Pele, the reader's column and greys), an SVG fence (sanitized as the reader sanitizes it) or a Vega-Lite chart (Vega, its data inline or from this library). Preview a non-trivial one before you write it (layout, labels that fit), or look at one while you review it or fix its \`diagram_invalid\`, \`diagram_unrendered\`, \`svg_invalid\` or \`chart_invalid\` lint: pass \`source\` (a fence's body, or the whole fence with its header; the language from \`lang\`, the fence, or the source itself: \`<svg\` is SVG, a JSON object Vega-Lite), or \`path\` and \`figure\` (its number in \`read\`'s Figures list). A \`source\` is checked as a write would check it, with the same sanitizing and data rules (only data inline or in this library), and what a write would report comes back with the drawing (\`svg_unsafe\` naming what is taken out, \`chart_invalid\`, \`svg_invalid\`, and \`image_no_alt\` when you pass the whole fence); one a write would call invalid is not drawn. Returns a line with what it is and its size, then the drawing as a PNG image; if it cannot be drawn, the error with line and column, and the line it names; if the PNG cannot be made, the SVG as text. Writes nothing and records nothing in the ledger. At most ${RENDERS_PER_MINUTE} renders a minute per account.`,
+        description: toolDescription("render", { RENDERS_PER_MINUTE }),
         inputSchema: {
           source: z
             .string()
@@ -1758,7 +1738,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "search",
       {
         title: "Ranked search",
-        description: `${BEYOND}ranked full-text search over titles, bodies and tags, with snippets. Any of the words matches, and pages with more of them, rarer ones or ones in the title rank first (BM25); words are stemmed, so comments finds comment. Use it to find pages by meaning words when you do not know the path; use grep for exact strings.`,
+        description: toolDescription("search"),
         inputSchema: {
           q: z
             .string()
@@ -1791,7 +1771,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "query",
       {
         title: "Filter by frontmatter",
-        description: `${BEYOND}list pages by frontmatter: tag, status, trust tier, staleness, directory. Faster and exact where grep over YAML is not. Find hot or cold pages by their reads over 30 days (each reader once a day): \`sort: "reads"\` (most read first), \`min_reads\`, \`max_reads\` (\`max_reads: 0\` for pages nobody read).`,
+        description: toolDescription("query"),
         inputSchema: {
           type: z
             .string()
@@ -1841,7 +1821,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "links",
       {
         title: "Links and backlinks",
-        description: `${BEYOND}a page's outbound links (with current target paths), inbound links (backlinks), and broken links. \`kind\` is \`body\` for a markdown link or \`source\` for a \`sources[].resource\` inside the library.`,
+        description: toolDescription("links"),
         inputSchema: { path: z.string(), ...libArg },
         annotations: readOnly,
       },
@@ -1852,7 +1832,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "sources",
       {
         title: "Sources and citations",
-        description: `${BEYOND}a page's sources with how often the body cites each (\`cited\`: every [^id] reference), footnotes with no matching source, and for sources inside the library their current path, trust tier and staleness (\`broken: true\` when the path does not exist).`,
+        description: toolDescription("sources"),
         inputSchema: { path: z.string(), ...libArg },
         annotations: readOnly,
       },
@@ -1863,7 +1843,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "log",
       {
         title: "What changed",
-        description: `${BEYOND}recent requests newest first: who (actor), when, their note, and the files each touched. Use it to see what other agents and humans did before you start, and to page back past what log.md shows (its latest 200 requests).`,
+        description: toolDescription("log"),
         inputSchema: {
           prefix: z.string().optional(),
           since: z.number().int().optional().describe("Only requests after this sequence number."),
@@ -1900,7 +1880,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "history",
       {
         title: "A file's history",
-        description: `${BEYOND}every ledger event for a page across moves: sequence, time, actor, op and hash. Read an old version with read(path, at).`,
+        description: toolDescription("history"),
         inputSchema: { path: z.string(), ...libArg },
         annotations: readOnly,
       },
@@ -1918,7 +1898,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "diff",
       {
         title: "Compare versions",
-        description: `${BEYOND}unified diff of a page between two sequence numbers. Omit both to see its latest change; omit \`to\` for head.`,
+        description: toolDescription("diff"),
         inputSchema: {
           path: z.string(),
           from: z.number().int().optional(),
@@ -1937,7 +1917,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "revert",
       {
         title: "Undo",
-        description: `${BEYOND}undo safely, forward-only: revert one path to its state at \`to_seq\`, or a whole request by \`request_id\` (from log). Adds new ledger events; nothing is erased. Only for the library's owner and their agents (403 \`owner_only\` in a library shared with you).`,
+        description: toolDescription("revert"),
         inputSchema: {
           path: z.string().optional(),
           to_seq: z.number().int().optional(),
@@ -1978,7 +1958,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "work",
       {
         title: "Maintenance queue",
-        description: `${BEYOND}what needs doing in this library: open comment threads (requests from people; a thread with no path is on the library itself), requests (\`request\`: threads marked as a bigger ask, left for people's agents to do, then reply and resolve), stale pages (past stale_after), broken links (body links and \`sources\` resources in this library that point nowhere; checked on every write and again daily, so a move or delete elsewhere shows here), lint (dangling footnotes included), hotlinked images (\`external_image\`, one item per page: \`attach\` each with \`source_url\`, \`edit\` the image to the attached path, cite the original in \`sources\`), and structure (what makes a directory's index.md poor: descriptions missing, too long or repeating the title, duplicate titles, pages nothing links to, directories with one page, none or too many; reported on the page or on the directory's index.md, and never fixed for you), ranked by how many pages link in. Each item has a suggested action; fix it through the normal write tools, and answer comments with \`comment\`. \`kind: "stale_soon"\` looks ahead instead: pages within 14 days of stale_after, to refresh before they go stale; only moving stale_after resets the clock.`,
+        description: toolDescription("work"),
         inputSchema: {
           kind: z
             .enum([
@@ -2012,7 +1992,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "comments",
       {
         title: "Read comment threads",
-        description: `${BEYOND}comment threads: requests and questions people (and agents) left on pages or on the library itself, each with the quoted text it is about, every reply, its kind (comment, or request: a bigger ask left for people's agents) and its thread id. Pass \`path\` for one page's threads (read them before editing it), an empty \`path\` for the threads on the library itself (on no page), or omit it for all of them. \`status\` is open (default), resolved or all. An outdated thread's quote is no longer in the body.`,
+        description: toolDescription("comments"),
         inputSchema: {
           path: z
             .string()
@@ -2063,7 +2043,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "comment",
       {
         title: "Comment, reply or resolve",
-        description: `${BEYOND}answer a comment thread or start one. \`reply\` adds to a thread; \`resolve\` closes it (with an optional closing reply, e.g. what you changed); \`reopen\` opens it again; \`open\` starts a thread on a page, optionally on a \`quote\` copied from its body as \`read\` shows it (matched by the text it reads as, markup aside; it must occur once; quote more of the sentence if it repeats), or with no \`path\` on the library itself. \`kind: "request"\` with \`open\` or \`reply\` marks the thread a request, a bigger ask left open for people's agents (\`work\` lists it as a \`request\`); \`kind: "comment"\` makes it a plain thread again. Resolve only what you actually addressed. Write \`@handle\` in a body to address someone who can reach the library: it reaches their inbox. Comments never change the page; edit it with the write tools.`,
+        description: toolDescription("comment"),
         inputSchema: {
           action: z.enum(["reply", "resolve", "reopen", "open"]),
           thread: z.string().optional().describe("reply, resolve, reopen: the thread id."),
@@ -2130,7 +2110,7 @@ export function buildServer(ctx: McpContext): McpServer {
       "export",
       {
         title: "Export the library",
-        description: `${BEYOND}a short-lived download URL (15 minutes) for the whole library as a tar: every page and attachment as a file, each Mermaid, SVG and Vega-Lite figure drawn beside its page as \`<page>.diagrams/<n>.svg\` (n its figure number; derived, so import ignores them). \`format: "okf"\` makes it a bundle that conforms to Google's Open Knowledge Format instead: each directory's index.md and log.md materialized, and \`type: Page\` on a page with no \`type\`. \`at\` exports an earlier sequence.`,
+        description: toolDescription("export"),
         inputSchema: {
           at: z.number().int().optional(),
           format: z.enum(EXPORT_FORMATS).optional(),
@@ -2153,7 +2133,7 @@ export function buildServer(ctx: McpContext): McpServer {
         "verify",
         {
           title: "Record a verification",
-          description: `${BEYOND}record that this process re-checked the page against its sources and resource: adds { by: ${ctx.actor}, at: now } to \`verified\`. The content is unchanged. Only call it after an actual check.`,
+          description: toolDescription("verify", { ACTOR: ctx.actor }),
           inputSchema: { path: z.string(), ...libArg },
           annotations: writes,
         },

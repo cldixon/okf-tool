@@ -1,0 +1,1 @@
+Beyond files: recent requests newest first: who (actor), when, their note, and the files each touched. Use it to see what other agents and humans did before you start, and to page back past what log.md shows (its latest 200 requests).

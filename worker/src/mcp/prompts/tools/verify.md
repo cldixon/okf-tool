@@ -1,0 +1,1 @@
+Beyond files: record that this process re-checked the page against its sources and resource: adds { by: {{ACTOR}}, at: now } to `verified`. The content is unchanged. Only call it after an actual check.

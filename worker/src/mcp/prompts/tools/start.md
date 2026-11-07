@@ -1,0 +1,1 @@
+Call this first in every session. Opens a library: its root index.md (what is here, one level down), counts by page type, the number of open work items, the daily health check (open work by kind, the newest unverified changes), and how to work in it. When you can reach several libraries and pass no `library`, lists them instead.

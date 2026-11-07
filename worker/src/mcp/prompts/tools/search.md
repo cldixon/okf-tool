@@ -1,0 +1,1 @@
+Beyond files: ranked full-text search over titles, bodies and tags, with snippets. Any of the words matches, and pages with more of them, rarer ones or ones in the title rank first (BM25); words are stemmed, so comments finds comment. Use it to find pages by meaning words when you do not know the path; use grep for exact strings.

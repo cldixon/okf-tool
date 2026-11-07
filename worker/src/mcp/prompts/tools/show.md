@@ -1,0 +1,1 @@
+Show one page to the person you work for, drawn as the Tempra app draws it, in a panel in the chat (in a chat that shows apps; elsewhere give them the link this returns). Use it when they ask to see a page, or when you want them to read one, e.g. after you wrote it. It is for reading only. Writes nothing.

@@ -1,0 +1,1 @@
+One directory level, like `ls` plus `cat index.md`: subdirectories with page counts, and pages with their titles and descriptions. The index is synthesized by the server from the pages' frontmatter. Omit `dir` for the root.

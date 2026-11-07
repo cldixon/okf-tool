@@ -1,0 +1,1 @@
+Apply writes, edits, moves and deletes as one all-or-nothing request, like a commit: related changes land together in the ledger and one failure applies none (the error says which op, as `Op n of m`). Each op has its own path and, where needed, if_match.

@@ -1,0 +1,1 @@
+Move or rename a file, or a whole directory when `from` is a directory prefix (one request, one ledger event per file; the result lists each file moved). Links keep working: they are stored by identity, not path, and render with the new path. Fails if a destination is taken.

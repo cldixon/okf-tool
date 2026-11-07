@@ -1,0 +1,1 @@
+Beyond files: a page's outbound links (with current target paths), inbound links (backlinks), and broken links. `kind` is `body` for a markdown link or `source` for a `sources[].resource` inside the library.

@@ -1,0 +1,1 @@
+Delete a page or attachment. Requires `if_match` with its current hash. A page with open comment threads is not deleted (409 `open_comments`): resolve them first. History is kept: the ledger records the delete and it can be reverted. Links pointing here become broken and show up in the work queue.

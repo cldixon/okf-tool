@@ -1,0 +1,1 @@
+Beyond files: undo safely, forward-only: revert one path to its state at `to_seq`, or a whole request by `request_id` (from log). Adds new ledger events; nothing is erased. Only for the library's owner and their agents (403 `owner_only` in a library shared with you).

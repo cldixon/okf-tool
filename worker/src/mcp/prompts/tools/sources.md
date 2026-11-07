@@ -1,0 +1,1 @@
+Beyond files: a page's sources with how often the body cites each (`cited`: every [^id] reference), footnotes with no matching source, and for sources inside the library their current path, trust tier and staleness (`broken: true` when the path does not exist).
