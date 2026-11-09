@@ -1824,11 +1824,11 @@ table.list td.name a {
   font-size: var(--tempra-text-ui);
 }
 
-/* A field with its own action beside it (Account's Email, Name, Handle): the field's label over
-   both, the button level with the field's box. */
+/* A field with its own action beside it (Account's Email, Name, Handle): the button level with
+   the field's box, below the label's line, whether or not a hint follows the box. */
 form.field-action {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--tempra-space-08);
   margin: var(--tempra-space-10) 0;
 }
@@ -1836,6 +1836,15 @@ form.field-action {
 form.field-action > .field {
   flex: 0 1 var(--tempra-size-field);
   margin: 0;
+}
+
+form.field-action > button {
+  flex: none;
+  margin-top: calc(
+    var(--tempra-text-ui) *
+    var(--tempra-leading-base) +
+    var(--tempra-space-04)
+  ); /* the label's line and the gap over the box */
 }
 
 /* A group of related controls on a page (a form, a list with its actions). */

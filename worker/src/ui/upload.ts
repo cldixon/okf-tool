@@ -56,9 +56,9 @@ export function uploadPage(v: UploadView, error?: { message: string; status: num
   }</p>
 <dl class="facts">${facts}</dl>
 ${error ? alertNotice(ERROR_ID, error.message) : ""}<form method="post" enctype="multipart/form-data" class="stack">
-<label class="field">File
-<input name="file" type="file" required${accept}${invalid(ERROR_ID, !!error)}>
-<span class="field-hint">${v.fromAgent ? "Save it from the chat first, then choose it here." : "If it came from a chat, choose it again here."}</span></label>
+<div class="field"><label>File
+<input name="file" type="file" required${accept}${invalid(ERROR_ID, !!error, "file-hint")}></label>
+<span class="field-hint" id="file-hint">${v.fromAgent ? "Save it from the chat first, then choose it here." : "If it came from a chat, choose it again here."}</span></div>
 <p><button class="primary" type="submit">Upload</button></p></form>
 <p class="muted">This link works once, for ${minutes} more ${minutes === 1 ? "minute" : "minutes"}.</p>`;
   return new Response(page("Upload a file", body), {

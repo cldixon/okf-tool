@@ -44,52 +44,42 @@
   <h1>Welcome</h1>
   {#if action.error}<div class="notice">{action.error}</div>{/if}
   <form onsubmit={submit}>
-    <p>
-      <Field label="Name"
-        ><input
-          type="text"
-          name="name"
-          defaultValue={me.name ?? ""}
-          autocomplete="name"
-          maxlength={80}
-          aria-describedby="welcome-name-hint"
-        /></Field
-      ><span id="welcome-name-hint" class="field-hint">
-        Optional. Your avatar's initials come from it.
-      </span>
-    </p>
-    <p>
-      <Field label="Handle"
-        ><input
-          type="text"
-          name="handle"
-          defaultValue={me.handle}
-          required
-          autocapitalize="off"
-          spellcheck="false"
-          aria-describedby="welcome-handle-hint"
-        /></Field
-      ><span id="welcome-handle-hint" class="field-hint">
-        Part of every library's address: {location.host}/handle/library. 2 to 39 lowercase
-        letters, digits, - or _.
-      </span>
-    </p>
-    <p>
-      <Field label="First library"
-        ><input
-          type="text"
-          name="library"
-          defaultValue="notes"
-          required
-          pattern={"[a-z0-9][a-z0-9\\-]{0,62}"}
-          autocapitalize="off"
-          spellcheck="false"
-          aria-describedby="welcome-library-hint"
-        /></Field
-      ><span id="welcome-library-hint" class="field-hint">
-        The last part of its address. Lowercase letters, digits and -.
-      </span>
-    </p>
+    <Field
+      label="Name"
+      hint="Optional. Your avatar's initials come from it."
+      ><input
+        type="text"
+        name="name"
+        defaultValue={me.name ?? ""}
+        autocomplete="name"
+        maxlength={80}
+      /></Field
+    >
+    <Field
+      label="Handle"
+      hint={`Part of every library's address: ${location.host}/handle/library. 2 to 39 lowercase letters, digits, - or _.`}
+      ><input
+        type="text"
+        name="handle"
+        defaultValue={me.handle}
+        required
+        autocapitalize="off"
+        spellcheck="false"
+      /></Field
+    >
+    <Field
+      label="First library"
+      hint="The last part of its address. Lowercase letters, digits and -."
+      ><input
+        type="text"
+        name="library"
+        defaultValue="notes"
+        required
+        pattern={"[a-z0-9][a-z0-9\\-]{0,62}"}
+        autocapitalize="off"
+        spellcheck="false"
+      /></Field
+    >
     <p>
       <label>
         <input type="checkbox" name="starter" value="1" defaultChecked /> Add a guide page

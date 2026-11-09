@@ -123,7 +123,7 @@
         <Button type="submit" disabled={action.busy}>Change</Button>
       </form>
       <form class="field-action" onsubmit={(e) => changeName(e, a.name)}>
-        <Field label="Name"
+        <Field label="Name" hint="Optional. Your avatar's initials come from it."
           ><input
             type="text"
             name="name"
@@ -134,14 +134,12 @@
         >
         <Button type="submit" disabled={action.busy}>Change</Button>
       </form>
-      <p class="small muted">Optional. Your avatar's initials come from it.</p>
       <form class="field-action" onsubmit={(e) => changeHandle(e, a.handle)}>
-        <Field label="Handle"
+        <Field label="Handle" hint="Your handle is in every library's address."
           ><input type="text" name="handle" defaultValue={a.handle} required /></Field
         >
         <Button type="submit" disabled={action.busy}>Change</Button>
       </form>
-      <p class="small muted">Your handle is in every library's address.</p>
       <h2 id="usage">Limits</h2>
       <p>
         Libraries: {a.usage.libraries} of {a.limits.libraries}. Active tokens:

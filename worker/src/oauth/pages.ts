@@ -39,9 +39,14 @@ export function page(title: string, body: string, opts: { wide?: boolean } = {})
 export const alertNotice = (id: string, message: string) =>
   `<p class="notice" id="${id}" role="alert">${esc(message)}</p>`;
 
-/** A field's attributes when the error with that id is about it. */
-export const invalid = (id: string, when = true) =>
-  when ? ` aria-invalid="true" aria-describedby="${id}"` : "";
+/**
+ * A field's attributes: invalid, and described by the error with that id, when the error is about
+ * it; described by its hint (the id of a `.field-hint` outside its label) as well, if it has one.
+ */
+export const invalid = (id: string, when = true, hint?: string) => {
+  const by = [when ? id : "", hint ?? ""].filter(Boolean).join(" ");
+  return `${when ? ' aria-invalid="true"' : ""}${by ? ` aria-describedby="${by}"` : ""}`;
+};
 
 /** Which consent field an error is about, to mark it (V-10). */
 export type ConsentField = "libraries" | "new_library" | "create" | "prefix" | "actor";
@@ -100,7 +105,8 @@ export function consentPage(opts: {
   const origin = details.clientDomain
     ? `Published by <strong>${esc(details.clientDomain)}</strong>.`
     : "This app registered itself; its name is not verified.";
-  const bad = (field: ConsentField) => invalid(ERROR_ID, opts.error?.field === field);
+  const bad = (field: ConsentField, hint?: string) =>
+    invalid(ERROR_ID, opts.error?.field === field, hint);
   const libChecks = opts.libraries
     .map((l) => {
       const key = consentKey(l);
@@ -132,9 +138,9 @@ ${opts.error ? alertNotice(ERROR_ID, opts.error.message) : ""}
     ${radio("libraries", "all", form.libraries, "All your libraries", `including ones you create later${anyShared ? "; libraries shared with you only when picked" : ""}`)}
     ${radio("libraries", "selected", form.libraries, "Only these", "")}
     <div class="indent">${libChecks}</div>
-    <label class="field">New library (optional)
-    <input type="text" id="new_library" name="new_library" value="${esc(form.newLibrary)}" placeholder="team-notes" autocapitalize="off" spellcheck="false"${bad("new_library")}>
-    <span class="field-hint">Connecting creates it. Leave it empty to create none.</span></label>
+    <div class="field"><label>New library (optional)
+    <input type="text" id="new_library" name="new_library" value="${esc(form.newLibrary)}" placeholder="team-notes" autocapitalize="off" spellcheck="false"${bad("new_library", "new_library-hint")}></label>
+    <span class="field-hint" id="new_library-hint">Connecting creates it. Leave it empty to create none.</span></div>
   </fieldset>
   <fieldset>
     <legend>Access</legend>
@@ -153,9 +159,9 @@ ${opts.error ? alertNotice(ERROR_ID, opts.error.message) : ""}
     <legend>Limits and name</legend>
     <label class="field">Only this folder in each library (optional)
     <input type="text" id="prefix" name="prefix" value="${esc(form.prefix)}" placeholder="notes" autocapitalize="off" spellcheck="false"${bad("prefix")}></label>
-    <label class="field">Connection name
-    <input type="text" id="actor" name="actor" value="${esc(form.actor)}" autocapitalize="off" spellcheck="false"${bad("actor")}>
-    <span class="field-hint">How this connection signs its changes for agents and exports, like claude/laptop.</span></label>
+    <div class="field"><label>Connection name
+    <input type="text" id="actor" name="actor" value="${esc(form.actor)}" autocapitalize="off" spellcheck="false"${bad("actor", "actor-hint")}></label>
+    <span class="field-hint" id="actor-hint">How this connection signs its changes for agents and exports, like claude/laptop.</span></div>
   </fieldset>
   </details>
   ${form.newLibrary ? `<p>Connecting creates the library <strong>${esc(form.newLibrary)}</strong>.</p>` : ""}
