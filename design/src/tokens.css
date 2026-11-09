@@ -216,6 +216,10 @@
   --tempra-text-h2: 22px; /* an attachment's name, a compose dialog's name */
   --tempra-text-page: 28px; /* a view's title (h1); a page's title on a phone */
   --tempra-text-title: 36px; /* a page's title */
+  /* The landing page's title and lede: fluid between a phone and a wide window, in rem so a
+     reader's zoom still scales them (a size in vw alone would not) */
+  --tempra-text-hero: clamp(2.5rem, 1.5rem + 3vw, 3.75rem); /* 40px to 60px */
+  --tempra-text-lede: clamp(1.0625rem, 0.9rem + 0.4vw, 1.25rem); /* 17px to 20px */
   --tempra-text-lockup: 26px; /* the server pages' large lockup: the mark and Tempra at the left gutter */
   --tempra-text-code: 0.9em; /* code: JetBrains Mono's x-height level with Inter's around it */
 
@@ -229,7 +233,8 @@
   --tempra-weight-medium: 500; /* names in rows, a page's title, the body's h1 and h2 */
   --tempra-weight-strong: 600; /* the sans's headings, section labels, the wordmark */
 
-  /* Leading: four */
+  /* Leading: five */
+  --tempra-leading-display: 1.1; /* the landing page's title, 40px and up */
   --tempra-leading-tight: 1.2; /* titles and headings */
   --tempra-leading-snug: 1.4; /* small text that wraps in a narrow column: the contents */
   --tempra-leading-base: 1.5; /* the app's text */
@@ -240,6 +245,9 @@
   /* Display text (22px and up, Inter's display cut): a little tighter, the same at every size,
      since the display cut's own spacing already tightens with the optical size */
   --tempra-tracking-display: -0.012em;
+  /* Past the display cut's largest optical size (32px), Inter's spacing no longer tightens with
+     size, so the landing page's title tightens itself */
+  --tempra-tracking-hero: -0.022em;
 
   /* Lines: a link's underline sits this far under the text (inside .prose, in em) */
   --tempra-line-offset: 2px;

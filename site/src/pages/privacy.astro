@@ -5,88 +5,92 @@ import { CONTACT, DELETION, LEGAL_UPDATED } from "../site";
 
 <Base title="Privacy · Tempra" description="What Tempra stores, where it goes, and how to remove it.">
   <article class="legal" aria-labelledby="title">
-    <h1 id="title">Privacy</h1>
-    <p class="muted">Last updated <time datetime={LEGAL_UPDATED.iso}>{LEGAL_UPDATED.text}</time></p>
-    <p>
-      This covers Tempra at tempra.dev, the landing page and the app. Tempra is in private beta. Questions go
-      to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
-    </p>
+    <header class="doc-head">
+      <h1 id="title" class="doc-title">Privacy</h1>
+      <p class="doc-tagline">Last updated <time datetime={LEGAL_UPDATED.iso}>{LEGAL_UPDATED.text}</time></p>
+    </header>
+    <div class="prose">
+      <p>
+        This covers Tempra at tempra.dev, the landing page and the app. Tempra is in private beta. Questions go
+        to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+      </p>
 
-    <h2>1. What we store</h2>
-    <ul>
-      <li>Your account: email address, handle, theme and email settings.</li>
-      <li>
-        Your libraries: pages, files, comments, and the record of every change with who made it.
-      </li>
-      <li>
-        Agents and apps you connect: their names and what they may reach. Tokens and secrets are
-        stored only as hashes.
-      </li>
-      <li>Sign-in sessions: when they started and were last used, and your browser's user agent.</li>
-      <li>How often each page is read, as counts. Readers are kept as hashed keys, never shown.</li>
-      <li>Notifications waiting for you, and the mail we send you.</li>
-      <li>Usage counts (requests, writes, emails) to apply limits.</li>
-      <li>If you request access: your email address, when you asked, and your IP address.</li>
-    </ul>
+      <h2>1. What we store</h2>
+      <ul>
+        <li>Your account: email address, handle, theme and email settings.</li>
+        <li>
+          Your libraries: pages, files, comments, and the record of every change with who made it.
+        </li>
+        <li>
+          Agents and apps you connect: their names and what they may reach. Tokens and secrets are
+          stored only as hashes.
+        </li>
+        <li>Sign-in sessions: when they started and were last used, and your browser's user agent.</li>
+        <li>How often each page is read, as counts. Readers are kept as hashed keys, never shown.</li>
+        <li>Notifications waiting for you, and the mail we send you.</li>
+        <li>Usage counts (requests, writes, emails) to apply limits.</li>
+        <li>If you request access: your email address, when you asked, and your IP address.</li>
+      </ul>
 
-    <h2>2. Cookies</h2>
-    <p>
-      The app sets one cookie, which keeps you signed in. It is sent only to tempra.dev and cannot
-      be read by scripts. It ends when you sign out, after 30 days unused, or after 90 days at
-      most. There are no analytics, advertising or third-party cookies, and the landing page sets
-      none.
-    </p>
+      <h2>2. Cookies</h2>
+      <p>
+        The app sets one cookie, which keeps you signed in. It is sent only to tempra.dev and cannot
+        be read by scripts. It ends when you sign out, after 30 days unused, or after 90 days at
+        most. There are no analytics, advertising or third-party cookies, and the landing page sets
+        none.
+      </p>
 
-    <h2>3. Logs</h2>
-    <p>
-      Like most web services, our hosting records requests and errors to keep the service running
-      and to fix problems. A record can include the time, the address asked for, the result, your
-      IP address and your browser's user agent. These logs are kept for a short time and are not
-      used for anything else.
-    </p>
+      <h2>3. Logs</h2>
+      <p>
+        Like most web services, our hosting records requests and errors to keep the service running
+        and to fix problems. A record can include the time, the address asked for, the result, your
+        IP address and your browser's user agent. These logs are kept for a short time and are not
+        used for anything else.
+      </p>
 
-    <h2>4. Where it is kept</h2>
-    <p>
-      On Cloudflare, which hosts and runs Tempra and sends its email. Data is encrypted at rest by
-      Cloudflare. The person who runs Tempra can read stored data, and does so only to run the
-      service, fix problems or handle abuse.
-    </p>
+      <h2>4. Where it is kept</h2>
+      <p>
+        On Cloudflare, which hosts and runs Tempra and sends its email. Data is encrypted at rest by
+        Cloudflare. The person who runs Tempra can read stored data, and does so only to run the
+        service, fix problems or handle abuse.
+      </p>
 
-    <h2>5. Who else sees your content</h2>
-    <ul>
-      <li>
-        People you share a library with see its pages, comments and history, including who made
-        each change. Handles appear in the app's addresses.
-      </li>
-      <li>
-        Agents you connect read and write what you allow. What their provider does with it is
-        governed by that provider's terms.
-      </li>
-      <li>
-        @tempra, Tempra's own agent, is off unless it is turned on for a library's owner. When it is
-        on, a comment that mentions @tempra, or replies in a thread it answered, sends that thread
-        and the pages it reads to answer to Anthropic's API, which writes its reply. Anthropic
-        handles that data under its
-        <a href="https://www.anthropic.com/legal/commercial-terms">commercial terms</a> and
-        <a href="https://www.anthropic.com/legal/privacy">privacy policy</a>.
-      </li>
-    </ul>
-    <p>We do not sell your data, show ads, or use tracking scripts.</p>
+      <h2>5. Who else sees your content</h2>
+      <ul>
+        <li>
+          People you share a library with see its pages, comments and history, including who made
+          each change. Handles appear in the app's addresses.
+        </li>
+        <li>
+          Agents you connect read and write what you allow. What their provider does with it is
+          governed by that provider's terms.
+        </li>
+        <li>
+          @tempra, Tempra's own agent, is off unless it is turned on for a library's owner. When it is
+          on, a comment that mentions @tempra, or replies in a thread it answered, sends that thread
+          and the pages it reads to answer to Anthropic's API, which writes its reply. Anthropic
+          handles that data under its
+          <a href="https://www.anthropic.com/legal/commercial-terms">commercial terms</a> and
+          <a href="https://www.anthropic.com/legal/privacy">privacy policy</a>.
+        </li>
+      </ul>
+      <p>We do not sell your data, show ads, or use tracking scripts.</p>
 
-    <h2>6. Email</h2>
-    <p>
-      We email sign-in links, invitations to libraries, notices about your account, and, unless
-      you turn it off in your account, mentions and replies in comment threads. If you requested
-      access, we send one email when you are let in.
-    </p>
+      <h2>6. Email</h2>
+      <p>
+        We email sign-in links, invitations to libraries, notices about your account, and, unless
+        you turn it off in your account, mentions and replies in comment threads. If you requested
+        access, we send one email when you are let in.
+      </p>
 
-    <h2>7. Export and deletion</h2>
-    <p>Export any library at any time. {DELETION}</p>
+      <h2>7. Export and deletion</h2>
+      <p>Export any library at any time. {DELETION}</p>
 
-    <h2>8. Contact</h2>
-    <p>
-      Write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a> to ask what we hold about you, to
-      correct it, or to have it removed.
-    </p>
+      <h2>8. Contact</h2>
+      <p>
+        Write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a> to ask what we hold about you, to
+        correct it, or to have it removed.
+      </p>
+    </div>
   </article>
 </Base>

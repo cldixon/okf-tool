@@ -101,7 +101,7 @@
 
 .public-main {
   flex: 1;
-  padding: var(--tempra-space-48) var(--public-inline) 64px; /* one-off: room above the foot */
+  padding: var(--tempra-space-48) var(--public-inline) var(--tempra-space-64); /* room above the foot */
 }
 
 .public-main > :first-child {
@@ -237,7 +237,7 @@
    Privacy and Not found keep the plain column between them. The sizes no token names (the
    lockup's 26px, the landing page's display type) are the Paper board's, set once here. */
 .public.site {
-  --site-inline: 64px; /* one-off: the site's margin at the window's edge */
+  --site-inline: var(--tempra-space-64); /* the site's margin at the window's edge */
   --site-head: 88px; /* one-off: the site's header */
 }
 
@@ -251,13 +251,13 @@
 .public.site .wordmark {
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
-  font-size: 26px; /* one-off: the large lockup's name */
-  letter-spacing: -0.015em; /* one-off: the lockup's name */
+  font-size: var(--tempra-text-lockup);
+  letter-spacing: var(--tempra-tracking-display);
   line-height: var(--tempra-leading-tight);
 }
 
 .public.site .public-nav .button.primary {
-  padding: var(--tempra-space-12) 22px; /* one-off: the site's pill */
+  padding: var(--tempra-space-12) var(--tempra-space-24);
   font-size: var(--tempra-text-name);
 }
 
@@ -289,20 +289,23 @@
   align-items: start;
 }
 
+/* The title as a page's title is, in the medium weight, at the hero size; it scales with the
+   window, so the phone needs no size of its own. */
 .landing-doc h1 {
   margin: 0;
-  font-size: 60px; /* one-off: the landing page's title */
-  font-weight: var(--tempra-weight-strong);
-  line-height: 1.133; /* one-off: 68px on 60px */
-  letter-spacing: -0.03em; /* one-off: the landing page's title */
-  text-wrap: balance;
+  font-size: var(--tempra-text-hero);
+  font-weight: var(--tempra-weight-medium);
+  line-height: var(--tempra-leading-display);
+  letter-spacing: var(--tempra-tracking-hero);
 }
 
 .landing-description {
   margin: var(--tempra-space-14) 0 0;
   color: var(--tempra-color-muted);
-  font-size: 20px; /* one-off: the landing page's description */
+  font-size: var(--tempra-text-lede);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-base);
+  text-wrap: pretty;
 }
 
 .landing-byline {
@@ -310,7 +313,7 @@
   align-items: center;
   gap: var(--tempra-space-08);
   margin: 0;
-  padding: 22px 0 var(--tempra-space-28); /* one-off: the board's byline */
+  padding: var(--tempra-space-24) 0 var(--tempra-space-28);
   border-bottom: 1px solid var(--tempra-color-border);
   font-size: var(--tempra-text-ui);
 }
@@ -328,7 +331,7 @@
 }
 
 .landing-text h2 {
-  margin: 0 0 var(--tempra-space-06);
+  margin: 0 0 var(--tempra-space-08);
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: var(--tempra-text-h2);
@@ -339,16 +342,14 @@
 .landing-text section p {
   margin: 0;
   font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-reader);
+  text-wrap: pretty;
 }
 
-.landing-text code {
-  font-size: var(--tempra-text-name);
-}
-
-/* The contents: level with the sections, the first heading marked. */
+/* The contents: level with the title's first line, as a page's are in the app (page.css). */
 .landing-contents {
-  padding-top: 218px; /* one-off: level with the sections, as the board has them */
+  padding-top: var(--tempra-space-12);
 }
 
 /* A phone: one column, the contents a closed "On this page" between hairlines, as the app's. */
@@ -359,7 +360,7 @@
   }
 
   .public.site .public-nav .button.primary {
-    padding: 11px var(--tempra-space-18); /* one-off: the site's pill on a phone */
+    padding: var(--tempra-space-10) var(--tempra-space-18);
     font-size: var(--tempra-text-base);
   }
 
@@ -376,14 +377,8 @@
     display: block;
   }
 
-  .landing-doc h1 {
-    font-size: 40px; /* one-off: the landing page's title on a phone */
-    line-height: 1.1; /* one-off: 44px on 40px */
-  }
-
   .landing-description {
     margin-top: var(--tempra-space-10);
-    font-size: var(--tempra-text-reader);
   }
 
   .landing-byline {
@@ -417,12 +412,7 @@
   }
 
   .landing-text h2 {
-    margin-bottom: var(--tempra-space-04);
-    font-size: 20px; /* one-off: a section's heading on a phone */
-  }
-
-  .landing-text section p {
-    line-height: 1.53; /* one-off: 26px on 17px */
+    margin-bottom: var(--tempra-space-06);
   }
 
   .landing-contents {
@@ -430,13 +420,14 @@
   }
 }
 
-/* Terms and privacy: plain text at a comfortable measure, dated, in numbered sections. */
+/* Terms and privacy: drawn as a Tempra page is (its title and a dated line as the head, the
+   text in the reader's typography, .prose), so they read as the documents they are. */
 .legal {
-  max-width: 38em;
+  max-width: var(--tempra-size-column-text);
 }
 
-.legal li + li {
-  margin-top: var(--tempra-space-08);
+.legal .doc-head {
+  margin-bottom: var(--tempra-space-32);
 }
 
 @media (max-width: 640px) {
