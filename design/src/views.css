@@ -482,7 +482,7 @@ a.activity-page-title:hover {
   border-bottom: 1px solid var(--tempra-color-border);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
   text-align: left;
   white-space: nowrap;
 }

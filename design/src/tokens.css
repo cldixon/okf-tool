@@ -215,13 +215,19 @@
   --tempra-text-lockup: 26px; /* the server pages' large lockup: the mark and Tempra at the left gutter */
   --tempra-text-code: 0.92em; /* code, a step under the text around it */
 
-  /* Weights: three */
-  --tempra-weight-regular: 400; /* text */
+  /* Weights: four. Inter is variable, so a weight is any value, not a file. Chrome (13px and
+     under, muted grey on the page's ground: the tree, the contents, the byline, menus, panels)
+     sits between regular and medium, as Inter's own UI cut is drawn for small sizes: at 400 its
+     hairline stems thin out to grey fuzz once antialiased, at 450 they hold a full pixel. Reading
+     text stays regular; its size and leading carry it. */
+  --tempra-weight-regular: 400; /* reading text: a page's body and description */
+  --tempra-weight-ui: 450; /* the app's chrome: every word outside .prose that is not a name */
   --tempra-weight-medium: 500; /* names in rows, a page's title, the body's h1 and h2 */
   --tempra-weight-strong: 600; /* the sans's headings, section labels, the wordmark */
 
-  /* Leading: three */
+  /* Leading: four */
   --tempra-leading-tight: 1.2; /* titles and headings */
+  --tempra-leading-snug: 1.4; /* small text that wraps in a narrow column: the contents */
   --tempra-leading-base: 1.5; /* the app's text */
   --tempra-leading-reader: 1.65; /* reading */
 
@@ -344,4 +350,24 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+/* Dark's grade. Light text on a dark ground, antialiased (base.css), draws thinner than the same
+   weight dark on light: the glyphs' edges fade into the ground rather than out of it. Fonts with a
+   grade axis compensate without changing widths; Inter has none, so the weights step up a little
+   instead, as Material's dark themes do with GRAD and Apple's with its dark-mode text. Strong is
+   heavy enough as it is. A weight cannot be light-dark(), so dark is said twice: chosen on the
+   root, or the system's with no choice made. */
+:root[data-theme="dark"] {
+  --tempra-weight-regular: 420;
+  --tempra-weight-ui: 480;
+  --tempra-weight-medium: 520;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tempra-weight-regular: 420;
+    --tempra-weight-ui: 480;
+    --tempra-weight-medium: 520;
+  }
 }

@@ -210,7 +210,7 @@
   max-width: none;
   margin-top: var(--tempra-space-06);
   padding: 0 var(--tempra-space-12);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
 }
 
 .public.narrow button.primary,

@@ -9,6 +9,7 @@
   color: var(--tempra-color-text);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-reader);
   font-kerning: normal;
   font-optical-sizing: auto;

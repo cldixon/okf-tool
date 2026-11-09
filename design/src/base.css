@@ -12,8 +12,14 @@ body {
   color: var(--tempra-color-text);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-base);
+  font-weight: var(--tempra-weight-ui);
   line-height: var(--tempra-leading-base);
+  /* Inter's contextual forms and kerning, always; no faux bold or oblique if a weight or the
+     italic has not loaded yet (the variable files have every weight, and the italic their own). */
+  font-kerning: normal;
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
@@ -363,7 +369,9 @@ details > summary {
   margin: 0 0 var(--tempra-space-08);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-label);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
+  /* Capitals' punctuation and figures (case-sensitive forms), as set in all caps */
+  font-feature-settings: "case";
   letter-spacing: var(--tempra-tracking-label);
   text-transform: uppercase;
 }

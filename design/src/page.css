@@ -104,6 +104,9 @@
   overflow: auto;
   padding: calc(var(--tempra-space-56) + var(--tempra-space-08)) var(--tempra-space-page)
     var(--tempra-space-24) 0; /* level with the title's first line */
+  /* Opaque, as the page under it is: a scroller on a see-through layer loses subpixel text on
+     the screens that still draw it (Windows, Linux at 1x) */
+  background: var(--tempra-color-bg);
 }
 
 .toc {
@@ -111,8 +114,9 @@
   padding: 0;
   border-left: 1px solid var(--tempra-color-border);
   list-style: none;
-  font-size: var(--tempra-text-meta);
-  line-height: var(--tempra-leading-base);
+  font-size: var(--tempra-text-ui);
+  line-height: var(--tempra-leading-snug);
+  text-wrap: pretty;
 }
 
 .toc a {
@@ -296,13 +300,17 @@
   font-weight: var(--tempra-weight-medium);
   line-height: var(--tempra-leading-tight);
   letter-spacing: var(--tempra-tracking-doc);
+  /* Lines of even length, never one word left on the last */
+  text-wrap: balance;
 }
 
 .doc-tagline {
   margin: 0;
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-base);
+  text-wrap: pretty;
 }
 
 /* ---------- The byline: who wrote this version, for whom, when; or who is editing now ---------- */
@@ -980,7 +988,7 @@
   margin: 0 0 var(--tempra-space-08);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
 }
 
 /* Current version (TEMPRA-309): the latest version's whole note, up to three lines; then Earlier

@@ -411,7 +411,7 @@ body.ground {
   margin: 0;
   color: var(--tempra-color-text);
   font-size: var(--tempra-text-ui);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
 }
 
 .compose-context {
@@ -1377,11 +1377,22 @@ a.button.pill-button {
   text-overflow: ellipsis;
 }
 
+/* A name cut short with an ellipsis clips at its box, and a glyph's ink can reach past its
+   advance (the W's and the V's outer strokes, an italic's overhang): a hair of room inside the
+   clip, given back outside it, keeps the first letter whole without moving it. */
+.tree-name,
+.tree-row > a,
+.nav-label,
+.topbar-crumbs .crumb[aria-current="page"] {
+  margin-inline: -2px;
+  padding-inline: 2px;
+}
+
 /* A folder's row is one button: it opens and closes the folder, and is never the current row. Its
    name rests muted in the rows' weight, as Linear's docs draw a section's label (TEMPRA-310), so
    only the current page is ever in the text colour; a hover brings it up, as any row's. */
 button.tree-name {
-  padding: 0;
+  padding-block: 0;
   border: 0;
   background: none;
   color: var(--tempra-color-muted);
@@ -1403,6 +1414,12 @@ button.tree-name {
 .tree-row:hover > a,
 .tree-row > a[aria-current="page"] {
   color: var(--tempra-color-text);
+}
+
+/* A folder's row is marked as a page's is, by its name alone: the base button's hover fill (a
+   pill at the button's box) never reaches it. */
+.tree-row > button.tree-name:hover:not(:disabled) {
+  background: transparent;
 }
 
 /* A file's icon follows its name. */
@@ -1790,7 +1807,7 @@ table.list th {
   border-bottom: 1px solid var(--tempra-color-border);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-label);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
   letter-spacing: var(--tempra-tracking-label);
   text-transform: uppercase;
 }
