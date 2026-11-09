@@ -114,6 +114,8 @@ pre,
 kbd,
 samp {
   font-family: var(--tempra-font-mono);
+  /* Code as typed: no ligatures (JetBrains Mono's != and => stay two characters) */
+  font-variant-ligatures: none;
 }
 
 code {

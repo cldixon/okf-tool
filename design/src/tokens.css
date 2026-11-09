@@ -199,10 +199,10 @@
     "Inter", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Helvetica, sans-serif;
   --tempra-font-display: var(--tempra-font-text);
   --tempra-font-display-settings: "opsz" 32; /* Inter's display cut, at any size it is used */
-  /* The mono: each platform's own, so code is never left to a generic monospace (Courier on
-     Windows): SF Mono on Apple, Cascadia then Consolas on Windows, the usual Linux faces */
+  /* The mono: JetBrains Mono, self-hosted (fonts.css), so code reads the same on every
+     platform; each platform's own after it while it loads or for a glyph it lacks */
   --tempra-font-mono:
-    ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", "Segoe UI Mono", Consolas,
+    "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas,
     "Liberation Mono", "DejaVu Sans Mono", monospace;
 
   /* Type scale: the only pixel sizes in the CSS (inside .prose, sizes are em of the reading size) */
@@ -217,7 +217,7 @@
   --tempra-text-page: 28px; /* a view's title (h1); a page's title on a phone */
   --tempra-text-title: 36px; /* a page's title */
   --tempra-text-lockup: 26px; /* the server pages' large lockup: the mark and Tempra at the left gutter */
-  --tempra-text-code: 0.92em; /* code, a step under the text around it */
+  --tempra-text-code: 0.9em; /* code: JetBrains Mono's x-height level with Inter's around it */
 
   /* Weights: four. Inter is variable, so a weight is any value, not a file. Chrome (13px and
      under, muted grey on the page's ground: the tree, the contents, the byline, menus, panels)
