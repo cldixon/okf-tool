@@ -4228,10 +4228,10 @@ async function browserRenders(
         throw new Error("two panels at once");
       }
       await openInfo();
-      // About this page in people's words (TEMPRA-134, C-12, C-13): Status "not set", no lint
+      // About this page in people's words (TEMPRA-134, C-12, C-13): Status "Not set", no lint
       // codes, suggested actions or path, and no For agents section (TEMPRA-144).
       await infoPanel
-        .locator("dd", { hasText: /^not set$/ })
+        .locator("dd", { hasText: /^Not set$/ })
         .first()
         .waitFor();
       const heads = await infoPanel.locator(".page-info-section > h3").allInnerTexts();

@@ -238,7 +238,7 @@
 
 .panel-head h2 {
   margin: 0;
-  font-size: var(--tempra-text-ui);
+  font-size: var(--tempra-text-name);
   font-weight: var(--tempra-weight-strong);
 }
 
@@ -299,7 +299,7 @@
   font-size: var(--tempra-text-title);
   font-weight: var(--tempra-weight-medium);
   line-height: var(--tempra-leading-tight);
-  letter-spacing: var(--tempra-tracking-doc);
+  letter-spacing: var(--tempra-tracking-display);
   /* Lines of even length, never one word left on the last */
   text-wrap: balance;
 }
@@ -836,10 +836,6 @@
     touch-action: none;
   }
 
-  .panel-head h2 {
-    font-size: var(--tempra-text-name);
-  }
-
   /* The drag handle, centred at the sheet's top edge. */
   .panel-grip {
     position: absolute;
@@ -986,9 +982,6 @@
 
 .page-info-section > h3 {
   margin: 0 0 var(--tempra-space-08);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-ui);
 }
 
 /* Current version (TEMPRA-309): the latest version's whole note, up to three lines; then Earlier

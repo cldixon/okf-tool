@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from "@tempra/design/components";
+  import { Button, Field } from "@tempra/design/components";
   import { untrack } from "svelte";
   import { api, field, post } from "../api";
   import ConfirmDialog from "../ConfirmDialog.svelte";
@@ -116,38 +116,30 @@
   {#if action.error}<div class="notice">{action.error}</div>{/if}
   <Status loaded={loaded.current}>
     {#snippet children(a)}
-      <form onsubmit={changeEmail}>
-        <p>
-          <label>
-            Email
-            <input type="email" name="email" autocomplete="email" defaultValue={a.email} required />
-          </label>
-          <Button type="submit" disabled={action.busy}>Change</Button>
-        </p>
+      <form class="field-action" onsubmit={changeEmail}>
+        <Field label="Email"
+          ><input type="email" name="email" autocomplete="email" defaultValue={a.email} required /></Field
+        >
+        <Button type="submit" disabled={action.busy}>Change</Button>
       </form>
-      <form onsubmit={(e) => changeName(e, a.name)}>
-        <p>
-          <label>
-            Name
-            <input
-              type="text"
-              name="name"
-              autocomplete="name"
-              maxlength={80}
-              defaultValue={a.name ?? ""}
-            />
-          </label>
-          <Button type="submit" disabled={action.busy}>Change</Button>
-        </p>
+      <form class="field-action" onsubmit={(e) => changeName(e, a.name)}>
+        <Field label="Name"
+          ><input
+            type="text"
+            name="name"
+            autocomplete="name"
+            maxlength={80}
+            defaultValue={a.name ?? ""}
+          /></Field
+        >
+        <Button type="submit" disabled={action.busy}>Change</Button>
       </form>
       <p class="small muted">Optional. Your avatar's initials come from it.</p>
-      <form onsubmit={(e) => changeHandle(e, a.handle)}>
-        <p>
-          <label>
-            Handle <input type="text" name="handle" defaultValue={a.handle} required />
-          </label>
-          <Button type="submit" disabled={action.busy}>Change</Button>
-        </p>
+      <form class="field-action" onsubmit={(e) => changeHandle(e, a.handle)}>
+        <Field label="Handle"
+          ><input type="text" name="handle" defaultValue={a.handle} required /></Field
+        >
+        <Button type="submit" disabled={action.busy}>Change</Button>
       </form>
       <p class="small muted">Your handle is in every library's address.</p>
       <h2 id="usage">Limits</h2>
@@ -212,12 +204,9 @@
       <h2>Delete account</h2>
       <p>Deletes every library you own. Export them first.</p>
       <form onsubmit={remove}>
-        <p>
-          <label>
-            Type {a.handle} to confirm
-            <input type="text" name="confirm" autocomplete="off" required />
-          </label>
-        </p>
+        <Field label={`Type ${a.handle} to confirm`}
+          ><input type="text" name="confirm" autocomplete="off" required /></Field
+        >
         <p>
           <Button type="submit" disabled={action.busy}>Delete account</Button>
         </p>

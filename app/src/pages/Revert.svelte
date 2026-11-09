@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from "@tempra/design/components";
+  import { Button, Field } from "@tempra/design/components";
   import { type LedgerRequest, touchedBy } from "../activity";
   import { useAgentNames } from "../agents.svelte.ts";
   import { api, field, post } from "../api";
@@ -71,10 +71,9 @@
         <p>Undoes every change in it, as a new change by you. Nothing is erased.</p>
         {#if action.error}<div class="notice">{action.error}</div>{/if}
         <form onsubmit={submit}>
-          <label>
-            Note
-            <input type="text" name="note" defaultValue={`Revert: ${r.note ?? "a change"}`} />
-          </label>
+          <Field label="Note"
+            ><input type="text" name="note" defaultValue={`Revert: ${r.note ?? "a change"}`} /></Field
+          >
           <p class="actions">
             <Button variant="primary" type="submit" disabled={action.busy}>Revert</Button><Button href={urls.activity({ view: "events" })}>Cancel</Button>
           </p>

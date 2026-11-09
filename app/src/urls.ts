@@ -181,12 +181,78 @@ export function dirOf(path: string) {
 }
 
 /**
- * A folder as a person reads it, until folders have titles of their own: its name with the first
- * letter capitalised and dashes and underscores as spaces ("the-app" → "The app").
+ * Words a slug cannot spell: acronyms and names with their own capitals, by the word in lower
+ * case. A folder's name takes these forms wherever the word stands ("sql" → "SQL", "web-api" →
+ * "Web API", "ios" → "iOS"). Add to it as libraries need; keep it to words whose form is not in
+ * doubt.
+ */
+export const WORD_FORMS: Readonly<Record<string, string>> = {
+  adr: "ADR",
+  ai: "AI",
+  api: "API",
+  apis: "APIs",
+  aws: "AWS",
+  ci: "CI",
+  cicd: "CI/CD",
+  cli: "CLI",
+  css: "CSS",
+  csv: "CSV",
+  db: "DB",
+  dns: "DNS",
+  faq: "FAQ",
+  gcp: "GCP",
+  gcs: "GCS",
+  github: "GitHub",
+  graphql: "GraphQL",
+  html: "HTML",
+  http: "HTTP",
+  id: "ID",
+  ids: "IDs",
+  ios: "iOS",
+  javascript: "JavaScript",
+  json: "JSON",
+  jsonl: "JSONL",
+  llm: "LLM",
+  llms: "LLMs",
+  macos: "macOS",
+  mcp: "MCP",
+  ml: "ML",
+  oauth: "OAuth",
+  okf: "OKF",
+  pdf: "PDF",
+  qa: "QA",
+  rest: "REST",
+  rfc: "RFC",
+  s3: "S3",
+  sdk: "SDK",
+  sql: "SQL",
+  sso: "SSO",
+  svg: "SVG",
+  typescript: "TypeScript",
+  ui: "UI",
+  url: "URL",
+  urls: "URLs",
+  ux: "UX",
+  wasm: "Wasm",
+  yaml: "YAML",
+};
+
+/**
+ * A folder as a person reads it, until folders have titles of their own: dashes and underscores
+ * as spaces, each word in its own form when WORD_FORMS knows it, and the first letter capitalised
+ * ("the-app" → "The app", "sql" → "SQL", "v2" stays "v2").
  */
 export function folderName(path: string) {
   const name = baseName(path).replace(/[-_]+/g, " ").trim();
-  return name ? name[0]?.toUpperCase() + name.slice(1) : path;
+  if (!name) return path;
+  return name
+    .split(/\s+/)
+    .map((w, i) => {
+      const form = WORD_FORMS[w.toLowerCase()];
+      if (form) return form;
+      return i === 0 && !/^v\d/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    })
+    .join(" ");
 }
 
 /** A library's Urls from its "owner/slug" (as notifications and the API name it). */

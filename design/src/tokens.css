@@ -199,7 +199,11 @@
     "Inter", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Helvetica, sans-serif;
   --tempra-font-display: var(--tempra-font-text);
   --tempra-font-display-settings: "opsz" 32; /* Inter's display cut, at any size it is used */
-  --tempra-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* The mono: each platform's own, so code is never left to a generic monospace (Courier on
+     Windows): SF Mono on Apple, Cascadia then Consolas on Windows, the usual Linux faces */
+  --tempra-font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", "Segoe UI Mono", Consolas,
+    "Liberation Mono", "DejaVu Sans Mono", monospace;
 
   /* Type scale: the only pixel sizes in the CSS (inside .prose, sizes are em of the reading size) */
   --tempra-text-initial: 9px; /* an avatar's initials */
@@ -232,9 +236,10 @@
   --tempra-leading-reader: 1.65; /* reading */
 
   /* Tracking */
-  --tempra-tracking-label: 0.04em; /* uppercase labels */
-  --tempra-tracking-title: -0.02em; /* h1 and a view's title */
-  --tempra-tracking-doc: -0.01em; /* a page's title */
+  --tempra-tracking-label: 0.04em; /* small capitals (the body's h4 to h6) */
+  /* Display text (22px and up, Inter's display cut): a little tighter, the same at every size,
+     since the display cut's own spacing already tightens with the optical size */
+  --tempra-tracking-display: -0.012em;
 
   /* Lines: a link's underline sits this far under the text (inside .prose, in em) */
   --tempra-line-offset: 2px;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from "@tempra/design/components";
+  import { Button, Field } from "@tempra/design/components";
   import { field, post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import type { Me } from "../ui";
@@ -45,24 +45,22 @@
   {#if action.error}<div class="notice">{action.error}</div>{/if}
   <form onsubmit={submit}>
     <p>
-      <label>
-        Name
-        <input
+      <Field label="Name"
+        ><input
           type="text"
           name="name"
           defaultValue={me.name ?? ""}
           autocomplete="name"
           maxlength={80}
           aria-describedby="welcome-name-hint"
-        />
-      </label><span id="welcome-name-hint" class="field-hint">
+        /></Field
+      ><span id="welcome-name-hint" class="field-hint">
         Optional. Your avatar's initials come from it.
       </span>
     </p>
     <p>
-      <label>
-        Handle
-        <input
+      <Field label="Handle"
+        ><input
           type="text"
           name="handle"
           defaultValue={me.handle}
@@ -70,16 +68,15 @@
           autocapitalize="off"
           spellcheck="false"
           aria-describedby="welcome-handle-hint"
-        />
-      </label><span id="welcome-handle-hint" class="field-hint">
+        /></Field
+      ><span id="welcome-handle-hint" class="field-hint">
         Part of every library's address: {location.host}/handle/library. 2 to 39 lowercase
         letters, digits, - or _.
       </span>
     </p>
     <p>
-      <label>
-        First library
-        <input
+      <Field label="First library"
+        ><input
           type="text"
           name="library"
           defaultValue="notes"
@@ -88,8 +85,8 @@
           autocapitalize="off"
           spellcheck="false"
           aria-describedby="welcome-library-hint"
-        />
-      </label><span id="welcome-library-hint" class="field-hint">
+        /></Field
+      ><span id="welcome-library-hint" class="field-hint">
         The last part of its address. Lowercase letters, digits and -.
       </span>
     </p>

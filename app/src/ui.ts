@@ -66,6 +66,11 @@ export function day(iso: string, timeZone?: string): string {
 }
 
 /** The first words of a text on one line, ending in "…" when cut at `max` characters. */
+/** A frontmatter word as a label: its first letter capitalised ("draft" → "Draft"). */
+export function sentenceCase(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
 export function clip(text: string, max: number): string {
   const line = text.replace(/\s+/g, " ").trim();
   return line.length <= max ? line : `${line.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;

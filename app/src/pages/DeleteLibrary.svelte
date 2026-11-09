@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from "@tempra/design/components";
+  import { Button, Field } from "@tempra/design/components";
   import { field, post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import type { Urls } from "../urls";
@@ -29,12 +29,9 @@
   <a href={urls.exportTar()}>Export it first</a>.
 </p>
 <form onsubmit={submit}>
-  <p>
-    <label>
-      Type {urls.slug} to confirm
-      <input type="text" name="confirm" autocomplete="off" required />
-    </label>
-  </p>
+  <Field label={`Type ${urls.slug} to confirm`}
+    ><input type="text" name="confirm" autocomplete="off" required /></Field
+  >
   <p>
     <Button type="submit" disabled={action.busy}>Delete library</Button>
   </p>

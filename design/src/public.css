@@ -150,7 +150,7 @@
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: var(--tempra-text-lockup);
-  letter-spacing: var(--tempra-tracking-doc);
+  letter-spacing: var(--tempra-tracking-display);
   line-height: var(--tempra-leading-tight);
 }
 
