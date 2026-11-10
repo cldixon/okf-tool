@@ -12,33 +12,74 @@ body {
   color: var(--tempra-color-text);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-base);
+  font-weight: var(--tempra-weight-ui);
   line-height: var(--tempra-leading-base);
+  /* Inter's contextual forms and kerning, always; no faux bold or oblique if a weight or the
+     italic has not loaded yet (the variable files have every weight, and the italic their own). */
+  font-kerning: normal;
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
   background: var(--tempra-color-selection);
 }
 
-h1 {
+/*
+ * Headings outside a page's body: four roles, each defined once here and taken by every view
+ * (the body's own are prose.css's). A stylesheet sets a heading's margins, never its type.
+ *   title     h1, a view's title: the display cut at the page size, medium.
+ *   section   h2: a section of a view (Settings' and Account's sections, the library list's
+ *             groups, the home's Recently changed, Activity's days), 15px strong.
+ *   sub       h3: a part of a section (Invite, Export), 13px strong.
+ *   group     .label and the small heads over a list or a column (Page info's parts, a
+ *             table's header, a menu's group): 12px medium in the muted grey, sentence case.
+ */
+h1,
+.view-title {
+  margin: 0 0 var(--tempra-space-16);
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
-  margin: 0 0 var(--tempra-space-16);
   font-size: var(--tempra-text-page);
   font-weight: var(--tempra-weight-medium);
   line-height: var(--tempra-leading-tight);
-  letter-spacing: var(--tempra-tracking-title);
+  letter-spacing: var(--tempra-tracking-display);
+  text-wrap: balance;
 }
 
-h2 {
+h2,
+.view-section-title,
+.lib-section-title,
+.activity-day-title,
+.settings-section > h2 {
   margin: var(--tempra-space-32) 0 var(--tempra-space-08);
-  font-size: var(--tempra-text-base);
+  font-size: var(--tempra-text-name);
   font-weight: var(--tempra-weight-strong);
+  line-height: var(--tempra-leading-tight);
+  text-wrap: balance;
 }
 
 h3 {
   font-size: var(--tempra-text-ui);
   font-weight: var(--tempra-weight-strong);
+  line-height: var(--tempra-leading-tight);
+}
+
+.label,
+.activity-working-title,
+.sidebar-label,
+.menu-list .menu-note,
+.page-info-section > h3,
+.catalogue-item > h2,
+table.list th,
+.events-table th {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-medium);
+  line-height: var(--tempra-leading-base);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 a {
@@ -75,6 +116,8 @@ pre,
 kbd,
 samp {
   font-family: var(--tempra-font-mono);
+  /* Code as typed: no ligatures (JetBrains Mono's != and => stay two characters) */
+  font-variant-ligatures: none;
 }
 
 code {
@@ -358,14 +401,9 @@ details > summary {
   font-weight: var(--tempra-weight-medium);
 }
 
-/* An uppercase label over a group (SOURCES, LINKED FROM). */
+/* A label over a group (Linked from): the group role above, its margin here. */
 .label {
   margin: 0 0 var(--tempra-space-08);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-label);
-  font-weight: var(--tempra-weight-regular);
-  letter-spacing: var(--tempra-tracking-label);
-  text-transform: uppercase;
 }
 
 /* A message about the page (saved, an error, a version in the past). */

@@ -8,7 +8,7 @@ import { initials, nameInitials, personInitials } from "./src/chrome";
 import { versionHref } from "./src/page/history";
 import { panelInUrl, threadInHash } from "./src/page/panel";
 import { followsInPlace, match, pageKey } from "./src/router";
-import { Urls } from "./src/urls";
+import { folderName, Urls } from "./src/urls";
 
 const at = (path: string) => match(new URL(path, "http://localhost"));
 
@@ -306,4 +306,14 @@ describe("the page view (TEMPRA-128)", () => {
     expect(personInitials(ann.mark, ann.fullName)).toBe("AS");
     expect(actorView("human:bo", null, {}, "human:dev", names).fullName).toBeNull();
   });
+});
+
+test("a folder's name spells known words in their own form (WORD_FORMS)", () => {
+  expect(folderName("sql")).toBe("SQL");
+  expect(folderName("docs/web-api")).toBe("Web API");
+  expect(folderName("api_docs")).toBe("API docs");
+  expect(folderName("ios")).toBe("iOS");
+  expect(folderName("the-app")).toBe("The app");
+  expect(folderName("v2")).toBe("v2");
+  expect(folderName("Sql")).toBe("SQL");
 });

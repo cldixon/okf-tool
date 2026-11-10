@@ -114,9 +114,9 @@ describe("drawn", () => {
     expect(host.querySelector("label:has(input[name=starter])")?.textContent).toBe(
       " Add a guide page",
     );
-    expect(text(host.querySelector("#welcome-library-hint") as Element)).toBe(
-      "The last part of its address. Lowercase letters, digits and -.",
-    );
+    const library = host.querySelector('input[name="library"]') as Element;
+    const hint = host.querySelector(`#${library.getAttribute("aria-describedby")}`) as Element;
+    expect(text(hint)).toBe("The last part of its address. Lowercase letters, digits and -.");
   });
 
   test("an invitation reads as who invited, the library and the access", async () => {

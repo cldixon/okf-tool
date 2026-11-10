@@ -292,12 +292,29 @@ describe("buttons", () => {
 describe("fields", () => {
   test("Field: the label around its control, the hint under it", () => {
     const d = draw(Field, { label: "Name", hint: "What people see", children: text("ctl") });
-    const label = one(d.host, "label.field");
-    expect(label.textContent).toBe("NamectlWhat people see");
-    expect(one(label, ".field-hint").textContent).toBe("What people see");
+    const label = one(d.host, ".field > label");
+    expect(label.textContent).toBe("Namectl");
+    expect(one(d.host, ".field > .field-hint").textContent).toBe("What people see");
     d.destroy();
     const n = draw(Field, { label: "Name", children: text("ctl") });
     expect(n.host.querySelector(".field-hint")).toBeNull();
+    n.destroy();
+  });
+
+  test("Field: the hint is its control's description, not part of its name", () => {
+    const input = createRawSnippet(() => ({
+      render: () => '<input type="text" aria-describedby="err" />',
+    }));
+    const d = draw(Field, { label: "Name", hint: "What people see", children: input });
+    const control = one(d.host, "input");
+    const hint = one(d.host, ".field-hint");
+    expect(hint.id).not.toBe("");
+    expect(control.closest("label")?.contains(hint)).toBe(false);
+    expect(control.getAttribute("aria-describedby")).toBe(`err ${hint.id}`);
+    d.destroy();
+    const plain = createRawSnippet(() => ({ render: () => '<input type="text" />' }));
+    const n = draw(Field, { label: "Name", children: plain });
+    expect(one(n.host, "input").hasAttribute("aria-describedby")).toBe(false);
     n.destroy();
   });
 

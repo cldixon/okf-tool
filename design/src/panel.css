@@ -175,7 +175,7 @@
   font-size: var(--tempra-text-page);
   font-weight: var(--tempra-weight-medium);
   line-height: var(--tempra-leading-tight);
-  letter-spacing: var(--tempra-tracking-doc);
+  letter-spacing: var(--tempra-tracking-display);
 }
 
 .page-panel .pp-description {

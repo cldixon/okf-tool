@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from "@tempra/design/components";
+  import { Button, Field } from "@tempra/design/components";
   import { ApiError, api, field, post } from "../api";
   import { useTitleOf } from "../frame.svelte.ts";
   import { useAction, useLoad } from "../load.svelte.ts";
@@ -58,9 +58,9 @@
         <p>Writes that version back as a new change by you. Nothing is erased.</p>
         {#if action.error}<div class="notice">{action.error}</div>{/if}
         <form onsubmit={submit}>
-          <label>
-            Note <input type="text" name="note" defaultValue={`Restore version ${v.n}`} />
-          </label>
+          <Field label="Note"
+            ><input type="text" name="note" defaultValue={`Restore version ${v.n}`} /></Field
+          >
           <p class="actions">
             <Button variant="primary" type="submit" disabled={action.busy}>Restore</Button><Button href={props.urls.pinned(undefined).file(props.path)}>Cancel</Button>
           </p>

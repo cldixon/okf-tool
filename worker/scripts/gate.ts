@@ -4228,10 +4228,10 @@ async function browserRenders(
         throw new Error("two panels at once");
       }
       await openInfo();
-      // About this page in people's words (TEMPRA-134, C-12, C-13): Status "not set", no lint
+      // About this page in people's words (TEMPRA-134, C-12, C-13): Status "Not set", no lint
       // codes, suggested actions or path, and no For agents section (TEMPRA-144).
       await infoPanel
-        .locator("dd", { hasText: /^not set$/ })
+        .locator("dd", { hasText: /^Not set$/ })
         .first()
         .waitFor();
       const heads = await infoPanel.locator(".page-info-section > h3").allInnerTexts();
@@ -5606,10 +5606,13 @@ async function freshAccountConnects(): Promise<string[]> {
     await page.locator('input[name="handle"]').fill("newcomer");
     await page.locator('input[name="library"]').fill("notes");
     // Both fields say they become the library's address, and how they may be written (H-12).
-    for (const id of ["welcome-handle-hint", "welcome-library-hint"]) {
-      const hint = await page.locator(`#${id}`).innerText();
+    // Each hint is its field's description (aria-describedby), not part of its name.
+    for (const name of ["handle", "library"]) {
+      const field = page.locator(`input[name="${name}"]`);
+      const id = await field.getAttribute("aria-describedby");
+      const hint = id ? await page.locator(`[id="${id}"]`).innerText() : "";
       if (!/address/.test(hint) || !/[Ll]owercase/.test(hint)) {
-        throw new Error(`the ${id} reads "${hint}"`);
+        throw new Error(`the ${name} field's hint reads "${hint}"`);
       }
     }
     // No guide: the library starts empty, so its home shows how to connect an agent.

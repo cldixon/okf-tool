@@ -25,13 +25,7 @@
 
 /* A view's title: the display face, sized as an h1 (TEMPRA-108). */
 .view-title {
-  font-family: var(--tempra-font-display);
-  font-variation-settings: var(--tempra-font-display-settings);
   margin: 0;
-  font-size: var(--tempra-text-page);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
-  letter-spacing: var(--tempra-tracking-title);
   overflow-wrap: anywhere;
 }
 
@@ -64,8 +58,6 @@
 
 .view-section-title {
   margin: 0;
-  font-size: var(--tempra-text-ui);
-  font-weight: var(--tempra-weight-strong);
 }
 
 .view-empty {
@@ -274,11 +266,9 @@
   margin-bottom: var(--tempra-space-32);
 }
 
+/* Its type is the group role's (base.css). */
 .activity-working-title {
   margin: 0;
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
 }
 
 .activity-working-list {
@@ -311,13 +301,11 @@
   margin-bottom: var(--tempra-space-28);
 }
 
+/* A day: the section role's type (base.css), over a hairline. */
 .activity-day-title {
   margin: 0;
   padding-bottom: var(--tempra-space-06);
   border-bottom: 1px solid var(--tempra-color-border);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
 }
 
 /* A page's row: its title and folder, then one line of who did what, all of it muted. */
@@ -480,9 +468,6 @@ a.activity-page-title:hover {
 .events-table th {
   padding: var(--tempra-space-08) var(--tempra-space-10);
   border-bottom: 1px solid var(--tempra-color-border);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
   text-align: left;
   white-space: nowrap;
 }
@@ -835,9 +820,6 @@ a.activity-page-title:hover {
 
 .settings-section > h2 {
   margin: 0 0 var(--tempra-space-16);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
 }
 
 .settings-section h3 {
@@ -951,9 +933,6 @@ a.activity-page-title:hover {
 
 .catalogue-item > h2 {
   margin: 0 0 var(--tempra-space-10);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-medium);
 }
 
 .catalogue-row {

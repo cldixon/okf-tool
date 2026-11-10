@@ -87,10 +87,6 @@ body.ground {
 
 .menu-list .menu-note {
   padding: var(--tempra-space-06) var(--tempra-space-10) var(--tempra-space-02);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-label);
-  letter-spacing: var(--tempra-tracking-label);
-  text-transform: uppercase;
 }
 
 .menu-list hr {
@@ -411,7 +407,7 @@ body.ground {
   margin: 0;
   color: var(--tempra-color-text);
   font-size: var(--tempra-text-ui);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
 }
 
 .compose-context {
@@ -646,8 +642,6 @@ a.button.pill-button {
 /* A section of the list (Yours, Shared with you). */
 .lib-section-title {
   margin: 0 0 var(--tempra-space-12);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
 }
 
 /* ---------- The workspace: the top bar, the sidebar, the page ---------- */
@@ -1119,8 +1113,6 @@ a.button.pill-button {
 
 .sidebar-label {
   margin: var(--tempra-space-14) var(--tempra-space-10) var(--tempra-space-04);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
 }
 
 /* The tree's scroll. Its last 40px fade into the sidebar, as Linear's docs do over their foot
@@ -1377,11 +1369,22 @@ a.button.pill-button {
   text-overflow: ellipsis;
 }
 
+/* A name cut short with an ellipsis clips at its box, and a glyph's ink can reach past its
+   advance (the W's and the V's outer strokes, an italic's overhang): a hair of room inside the
+   clip, given back outside it, keeps the first letter whole without moving it. */
+.tree-name,
+.tree-row > a,
+.nav-label,
+.topbar-crumbs .crumb[aria-current="page"] {
+  margin-inline: -2px;
+  padding-inline: 2px;
+}
+
 /* A folder's row is one button: it opens and closes the folder, and is never the current row. Its
    name rests muted in the rows' weight, as Linear's docs draw a section's label (TEMPRA-310), so
    only the current page is ever in the text colour; a hover brings it up, as any row's. */
 button.tree-name {
-  padding: 0;
+  padding-block: 0;
   border: 0;
   background: none;
   color: var(--tempra-color-muted);
@@ -1403,6 +1406,12 @@ button.tree-name {
 .tree-row:hover > a,
 .tree-row > a[aria-current="page"] {
   color: var(--tempra-color-text);
+}
+
+/* A folder's row is marked as a page's is, by its name alone: the base button's hover fill (a
+   pill at the button's box) never reaches it. */
+.tree-row > button.tree-name:hover:not(:disabled) {
+  background: transparent;
 }
 
 /* A file's icon follows its name. */
@@ -1518,8 +1527,11 @@ button.tree-name {
 }
 
 .switcher [role="option"] {
+  overflow: hidden;
   padding: var(--tempra-space-06) var(--tempra-space-10);
   border-radius: var(--tempra-radius-row);
+  text-overflow: ellipsis;
+  white-space: nowrap; /* one line: the title whole, its path cut short at the end */
   cursor: pointer;
 }
 
@@ -1788,11 +1800,6 @@ table.list {
 table.list th {
   padding: var(--tempra-space-06) var(--tempra-space-10);
   border-bottom: 1px solid var(--tempra-color-border);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-label);
-  font-weight: var(--tempra-weight-regular);
-  letter-spacing: var(--tempra-tracking-label);
-  text-transform: uppercase;
 }
 
 table.list td {
@@ -1809,6 +1816,35 @@ table.list td.name a {
   display: flex;
   align-items: center;
   gap: var(--tempra-space-16);
+}
+
+/* A label beside its control in a row (Account's Theme): a field's label, as Field draws it. */
+.field-row > span:first-child {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-ui);
+}
+
+/* A field with its own action beside it (Account's Email, Name, Handle): the button level with
+   the field's box, below the label's line, whether or not a hint follows the box. */
+form.field-action {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tempra-space-08);
+  margin: var(--tempra-space-10) 0;
+}
+
+form.field-action > .field {
+  flex: 0 1 var(--tempra-size-field);
+  margin: 0;
+}
+
+form.field-action > button {
+  flex: none;
+  margin-top: calc(
+    var(--tempra-text-ui) *
+    var(--tempra-leading-base) +
+    var(--tempra-space-04)
+  ); /* the label's line and the gap over the box */
 }
 
 /* A group of related controls on a page (a form, a list with its actions). */
@@ -1831,7 +1867,11 @@ form.token {
   flex-wrap: wrap;
   align-items: flex-start;
   flex-direction: column;
-  gap: var(--tempra-space-08);
+  gap: var(--tempra-space-10);
+}
+
+form.token > .field {
+  margin: 0;
 }
 
 ul.events {

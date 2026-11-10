@@ -263,8 +263,8 @@ describe("the folder filter", () => {
       { value: "", label: "All folders" },
       { value: "app", label: "App" },
       { value: "app-notes", label: "App notes" },
-      { value: "v2", label: "V2" },
-      { value: "v2/deep", label: "V2 / Deep" },
+      { value: "v2", label: "v2" },
+      { value: "v2/deep", label: "v2 / Deep" },
     ]);
     // A folder in the URL the index lacks is still offered.
     expect(folderOptions([], "gone/")).toEqual([

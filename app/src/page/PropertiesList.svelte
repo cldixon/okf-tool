@@ -2,7 +2,7 @@
   import AgentName from "../AgentName.svelte";
   import { useTitleOf } from "../frame.svelte.ts";
   import Moment from "../Moment.svelte";
-  import { day, plural } from "../ui";
+  import { day, plural, sentenceCase } from "../ui";
   import type { Urls } from "../urls";
   import type { Namer } from "./byline";
   import { actedBy, type Json, type Links, type PageFile, type Standing } from "./data";
@@ -58,9 +58,9 @@
   const pages = $derived([...new Map(props.links.inbound.map((l) => [l.path, l])).values()]);
 </script>
 
-{#snippet notSet()}<span class="muted">not set</span>{/snippet}
+{#snippet notSet()}<span class="muted">Not set</span>{/snippet}
 <dl class="facts"
-  ><div class="fact"><dt>Status</dt><dd>{#if status !== null}{status}{:else}{@render notSet()}{/if}</dd></div
+  ><div class="fact"><dt>Status</dt><dd>{#if status !== null}{sentenceCase(status)}{:else}{@render notSet()}{/if}</dd></div
   ><div class="fact"><dt>Stale</dt><dd>{staleWords(props.page)}</dd></div
   >{#if last}<div class="fact"
       ><dt>Last changed</dt><dd><span><AgentName who={props.name(last.actor, actedBy(last))} />, <Moment ts={last.ts} /></span></dd></div

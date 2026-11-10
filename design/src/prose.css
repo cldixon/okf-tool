@@ -9,6 +9,7 @@
   color: var(--tempra-color-text);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-reader);
   font-kerning: normal;
   font-optical-sizing: auto;
@@ -79,7 +80,7 @@
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: 1.65em;
   font-weight: var(--tempra-weight-medium);
-  letter-spacing: -0.012em;
+  letter-spacing: var(--tempra-tracking-display);
 }
 
 .prose h2 {
@@ -87,7 +88,7 @@
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: 1.35em;
   font-weight: var(--tempra-weight-medium);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tempra-tracking-display);
 }
 
 .prose h3 {
@@ -102,7 +103,7 @@
   font-size: 1em;
   font-weight: var(--tempra-weight-strong);
   font-variant-caps: all-small-caps;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tempra-tracking-label);
 }
 
 .prose h5,
@@ -211,7 +212,7 @@
   border-radius: var(--tempra-radius-code);
   background: var(--tempra-color-code-bg);
   font-family: var(--tempra-font-mono);
-  font-size: 0.86em;
+  font-size: var(--tempra-text-code);
   font-variant-ligatures: none;
   font-variant-numeric: normal;
   box-decoration-break: clone;
@@ -254,7 +255,6 @@
   color: var(--tempra-color-muted);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-label);
-  letter-spacing: 0.04em;
   text-transform: lowercase;
 }
 

@@ -60,7 +60,8 @@
   line-height: var(--tempra-leading-base);
 }
 
-/* A compact thread: its quote, then one line: who, the first words, when. */
+/* A compact thread: its quote; who and when on one line; then the first words, on up to two
+   lines of their own, so a thread reads by what it says, not by its first few letters. */
 .thread.collapsed {
   display: flex;
   flex-direction: column;
@@ -77,8 +78,9 @@
 
 .thread-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--tempra-space-08);
+  gap: var(--tempra-space-04) var(--tempra-space-08);
   width: 100%;
   min-width: 0;
 }
@@ -101,8 +103,8 @@
 }
 
 .thread.collapsed .agent-name {
-  flex: none;
-  max-width: 60%;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   color: var(--tempra-color-text);
   text-overflow: ellipsis;
@@ -120,11 +122,22 @@
 }
 
 .thread-words {
-  flex: 1;
+  display: -webkit-box;
+  flex: 1 0 100%;
+  order: 1; /* under who and when */
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding-left: calc(var(--tempra-size-avatar-small) + var(--tempra-space-08)); /* under the name */
+  color: var(--tempra-color-text);
+  font-size: var(--tempra-text-ui);
+  line-height: var(--tempra-leading-base);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  text-wrap: pretty;
+}
+
+.thread-words:empty {
+  display: none;
 }
 
 .thread-replies {

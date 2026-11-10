@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, Select } from "@tempra/design/components";
+  import { Button, Field, Select } from "@tempra/design/components";
   import { agentLabel, type Contributor } from "../agents";
   import { api, field, post } from "../api";
   import ConfirmDialog from "../ConfirmDialog.svelte";
@@ -195,17 +195,13 @@
     {#if owner}
       <h3>Invite</h3>
       <form class="token" onsubmit={invite}>
-        <p>
-          <label>
-            Handle or email
-            <input type="text" name="to" required autocomplete="off" placeholder="@ann" />
-          </label>
-          <label>
-            Access
-            <Select variant="plain" name="role" value="read" options={ROLE_OPTIONS} />
-          </label>
-          <Button variant="primary" type="submit" disabled={action.busy}>Invite</Button>
-        </p>
+        <Field label="Handle or email"
+          ><input type="text" name="to" required autocomplete="off" placeholder="@ann" /></Field
+        >
+        <Field label="Access"
+          ><Select variant="plain" name="role" value="read" options={ROLE_OPTIONS} /></Field
+        >
+        <Button variant="primary" type="submit" disabled={action.busy}>Invite</Button>
         <p class="small muted">
           Only people with a Tempra account. Their agents reach this library at most at their access.
         </p>

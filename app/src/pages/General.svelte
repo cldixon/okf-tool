@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from "@tempra/design/components";
+  import { Button, Field } from "@tempra/design/components";
   import { field, post } from "../api";
   import { useAction } from "../load.svelte.ts";
   import { librariesChanged } from "../role";
@@ -43,27 +43,26 @@
   {#if role.current === "owner"}
     {#key `${lib?.title}|${lib?.description}`}
       <form class="stack" onsubmit={save}>
-        <p class="field">
-          <label for="library-title">Title</label><input
+        <Field label="Title" hint={`The library's address stays ${urls.owner}/${urls.slug}.`}
+          ><input
             id="library-title"
             name="title"
             type="text"
             maxlength={120}
             defaultValue={lib?.title ?? ""}
             placeholder={urls.slug}
-          />
-        </p>
-        <p class="field">
-          <label for="library-description">Description</label><input
+          /></Field
+        >
+        <Field label="Description"
+          ><input
             id="library-description"
             name="description"
             type="text"
             maxlength={300}
             defaultValue={lib?.description ?? ""}
             placeholder="What this library is for, in one line"
-          />
-        </p>
-        <p class="small muted">The library's address stays {urls.owner}/{urls.slug}.</p>
+          /></Field
+        >
         <p>
           <Button variant="primary" type="submit" disabled={action.busy}>Save</Button>
         </p>

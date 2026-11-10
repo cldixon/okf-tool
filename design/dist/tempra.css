@@ -139,6 +139,129 @@
 }
 
 /*
+ * JetBrains Mono (jetbrains.com/lp/mono, SIL Open Font License 1.1,
+ * design/fonts/OFL-JetBrainsMono.txt), self-hosted as Inter is: the code face, so code, fences,
+ * the Markdown view and paths look the same on every platform. Variable in weight, with an
+ * italic; a tall x-height, close to Inter's, so inline code sits level with the words around it.
+ * From @fontsource-variable/jetbrains-mono 5.3.0, split by script; a page with no code fetches
+ * none of it.
+ */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-cyrillic-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-cyrillic-wght-normal.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-greek-wght-normal.woff2") format("woff2");
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-vietnamese-wght-normal.woff2") format("woff2");
+  unicode-range:
+    U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-cyrillic-ext-wght-italic.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-cyrillic-wght-italic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-greek-wght-italic.woff2") format("woff2");
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-vietnamese-wght-italic.woff2") format("woff2");
+  unicode-range:
+    U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-ext-wght-italic.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-wght-italic.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/*
  * Tempra design tokens: the one place values live (TEMPRA-8). Two tiers: the palette's
  * primitives (--tempra-white, --tempra-grey-*, --tempra-orange-*, --tempra-blue-720 and the chart
  * hues), raw values that only this file reads, and the roles every stylesheet uses, each
@@ -339,7 +462,11 @@
     "Inter", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Helvetica, sans-serif;
   --tempra-font-display: var(--tempra-font-text);
   --tempra-font-display-settings: "opsz" 32; /* Inter's display cut, at any size it is used */
-  --tempra-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* The mono: JetBrains Mono, self-hosted (fonts.css), so code reads the same on every
+     platform; each platform's own after it while it loads or for a glyph it lacks */
+  --tempra-font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas,
+    "Liberation Mono", "DejaVu Sans Mono", monospace;
 
   /* Type scale: the only pixel sizes in the CSS (inside .prose, sizes are em of the reading size) */
   --tempra-text-initial: 9px; /* an avatar's initials */
@@ -352,23 +479,38 @@
   --tempra-text-h2: 22px; /* an attachment's name, a compose dialog's name */
   --tempra-text-page: 28px; /* a view's title (h1); a page's title on a phone */
   --tempra-text-title: 36px; /* a page's title */
+  /* The landing page's title and lede: fluid between a phone and a wide window, in rem so a
+     reader's zoom still scales them (a size in vw alone would not) */
+  --tempra-text-hero: clamp(2.5rem, 1.5rem + 3vw, 3.75rem); /* 40px to 60px */
+  --tempra-text-lede: clamp(1.0625rem, 0.9rem + 0.4vw, 1.25rem); /* 17px to 20px */
   --tempra-text-lockup: 26px; /* the server pages' large lockup: the mark and Tempra at the left gutter */
-  --tempra-text-code: 0.92em; /* code, a step under the text around it */
+  --tempra-text-code: 0.9em; /* code: JetBrains Mono's x-height level with Inter's around it */
 
-  /* Weights: three */
-  --tempra-weight-regular: 400; /* text */
+  /* Weights: four. Inter is variable, so a weight is any value, not a file. Chrome (13px and
+     under, muted grey on the page's ground: the tree, the contents, the byline, menus, panels)
+     sits between regular and medium, as Inter's own UI cut is drawn for small sizes: at 400 its
+     hairline stems thin out to grey fuzz once antialiased, at 450 they hold a full pixel. Reading
+     text stays regular; its size and leading carry it. */
+  --tempra-weight-regular: 400; /* reading text: a page's body and description */
+  --tempra-weight-ui: 450; /* the app's chrome: every word outside .prose that is not a name */
   --tempra-weight-medium: 500; /* names in rows, a page's title, the body's h1 and h2 */
   --tempra-weight-strong: 600; /* the sans's headings, section labels, the wordmark */
 
-  /* Leading: three */
+  /* Leading: five */
+  --tempra-leading-display: 1.1; /* the landing page's title, 40px and up */
   --tempra-leading-tight: 1.2; /* titles and headings */
+  --tempra-leading-snug: 1.4; /* small text that wraps in a narrow column: the contents */
   --tempra-leading-base: 1.5; /* the app's text */
   --tempra-leading-reader: 1.65; /* reading */
 
   /* Tracking */
-  --tempra-tracking-label: 0.04em; /* uppercase labels */
-  --tempra-tracking-title: -0.02em; /* h1 and a view's title */
-  --tempra-tracking-doc: -0.01em; /* a page's title */
+  --tempra-tracking-label: 0.04em; /* small capitals (the body's h4 to h6) */
+  /* Display text (22px and up, Inter's display cut): a little tighter, the same at every size,
+     since the display cut's own spacing already tightens with the optical size */
+  --tempra-tracking-display: -0.012em;
+  /* Past the display cut's largest optical size (32px), Inter's spacing no longer tightens with
+     size, so the landing page's title tightens itself */
+  --tempra-tracking-hero: -0.022em;
 
   /* Lines: a link's underline sits this far under the text (inside .prose, in em) */
   --tempra-line-offset: 2px;
@@ -486,6 +628,26 @@
   color-scheme: dark;
 }
 
+/* Dark's grade. Light text on a dark ground, antialiased (base.css), draws thinner than the same
+   weight dark on light: the glyphs' edges fade into the ground rather than out of it. Fonts with a
+   grade axis compensate without changing widths; Inter has none, so the weights step up a little
+   instead, as Material's dark themes do with GRAD and Apple's with its dark-mode text. Strong is
+   heavy enough as it is. A weight cannot be light-dark(), so dark is said twice: chosen on the
+   root, or the system's with no choice made. */
+:root[data-theme="dark"] {
+  --tempra-weight-regular: 420;
+  --tempra-weight-ui: 480;
+  --tempra-weight-medium: 520;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tempra-weight-regular: 420;
+    --tempra-weight-ui: 480;
+    --tempra-weight-medium: 520;
+  }
+}
+
 /* Element defaults for every page of the app and the site; values come from tokens.css. */
 *,
 *::before,
@@ -500,33 +662,74 @@ body {
   color: var(--tempra-color-text);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-base);
+  font-weight: var(--tempra-weight-ui);
   line-height: var(--tempra-leading-base);
+  /* Inter's contextual forms and kerning, always; no faux bold or oblique if a weight or the
+     italic has not loaded yet (the variable files have every weight, and the italic their own). */
+  font-kerning: normal;
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
   background: var(--tempra-color-selection);
 }
 
-h1 {
+/*
+ * Headings outside a page's body: four roles, each defined once here and taken by every view
+ * (the body's own are prose.css's). A stylesheet sets a heading's margins, never its type.
+ *   title     h1, a view's title: the display cut at the page size, medium.
+ *   section   h2: a section of a view (Settings' and Account's sections, the library list's
+ *             groups, the home's Recently changed, Activity's days), 15px strong.
+ *   sub       h3: a part of a section (Invite, Export), 13px strong.
+ *   group     .label and the small heads over a list or a column (Page info's parts, a
+ *             table's header, a menu's group): 12px medium in the muted grey, sentence case.
+ */
+h1,
+.view-title {
+  margin: 0 0 var(--tempra-space-16);
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
-  margin: 0 0 var(--tempra-space-16);
   font-size: var(--tempra-text-page);
   font-weight: var(--tempra-weight-medium);
   line-height: var(--tempra-leading-tight);
-  letter-spacing: var(--tempra-tracking-title);
+  letter-spacing: var(--tempra-tracking-display);
+  text-wrap: balance;
 }
 
-h2 {
+h2,
+.view-section-title,
+.lib-section-title,
+.activity-day-title,
+.settings-section > h2 {
   margin: var(--tempra-space-32) 0 var(--tempra-space-08);
-  font-size: var(--tempra-text-base);
+  font-size: var(--tempra-text-name);
   font-weight: var(--tempra-weight-strong);
+  line-height: var(--tempra-leading-tight);
+  text-wrap: balance;
 }
 
 h3 {
   font-size: var(--tempra-text-ui);
   font-weight: var(--tempra-weight-strong);
+  line-height: var(--tempra-leading-tight);
+}
+
+.label,
+.activity-working-title,
+.sidebar-label,
+.menu-list .menu-note,
+.page-info-section > h3,
+.catalogue-item > h2,
+table.list th,
+.events-table th {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-medium);
+  line-height: var(--tempra-leading-base);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 a {
@@ -563,6 +766,8 @@ pre,
 kbd,
 samp {
   font-family: var(--tempra-font-mono);
+  /* Code as typed: no ligatures (JetBrains Mono's != and => stay two characters) */
+  font-variant-ligatures: none;
 }
 
 code {
@@ -846,14 +1051,9 @@ details > summary {
   font-weight: var(--tempra-weight-medium);
 }
 
-/* An uppercase label over a group (SOURCES, LINKED FROM). */
+/* A label over a group (Linked from): the group role above, its margin here. */
 .label {
   margin: 0 0 var(--tempra-space-08);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-label);
-  font-weight: var(--tempra-weight-regular);
-  letter-spacing: var(--tempra-tracking-label);
-  text-transform: uppercase;
 }
 
 /* A message about the page (saved, an error, a version in the past). */
@@ -955,6 +1155,7 @@ details > summary {
   color: var(--tempra-color-text);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-reader);
   font-kerning: normal;
   font-optical-sizing: auto;
@@ -1025,7 +1226,7 @@ details > summary {
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: 1.65em;
   font-weight: var(--tempra-weight-medium);
-  letter-spacing: -0.012em;
+  letter-spacing: var(--tempra-tracking-display);
 }
 
 .prose h2 {
@@ -1033,7 +1234,7 @@ details > summary {
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: 1.35em;
   font-weight: var(--tempra-weight-medium);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tempra-tracking-display);
 }
 
 .prose h3 {
@@ -1048,7 +1249,7 @@ details > summary {
   font-size: 1em;
   font-weight: var(--tempra-weight-strong);
   font-variant-caps: all-small-caps;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tempra-tracking-label);
 }
 
 .prose h5,
@@ -1157,7 +1358,7 @@ details > summary {
   border-radius: var(--tempra-radius-code);
   background: var(--tempra-color-code-bg);
   font-family: var(--tempra-font-mono);
-  font-size: 0.86em;
+  font-size: var(--tempra-text-code);
   font-variant-ligatures: none;
   font-variant-numeric: normal;
   box-decoration-break: clone;
@@ -1200,7 +1401,6 @@ details > summary {
   color: var(--tempra-color-muted);
   font-family: var(--tempra-font-text);
   font-size: var(--tempra-text-label);
-  letter-spacing: 0.04em;
   text-transform: lowercase;
 }
 
@@ -2164,10 +2364,6 @@ body.ground {
 
 .menu-list .menu-note {
   padding: var(--tempra-space-06) var(--tempra-space-10) var(--tempra-space-02);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-label);
-  letter-spacing: var(--tempra-tracking-label);
-  text-transform: uppercase;
 }
 
 .menu-list hr {
@@ -2488,7 +2684,7 @@ body.ground {
   margin: 0;
   color: var(--tempra-color-text);
   font-size: var(--tempra-text-ui);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
 }
 
 .compose-context {
@@ -2723,8 +2919,6 @@ a.button.pill-button {
 /* A section of the list (Yours, Shared with you). */
 .lib-section-title {
   margin: 0 0 var(--tempra-space-12);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
 }
 
 /* ---------- The workspace: the top bar, the sidebar, the page ---------- */
@@ -3196,8 +3390,6 @@ a.button.pill-button {
 
 .sidebar-label {
   margin: var(--tempra-space-14) var(--tempra-space-10) var(--tempra-space-04);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
 }
 
 /* The tree's scroll. Its last 40px fade into the sidebar, as Linear's docs do over their foot
@@ -3454,11 +3646,22 @@ a.button.pill-button {
   text-overflow: ellipsis;
 }
 
+/* A name cut short with an ellipsis clips at its box, and a glyph's ink can reach past its
+   advance (the W's and the V's outer strokes, an italic's overhang): a hair of room inside the
+   clip, given back outside it, keeps the first letter whole without moving it. */
+.tree-name,
+.tree-row > a,
+.nav-label,
+.topbar-crumbs .crumb[aria-current="page"] {
+  margin-inline: -2px;
+  padding-inline: 2px;
+}
+
 /* A folder's row is one button: it opens and closes the folder, and is never the current row. Its
    name rests muted in the rows' weight, as Linear's docs draw a section's label (TEMPRA-310), so
    only the current page is ever in the text colour; a hover brings it up, as any row's. */
 button.tree-name {
-  padding: 0;
+  padding-block: 0;
   border: 0;
   background: none;
   color: var(--tempra-color-muted);
@@ -3480,6 +3683,12 @@ button.tree-name {
 .tree-row:hover > a,
 .tree-row > a[aria-current="page"] {
   color: var(--tempra-color-text);
+}
+
+/* A folder's row is marked as a page's is, by its name alone: the base button's hover fill (a
+   pill at the button's box) never reaches it. */
+.tree-row > button.tree-name:hover:not(:disabled) {
+  background: transparent;
 }
 
 /* A file's icon follows its name. */
@@ -3595,8 +3804,11 @@ button.tree-name {
 }
 
 .switcher [role="option"] {
+  overflow: hidden;
   padding: var(--tempra-space-06) var(--tempra-space-10);
   border-radius: var(--tempra-radius-row);
+  text-overflow: ellipsis;
+  white-space: nowrap; /* one line: the title whole, its path cut short at the end */
   cursor: pointer;
 }
 
@@ -3865,11 +4077,6 @@ table.list {
 table.list th {
   padding: var(--tempra-space-06) var(--tempra-space-10);
   border-bottom: 1px solid var(--tempra-color-border);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-label);
-  font-weight: var(--tempra-weight-regular);
-  letter-spacing: var(--tempra-tracking-label);
-  text-transform: uppercase;
 }
 
 table.list td {
@@ -3886,6 +4093,35 @@ table.list td.name a {
   display: flex;
   align-items: center;
   gap: var(--tempra-space-16);
+}
+
+/* A label beside its control in a row (Account's Theme): a field's label, as Field draws it. */
+.field-row > span:first-child {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-ui);
+}
+
+/* A field with its own action beside it (Account's Email, Name, Handle): the button level with
+   the field's box, below the label's line, whether or not a hint follows the box. */
+form.field-action {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tempra-space-08);
+  margin: var(--tempra-space-10) 0;
+}
+
+form.field-action > .field {
+  flex: 0 1 var(--tempra-size-field);
+  margin: 0;
+}
+
+form.field-action > button {
+  flex: none;
+  margin-top: calc(
+    var(--tempra-text-ui) *
+    var(--tempra-leading-base) +
+    var(--tempra-space-04)
+  ); /* the label's line and the gap over the box */
 }
 
 /* A group of related controls on a page (a form, a list with its actions). */
@@ -3908,7 +4144,11 @@ form.token {
   flex-wrap: wrap;
   align-items: flex-start;
   flex-direction: column;
-  gap: var(--tempra-space-08);
+  gap: var(--tempra-space-10);
+}
+
+form.token > .field {
+  margin: 0;
 }
 
 ul.events {
@@ -4036,6 +4276,9 @@ ul.events {
   overflow: auto;
   padding: calc(var(--tempra-space-56) + var(--tempra-space-08)) var(--tempra-space-page)
     var(--tempra-space-24) 0; /* level with the title's first line */
+  /* Opaque, as the page under it is: a scroller on a see-through layer loses subpixel text on
+     the screens that still draw it (Windows, Linux at 1x) */
+  background: var(--tempra-color-bg);
 }
 
 .toc {
@@ -4043,8 +4286,9 @@ ul.events {
   padding: 0;
   border-left: 1px solid var(--tempra-color-border);
   list-style: none;
-  font-size: var(--tempra-text-meta);
-  line-height: var(--tempra-leading-base);
+  font-size: var(--tempra-text-ui);
+  line-height: var(--tempra-leading-snug);
+  text-wrap: pretty;
 }
 
 .toc a {
@@ -4166,7 +4410,7 @@ ul.events {
 
 .panel-head h2 {
   margin: 0;
-  font-size: var(--tempra-text-ui);
+  font-size: var(--tempra-text-name);
   font-weight: var(--tempra-weight-strong);
 }
 
@@ -4227,14 +4471,18 @@ ul.events {
   font-size: var(--tempra-text-title);
   font-weight: var(--tempra-weight-medium);
   line-height: var(--tempra-leading-tight);
-  letter-spacing: var(--tempra-tracking-doc);
+  letter-spacing: var(--tempra-tracking-display);
+  /* Lines of even length, never one word left on the last */
+  text-wrap: balance;
 }
 
 .doc-tagline {
   margin: 0;
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-base);
+  text-wrap: pretty;
 }
 
 /* ---------- The byline: who wrote this version, for whom, when; or who is editing now ---------- */
@@ -4760,10 +5008,6 @@ ul.events {
     touch-action: none;
   }
 
-  .panel-head h2 {
-    font-size: var(--tempra-text-name);
-  }
-
   /* The drag handle, centred at the sheet's top edge. */
   .panel-grip {
     position: absolute;
@@ -4910,9 +5154,6 @@ ul.events {
 
 .page-info-section > h3 {
   margin: 0 0 var(--tempra-space-08);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
 }
 
 /* Current version (TEMPRA-309): the latest version's whole note, up to three lines; then Earlier
@@ -5010,7 +5251,8 @@ ul.events {
   line-height: var(--tempra-leading-base);
 }
 
-/* A compact thread: its quote, then one line: who, the first words, when. */
+/* A compact thread: its quote; who and when on one line; then the first words, on up to two
+   lines of their own, so a thread reads by what it says, not by its first few letters. */
 .thread.collapsed {
   display: flex;
   flex-direction: column;
@@ -5027,8 +5269,9 @@ ul.events {
 
 .thread-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--tempra-space-08);
+  gap: var(--tempra-space-04) var(--tempra-space-08);
   width: 100%;
   min-width: 0;
 }
@@ -5051,8 +5294,8 @@ ul.events {
 }
 
 .thread.collapsed .agent-name {
-  flex: none;
-  max-width: 60%;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   color: var(--tempra-color-text);
   text-overflow: ellipsis;
@@ -5070,11 +5313,22 @@ ul.events {
 }
 
 .thread-words {
-  flex: 1;
+  display: -webkit-box;
+  flex: 1 0 100%;
+  order: 1; /* under who and when */
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding-left: calc(var(--tempra-size-avatar-small) + var(--tempra-space-08)); /* under the name */
+  color: var(--tempra-color-text);
+  font-size: var(--tempra-text-ui);
+  line-height: var(--tempra-leading-base);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  text-wrap: pretty;
+}
+
+.thread-words:empty {
+  display: none;
 }
 
 .thread-replies {
@@ -5360,13 +5614,7 @@ section.thread.open {
 
 /* A view's title: the display face, sized as an h1 (TEMPRA-108). */
 .view-title {
-  font-family: var(--tempra-font-display);
-  font-variation-settings: var(--tempra-font-display-settings);
   margin: 0;
-  font-size: var(--tempra-text-page);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
-  letter-spacing: var(--tempra-tracking-title);
   overflow-wrap: anywhere;
 }
 
@@ -5399,8 +5647,6 @@ section.thread.open {
 
 .view-section-title {
   margin: 0;
-  font-size: var(--tempra-text-ui);
-  font-weight: var(--tempra-weight-strong);
 }
 
 .view-empty {
@@ -5609,11 +5855,9 @@ section.thread.open {
   margin-bottom: var(--tempra-space-32);
 }
 
+/* Its type is the group role's (base.css). */
 .activity-working-title {
   margin: 0;
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
 }
 
 .activity-working-list {
@@ -5646,13 +5890,11 @@ section.thread.open {
   margin-bottom: var(--tempra-space-28);
 }
 
+/* A day: the section role's type (base.css), over a hairline. */
 .activity-day-title {
   margin: 0;
   padding-bottom: var(--tempra-space-06);
   border-bottom: 1px solid var(--tempra-color-border);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
 }
 
 /* A page's row: its title and folder, then one line of who did what, all of it muted. */
@@ -5815,9 +6057,6 @@ a.activity-page-title:hover {
 .events-table th {
   padding: var(--tempra-space-08) var(--tempra-space-10);
   border-bottom: 1px solid var(--tempra-color-border);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
   text-align: left;
   white-space: nowrap;
 }
@@ -6170,9 +6409,6 @@ a.activity-page-title:hover {
 
 .settings-section > h2 {
   margin: 0 0 var(--tempra-space-16);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
 }
 
 .settings-section h3 {
@@ -6286,9 +6522,6 @@ a.activity-page-title:hover {
 
 .catalogue-item > h2 {
   margin: 0 0 var(--tempra-space-10);
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-medium);
 }
 
 .catalogue-row {
@@ -6413,7 +6646,7 @@ a.activity-page-title:hover {
 
 .public-main {
   flex: 1;
-  padding: var(--tempra-space-48) var(--public-inline) 64px; /* one-off: room above the foot */
+  padding: var(--tempra-space-48) var(--public-inline) var(--tempra-space-64); /* room above the foot */
 }
 
 .public-main > :first-child {
@@ -6462,7 +6695,7 @@ a.activity-page-title:hover {
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: var(--tempra-text-lockup);
-  letter-spacing: var(--tempra-tracking-doc);
+  letter-spacing: var(--tempra-tracking-display);
   line-height: var(--tempra-leading-tight);
 }
 
@@ -6522,7 +6755,7 @@ a.activity-page-title:hover {
   max-width: none;
   margin-top: var(--tempra-space-06);
   padding: 0 var(--tempra-space-12);
-  font-weight: var(--tempra-weight-regular);
+  font-weight: var(--tempra-weight-ui);
 }
 
 .public.narrow button.primary,
@@ -6549,7 +6782,7 @@ a.activity-page-title:hover {
    Privacy and Not found keep the plain column between them. The sizes no token names (the
    lockup's 26px, the landing page's display type) are the Paper board's, set once here. */
 .public.site {
-  --site-inline: 64px; /* one-off: the site's margin at the window's edge */
+  --site-inline: var(--tempra-space-64); /* the site's margin at the window's edge */
   --site-head: 88px; /* one-off: the site's header */
 }
 
@@ -6563,13 +6796,13 @@ a.activity-page-title:hover {
 .public.site .wordmark {
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
-  font-size: 26px; /* one-off: the large lockup's name */
-  letter-spacing: -0.015em; /* one-off: the lockup's name */
+  font-size: var(--tempra-text-lockup);
+  letter-spacing: var(--tempra-tracking-display);
   line-height: var(--tempra-leading-tight);
 }
 
 .public.site .public-nav .button.primary {
-  padding: var(--tempra-space-12) 22px; /* one-off: the site's pill */
+  padding: var(--tempra-space-12) var(--tempra-space-24);
   font-size: var(--tempra-text-name);
 }
 
@@ -6601,20 +6834,23 @@ a.activity-page-title:hover {
   align-items: start;
 }
 
+/* The title as a page's title is, in the medium weight, at the hero size; it scales with the
+   window, so the phone needs no size of its own. */
 .landing-doc h1 {
   margin: 0;
-  font-size: 60px; /* one-off: the landing page's title */
-  font-weight: var(--tempra-weight-strong);
-  line-height: 1.133; /* one-off: 68px on 60px */
-  letter-spacing: -0.03em; /* one-off: the landing page's title */
-  text-wrap: balance;
+  font-size: var(--tempra-text-hero);
+  font-weight: var(--tempra-weight-medium);
+  line-height: var(--tempra-leading-display);
+  letter-spacing: var(--tempra-tracking-hero);
 }
 
 .landing-description {
   margin: var(--tempra-space-14) 0 0;
   color: var(--tempra-color-muted);
-  font-size: 20px; /* one-off: the landing page's description */
+  font-size: var(--tempra-text-lede);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-base);
+  text-wrap: pretty;
 }
 
 .landing-byline {
@@ -6622,7 +6858,7 @@ a.activity-page-title:hover {
   align-items: center;
   gap: var(--tempra-space-08);
   margin: 0;
-  padding: 22px 0 var(--tempra-space-28); /* one-off: the board's byline */
+  padding: var(--tempra-space-24) 0 var(--tempra-space-28);
   border-bottom: 1px solid var(--tempra-color-border);
   font-size: var(--tempra-text-ui);
 }
@@ -6640,7 +6876,7 @@ a.activity-page-title:hover {
 }
 
 .landing-text h2 {
-  margin: 0 0 var(--tempra-space-06);
+  margin: 0 0 var(--tempra-space-08);
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
   font-size: var(--tempra-text-h2);
@@ -6651,16 +6887,14 @@ a.activity-page-title:hover {
 .landing-text section p {
   margin: 0;
   font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-regular);
   line-height: var(--tempra-leading-reader);
+  text-wrap: pretty;
 }
 
-.landing-text code {
-  font-size: var(--tempra-text-name);
-}
-
-/* The contents: level with the sections, the first heading marked. */
+/* The contents: level with the title's first line, as a page's are in the app (page.css). */
 .landing-contents {
-  padding-top: 218px; /* one-off: level with the sections, as the board has them */
+  padding-top: var(--tempra-space-12);
 }
 
 /* A phone: one column, the contents a closed "On this page" between hairlines, as the app's. */
@@ -6671,7 +6905,7 @@ a.activity-page-title:hover {
   }
 
   .public.site .public-nav .button.primary {
-    padding: 11px var(--tempra-space-18); /* one-off: the site's pill on a phone */
+    padding: var(--tempra-space-10) var(--tempra-space-18);
     font-size: var(--tempra-text-base);
   }
 
@@ -6688,14 +6922,8 @@ a.activity-page-title:hover {
     display: block;
   }
 
-  .landing-doc h1 {
-    font-size: 40px; /* one-off: the landing page's title on a phone */
-    line-height: 1.1; /* one-off: 44px on 40px */
-  }
-
   .landing-description {
     margin-top: var(--tempra-space-10);
-    font-size: var(--tempra-text-reader);
   }
 
   .landing-byline {
@@ -6729,12 +6957,7 @@ a.activity-page-title:hover {
   }
 
   .landing-text h2 {
-    margin-bottom: var(--tempra-space-04);
-    font-size: 20px; /* one-off: a section's heading on a phone */
-  }
-
-  .landing-text section p {
-    line-height: 1.53; /* one-off: 26px on 17px */
+    margin-bottom: var(--tempra-space-06);
   }
 
   .landing-contents {
@@ -6742,13 +6965,14 @@ a.activity-page-title:hover {
   }
 }
 
-/* Terms and privacy: plain text at a comfortable measure, dated, in numbered sections. */
+/* Terms and privacy: drawn as a Tempra page is (its title and a dated line as the head, the
+   text in the reader's typography, .prose), so they read as the documents they are. */
 .legal {
-  max-width: 38em;
+  max-width: var(--tempra-size-column-text);
 }
 
-.legal li + li {
-  margin-top: var(--tempra-space-08);
+.legal .doc-head {
+  margin-bottom: var(--tempra-space-32);
 }
 
 @media (max-width: 640px) {
