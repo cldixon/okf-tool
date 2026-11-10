@@ -3796,7 +3796,17 @@ async function browserRenders(
         if (!/: Claude Code for @\w+ is reading$/.test(title)) {
           throw new Error(`the row's tooltip is "${title}"`);
         }
-        if ((await byline.getByText(/reading/).count()) > 0) {
+        // The byline shows no words for it either (its shimmer is the cue; a screen reader's
+        // words beside the name are visually hidden).
+        const bylineShown = await byline.evaluate((el) => {
+          const copy = (el as { cloneNode(deep: boolean): unknown }).cloneNode(true) as {
+            querySelectorAll(s: string): Iterable<{ remove(): void }>;
+            textContent: string | null;
+          };
+          for (const hidden of copy.querySelectorAll(".visually-hidden")) hidden.remove();
+          return copy.textContent ?? "";
+        });
+        if (/reading/.test(bylineShown)) {
           throw new Error("the byline says the agent is reading");
         }
         if (shots) {
