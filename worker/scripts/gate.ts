@@ -4160,10 +4160,11 @@ async function browserRenders(
       const here = `${lib}/${path}`;
       await page.goto(here);
       await contentsNav.waitFor({ timeout: 15_000 });
-      // Just written by an agent: the byline names it once, then "editing now" with the pulsing
-      // dot (TEMPRA-131).
-      await byline.getByText(/editing now$/).waitFor({ timeout: 5000 });
-      await byline.locator(".change-dot.live").waitFor();
+      // Just written by an agent: the byline names it and says when, and no longer "editing now".
+      await byline.getByText(/edited just now/).waitFor({ timeout: 5000 });
+      if ((await byline.getByText(/editing now/).count()) > 0) {
+        throw new Error("the byline says editing now");
+      }
       if (shots) await page.screenshot({ path: `${shots}/page.png` });
       const entries = await contentsNav.locator("a").allInnerTexts();
       if (entries.join("|") !== "First|Inside|Second") throw new Error(`contents: ${entries}`);

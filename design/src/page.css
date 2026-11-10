@@ -352,13 +352,6 @@
   color: var(--tempra-color-text);
 }
 
-.byline-live {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tempra-space-06);
-  color: var(--tempra-color-text);
-}
-
 /* ---------- History: the versions, newest first ---------- */
 
 .versions {

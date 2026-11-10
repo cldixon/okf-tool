@@ -345,8 +345,6 @@
             page={c}
             history={props.data.history}
             {name}
-            {live}
-            {current}
             {status}
           /><h1 class="doc-title">{title}</h1
           >{#if typeof fm.description === "string"}<p class="doc-tagline">{fm.description}</p>{/if}{#if current}<CheckedLine {urls} path={c.path} standing={s} {name} />{/if}{@render tools("head")}{#if hasContents}<details
