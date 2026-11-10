@@ -3796,7 +3796,17 @@ async function browserRenders(
         if (!/: Claude Code for @\w+ is reading$/.test(title)) {
           throw new Error(`the row's tooltip is "${title}"`);
         }
-        if ((await byline.getByText(/reading/).count()) > 0) {
+        // The byline shows no words for it either (its shimmer is the cue; a screen reader's
+        // words beside the name are visually hidden).
+        const bylineShown = await byline.evaluate((el) => {
+          const copy = (el as { cloneNode(deep: boolean): unknown }).cloneNode(true) as {
+            querySelectorAll(s: string): Iterable<{ remove(): void }>;
+            textContent: string | null;
+          };
+          for (const hidden of copy.querySelectorAll(".visually-hidden")) hidden.remove();
+          return copy.textContent ?? "";
+        });
+        if (/reading/.test(bylineShown)) {
           throw new Error("the byline says the agent is reading");
         }
         if (shots) {
@@ -4160,10 +4170,11 @@ async function browserRenders(
       const here = `${lib}/${path}`;
       await page.goto(here);
       await contentsNav.waitFor({ timeout: 15_000 });
-      // Just written by an agent: the byline names it once, then "editing now" with the pulsing
-      // dot (TEMPRA-131).
-      await byline.getByText(/editing now$/).waitFor({ timeout: 5000 });
-      await byline.locator(".change-dot.live").waitFor();
+      // Just written by an agent: the byline names it and says when, and no longer "editing now".
+      await byline.getByText(/edited just now/).waitFor({ timeout: 5000 });
+      if ((await byline.getByText(/editing now/).count()) > 0) {
+        throw new Error("the byline says editing now");
+      }
       if (shots) await page.screenshot({ path: `${shots}/page.png` });
       const entries = await contentsNav.locator("a").allInnerTexts();
       if (entries.join("|") !== "First|Inside|Second") throw new Error(`contents: ${entries}`);

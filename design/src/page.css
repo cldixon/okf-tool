@@ -292,6 +292,12 @@
   margin-bottom: var(--tempra-space-32);
 }
 
+/* A page's head starts with its byline: the page starts higher, so the title stays where it was
+   (56px under the top bar) with more room between the two. */
+.page-view .doc:has(> .doc-page > .doc-head) {
+  padding-top: var(--tempra-space-40);
+}
+
 .doc-title {
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
@@ -320,7 +326,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tempra-space-06) var(--tempra-space-08);
-  margin-top: var(--tempra-space-20);
+  /* Above the title (a trial of a blog post's byline): its space is below it. */
+  margin-bottom: var(--tempra-space-32);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-ui);
 }
@@ -329,15 +336,31 @@
   color: var(--tempra-color-faint);
 }
 
+/* Another agent at the page now, after the author: "… & Codex for @ann". */
+.byline-and {
+  color: var(--tempra-color-muted);
+}
+
+/* Who wrote it from when: a hairline leaning as a slash, a little taller than the text. */
+.byline-slash {
+  align-self: center;
+  width: 1px;
+  height: 1.25em;
+  margin: 0 var(--tempra-space-04);
+  background: var(--tempra-color-faint);
+  transform: rotate(15deg);
+}
+
 /* What is exceptional about the page, at the byline's end: "Draft", "Stale" (TEMPRA-139). */
 .byline-pills {
   display: inline-flex;
   gap: var(--tempra-space-06);
 }
 
-/* Whether a person checked the page: one quiet line under the byline, only when someone has. */
+/* Whether a person checked the page: one quiet line under the title and description, only when
+   someone has. */
 .doc-checked {
-  margin: var(--tempra-space-08) 0 0;
+  margin: var(--tempra-space-16) 0 0;
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-ui);
 }
@@ -347,13 +370,6 @@
 }
 
 .doc-checked a:hover {
-  color: var(--tempra-color-text);
-}
-
-.byline-live {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tempra-space-06);
   color: var(--tempra-color-text);
 }
 
@@ -786,6 +802,14 @@
     --doc-pad: var(--tempra-space-16);
     padding-top: var(--tempra-space-16);
     padding-bottom: var(--tempra-space-96);
+  }
+
+  .page-view .doc:has(> .doc-page > .doc-head) {
+    padding-top: var(--tempra-space-16);
+  }
+
+  .doc-head .byline {
+    margin-bottom: var(--tempra-space-24);
   }
 
   .doc-crumbs {
