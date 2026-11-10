@@ -341,15 +341,15 @@
           ><!-- On a phone, whose bar has no room for the path: the page's folders above its title
                (TEMPRA-139, TEMPRA-145). --><nav class="doc-crumbs" aria-label="Folders"
             >{#each folders as f, i (f)}<span>{#if i > 0}<span aria-hidden="true">{" / "}</span>{/if}{folderName(f)}</span>{/each}</nav
-          ><h1 class="doc-title">{title}</h1
-          >{#if typeof fm.description === "string"}<p class="doc-tagline">{fm.description}</p>{/if}<Byline
+          ><!-- Who wrote it and when, above the title, as a blog post's byline (a trial). --><Byline
             page={c}
             history={props.data.history}
             {name}
             {live}
             {current}
             {status}
-          />{#if current}<CheckedLine {urls} path={c.path} standing={s} {name} />{/if}{@render tools("head")}{#if hasContents}<details
+          /><h1 class="doc-title">{title}</h1
+          >{#if typeof fm.description === "string"}<p class="doc-tagline">{fm.description}</p>{/if}{#if current}<CheckedLine {urls} path={c.path} standing={s} {name} />{/if}{@render tools("head")}{#if hasContents}<details
               class="toc-inline"
               bind:this={inlineContents}
               ><summary>On this page<Icon name="down" /></summary><Contents

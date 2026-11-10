@@ -4492,7 +4492,8 @@ ul.events {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tempra-space-06) var(--tempra-space-08);
-  margin-top: var(--tempra-space-20);
+  /* Above the title (a trial of a blog post's byline): its space is below it. */
+  margin-bottom: var(--tempra-space-16);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-ui);
 }
@@ -4507,9 +4508,10 @@ ul.events {
   gap: var(--tempra-space-06);
 }
 
-/* Whether a person checked the page: one quiet line under the byline, only when someone has. */
+/* Whether a person checked the page: one quiet line under the title and description, only when
+   someone has. */
 .doc-checked {
-  margin: var(--tempra-space-08) 0 0;
+  margin: var(--tempra-space-16) 0 0;
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-ui);
 }
