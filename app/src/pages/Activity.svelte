@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Notice, PillButton, Segmented } from "@tempra/design/components";
-  import { activityKey, loadActivity } from "../activity";
+  import { activityKey, inFolder, loadActivity, workingNow } from "../activity";
   import { useLiveWrites } from "../activity.svelte.ts";
   import { useFeed, useTrailing } from "../live.svelte.ts";
   import { useLoad } from "../load.svelte.ts";
@@ -10,20 +10,22 @@
   import Status from "../Status.svelte";
   import { plural } from "../ui";
   import type { ActivityFilters, ActivityView, Urls } from "../urls";
+  import ByPage from "./ByPage.svelte";
   import EventFilters from "./EventFilters.svelte";
   import EveryEvent from "./EveryEvent.svelte";
+  import FolderFilter from "./FolderFilter.svelte";
   import Older from "./Older.svelte";
-  import Summary from "./Summary.svelte";
   import WhoFilter from "./WhoFilter.svelte";
 
   /**
    * Activity (take 4, TEMPRA-115; tempra-dev: app/activity, decisions/three-activity-surfaces):
-   * what happened in the library, in two views under one switch. The Summary (the default) tells
-   * each request as a sentence, grouped by day, with an agent writing now as a live entry at the
-   * top; Every event is the ledger as a table, with Download. `-/ledger` opens Every event. Both
-   * follow the change feed. Nothing is marked "new since you looked" (TEMPRA-173): a person comes
-   * here to look, and is not kept count of.
-   * The view and filters are in the URL, so a view can be linked and back and forward restore it.
+   * what happened in the library, in two views under one switch. By page (the default; Option B,
+   * TEMPRA-308) has the agents working now on top, then each day's changes grouped by page, with
+   * no times on the rows; Every event is the ledger as a table, with Download. `-/ledger` opens
+   * Every event. Both follow the change feed. Nothing is marked "new since you looked"
+   * (TEMPRA-173): a person comes here to look, and is not kept count of.
+   * The view and filters (who, the folder) are in the URL, so a view can be linked and back and
+   * forward restore it.
    */
   let {
     urls,
@@ -36,7 +38,7 @@
     () => "Activity",
   );
   const view = $derived(filters.view === "events" ? "events" : "summary");
-  const prefix = $derived(filters.prefix ?? "");
+  const prefix = $derived((filters.prefix ?? "").replace(/\/+$/, ""));
   const exact = $derived(filters.actor ?? "");
   // Switching the view is a move of its own (back returns to the other); filters replace.
   const go = (change: ActivityFilters, replace = true) =>
@@ -54,18 +56,21 @@
 
   // Live (tempra-dev: app/live): a write the filters may match reloads the newest page, once per
   // burst (pages' titles come from the frame's index, which follows the feed itself). An agent's
-  // write is remembered as writing now (the pulsing dot).
+  // write is remembered as writing now (Working now, the pulsing dots).
   const reload = useTrailing(() => loaded.reload());
   const live = useLiveWrites();
+  const working = $derived(
+    workingNow(live.writing, live.now, { who: filters.who ?? "everyone", prefix }),
+  );
   useFeed(
     () => urls,
     () => loaded.data?.head ?? null,
     (events) => {
       live.heard(events);
-      const under = (p: string | null) =>
-        !prefix || p === prefix || !!p?.startsWith(`${prefix.replace(/\/$/, "")}/`);
       const hit = events.some(
-        (e) => (!exact || e.actor === exact) && (under(e.path) || under(e.from_path)),
+        (e) =>
+          (!exact || e.actor === exact) &&
+          (inFolder(prefix, e.path) || inFolder(prefix, e.from_path)),
       );
       if (hit) reload();
     },
@@ -90,7 +95,7 @@
     <Segmented
       label="View"
       options={[
-        { value: "summary", label: "Summary" },
+        { value: "summary", label: "By page" },
         { value: "events", label: "Every event" },
       ]}
       value={view}
@@ -103,6 +108,7 @@
       actor={exact}
       onChange={(who, a) => go({ who, actor: a || undefined })}
     />
+    <FolderFilter {prefix} onChange={(p) => go({ prefix: p || undefined })} />
     {#if view === "events"}
       <EventFilters kind={filters.kind ?? ""} q={filters.q ?? ""} onChange={(change) => go(change)} />
       <PillButton class="activity-download" icon="download" label="Download" href={urls.ledgerJsonl()} download />
@@ -114,12 +120,12 @@
         <Older {urls} {prefix} actor={exact} first={page}>
           {#snippet children(requests, more)}
             {#if view === "summary"}
-              <Summary
+              <ByPage
                 {urls}
                 {requests}
                 empty={page.requests.length === 0}
                 who={filters.who ?? "everyone"}
-                writing={live.writing}
+                {working}
                 now={live.now}
               />
             {:else}

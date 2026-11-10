@@ -5598,11 +5598,108 @@ section.thread.open {
 
 /* ---------- Activity ---------- */
 
+/* By page (Option B, TEMPRA-308): Working now, then each day under its heading, a row per page. */
+.activity-working {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tempra-space-10);
+}
+
+.activity-working:has(.activity-working-title) {
+  margin-bottom: var(--tempra-space-32);
+}
+
+.activity-working-title {
+  margin: 0;
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+  font-weight: var(--tempra-weight-regular);
+}
+
+.activity-working-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tempra-space-10);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-working-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tempra-space-10);
+  min-width: 0;
+  font-size: var(--tempra-text-base);
+  overflow-wrap: anywhere;
+}
+
+/* The dot sits on the line's middle, as the text's x-height does. */
+.activity-working-list .change-dot {
+  flex: none;
+  align-self: center;
+}
+
 .activity-day {
   display: flex;
   flex-direction: column;
-  gap: var(--tempra-space-04);
-  margin-bottom: var(--tempra-space-32);
+  margin-bottom: var(--tempra-space-28);
+}
+
+.activity-day-title {
+  margin: 0;
+  padding-bottom: var(--tempra-space-06);
+  border-bottom: 1px solid var(--tempra-color-border);
+  font-size: var(--tempra-text-reader);
+  font-weight: var(--tempra-weight-strong);
+  line-height: var(--tempra-leading-tight);
+}
+
+/* A page's row: its title and folder, then one line of who did what, all of it muted. */
+.change-row.activity-page {
+  padding: var(--tempra-space-14) var(--tempra-space-10);
+}
+
+.activity-page .change-row-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--tempra-space-08);
+}
+
+.activity-page-title {
+  font-size: var(--tempra-text-name);
+  font-weight: var(--tempra-weight-medium);
+}
+
+a.activity-page-title {
+  text-decoration: none;
+}
+
+a.activity-page-title:hover {
+  text-decoration: underline;
+}
+
+.activity-page-folder {
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-meta);
+}
+
+.activity-page .change-row-line .change-dot {
+  align-self: center;
+}
+
+.activity-page-line {
+  margin: 0;
+  color: var(--tempra-color-muted);
+  font-size: var(--tempra-text-ui);
+  overflow-wrap: anywhere;
+}
+
+/* Who, in the line's own grey and weight. */
+.activity-page-line .agent-name > b {
+  color: inherit;
+  font-weight: inherit;
 }
 
 /* Who changed what, and when (ChangeRow, TEMPRA-288): the avatar, the line and its detail, the
@@ -5622,7 +5719,6 @@ section.thread.open {
 }
 
 /* A run of one person's changes reads as one block: no rule inside it, no avatar again. */
-.activity-day .change-row:has(+ .change-row.continued),
 .home-recent .change-row:has(+ .change-row.continued) {
   padding-bottom: var(--tempra-space-04);
   border-bottom-color: transparent;
@@ -5630,6 +5726,11 @@ section.thread.open {
 
 .change-row.continued {
   padding-top: var(--tempra-space-04);
+}
+
+/* Bare: no lead, the line at the row's start (Activity by page). */
+.change-row.bare {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .change-row-lead {
@@ -5664,47 +5765,6 @@ section.thread.open {
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-meta);
   white-space: nowrap;
-}
-
-.entry-words,
-.entry-more {
-  color: var(--tempra-color-muted);
-}
-
-.entry-words {
-  font-size: var(--tempra-text-meta);
-}
-
-/* The request's note, quoted. */
-.entry-note {
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-base);
-  overflow-wrap: anywhere;
-}
-
-/* The pages it touched: what happened, the title, the words changed. */
-.entry-touched {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tempra-space-02);
-  margin: var(--tempra-space-04) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.entry-touched li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--tempra-space-10);
-  min-width: 0;
-}
-
-.entry-what {
-  flex: none;
-  width: 52px; /* one-off: the verb column (Edited, Moved) */
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-label);
 }
 
 /* Activity's controls (take 4, TEMPRA-115; TEMPRA-288 from the design system's Select,
@@ -5839,6 +5899,10 @@ section.thread.open {
   .change-row {
     gap: var(--tempra-space-10);
     padding: var(--tempra-space-12) var(--tempra-space-08);
+  }
+
+  .change-row.activity-page {
+    padding-inline: var(--tempra-space-08);
   }
 }
 

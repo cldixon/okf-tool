@@ -573,6 +573,14 @@ describe("choices and panels", () => {
     expect(one(crow, ".change-row-lead").textContent).toBe("");
     expect(crow.querySelector(".change-row-when")).toBeNull();
     c.destroy();
+    // No lead at all: bare, no avatar column (Activity by page, TEMPRA-308).
+    const b = draw(ChangeRow, { children: text("Retention cohorts"), detail: text("Edited") });
+    const brow = one(b.host, "article.change-row");
+    expect(brow.classList.contains("bare")).toBe(true);
+    expect(brow.querySelector(".change-row-lead")).toBeNull();
+    expect(one(brow, "p.change-row-line").textContent).toBe("Retention cohorts");
+    expect(row.classList.contains("bare")).toBe(false);
+    b.destroy();
   });
 
   test("PanelHead: its title as a focusable h2, the count, × named for the panel", () => {

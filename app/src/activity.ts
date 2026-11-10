@@ -1,14 +1,18 @@
 import type { ActedBy } from "./agents";
 import { api } from "./api";
+import { isAgentChange } from "./changes";
+import type { FeedEvent } from "./live";
 import { registerPage } from "./prefetch";
-import { day, plural, relativeTime } from "./ui";
-import type { ActivityFilters, Urls } from "./urls";
+import type { OutlineFile } from "./tree";
+import { day, plural } from "./ui";
+import { type ActivityFilters, dirOf, folderName, type Urls, type Who } from "./urls";
 
 /*
- * Activity (take 4, TEMPRA-115; tempra-dev: app/activity): what happened, for people. One entry per
- * request, told as a sentence of what it did ("Claude Code changed 3 pages in The app"), with
- * its note and the pages it touched. The Activity page draws them grouped by day
- * (EntryRow.svelte, LiveEntry.svelte); the hooks are in activity.svelte.ts.
+ * Activity (take 4, TEMPRA-115; by page since Option B, TEMPRA-308; tempra-dev: app/activity):
+ * what happened, for people. By page: the agents working now, then each day's changes grouped by
+ * page ("Edited twice by Claude Code for @dev, +252 −42 words"), a request that changed many
+ * pages as one row (`byPage`); Every event: the ledger as a table (`eventRows`). The pages are
+ * pages/ByPage.svelte and pages/EveryEvent.svelte; the hooks are in activity.svelte.ts.
  */
 
 /** One ledger event as `GET …/requests` returns it (worker/src/store/store.ts `EventRow`). */
@@ -53,6 +57,8 @@ const rewrote = (w: Words | null) =>
 
 /** A page or file a request touched, and what happened to it. */
 export interface Touched {
+  /** The page's id (the same across a move). */
+  page: string;
   path: string;
   title: string;
   what: What;
@@ -63,32 +69,6 @@ export interface Touched {
   seq: number;
 }
 
-/** A piece of an entry's sentence: words, a page to link, or a folder to link. */
-export type Part =
-  | string
-  | { page: string; title: string; seq: number; gone: boolean; words: Words | null }
-  | { folder: string };
-
-/** One request as Activity tells it. */
-export interface Entry {
-  id: string;
-  /** When it ended (its last event). */
-  ts: string;
-  actor: string;
-  by: ActedBy | null;
-  /** Its first and last sequence. */
-  first: number;
-  last: number;
-  /** What it did, after the person's name. */
-  parts: Part[];
-  /** The request's note, or what a comment said, quoted under the sentence. */
-  quote: string | null;
-  /** Content it changed, in order (not comments or verifications). */
-  touched: Touched[];
-  /** The sentence names every change itself, so a list beneath would only repeat it. */
-  named: boolean;
-}
-
 /** A page's title by its path (`useTitleOf().of`: the outline's title, else its file name). */
 type TitleOf = (path: string) => string;
 
@@ -96,16 +76,6 @@ type TitleOf = (path: string) => string;
 export function wordsText(w: Words | null): string | null {
   if (!w || (w.added === 0 && w.removed === 0)) return null;
   return `+${w.added} −${w.removed} words`;
-}
-
-/** Joins clauses as a person writes a list: "a", "a and b", "a, b and c". */
-function joinParts(clauses: Part[][]): Part[] {
-  const out: Part[] = [];
-  clauses.forEach((c, i) => {
-    if (i > 0) out.push(i === clauses.length - 1 ? " and " : ", ");
-    out.push(...c);
-  });
-  return out;
 }
 
 const asWords = (v: unknown): Words | null => {
@@ -156,6 +126,7 @@ export function touchedBy(events: LedgerEvent[], titleOf: TitleOf): Touched[] {
               : "moved";
     const from = typeof moved?.meta?.from_path === "string" ? moved.meta.from_path : null;
     out.push({
+      page: last.page_id,
       path: last.path,
       title: titleOf(last.path),
       what,
@@ -165,140 +136,6 @@ export function touchedBy(events: LedgerEvent[], titleOf: TitleOf): Touched[] {
     });
   }
   return out;
-}
-
-const pagePart = (t: Touched, withWords: boolean): Part => ({
-  page: t.path,
-  title: t.title,
-  seq: t.seq,
-  gone: t.what === "deleted",
-  words: withWords ? t.words : null,
-});
-
-/** " in The app and Decisions", " across 4 folders", or nothing when some are at the top. */
-function wherePart(paths: string[]): Part[] {
-  const dirs: string[] = [];
-  for (const p of paths) {
-    const i = p.indexOf("/");
-    if (i === -1) return [];
-    const d = p.slice(0, i);
-    if (!dirs.includes(d)) dirs.push(d);
-  }
-  if (dirs.length === 0) return [];
-  if (dirs.length > 2) return [` across ${dirs.length} folders`];
-  return [" in ", ...joinParts(dirs.map((d) => [{ folder: d }]))];
-}
-
-/** The content clause: "rewrote A and added B", or "changed 3 pages in The app". */
-function contentClauses(touched: Touched[], imported: boolean): Part[][] {
-  if (touched.length === 0) return [];
-  const unit = touched.every((t) => isPage(t.path)) ? "page" : "file";
-  const verbs = [...new Set(touched.map((t) => t.what))];
-  if (imported) {
-    return [[`imported ${plural(touched.length, unit)}`, ...wherePart(touched.map((t) => t.path))]];
-  }
-  if (touched.length > 2) {
-    const verb = verbs.length === 1 ? verbs[0] : "changed";
-    return [[`${verb} ${plural(touched.length, unit)}`, ...wherePart(touched.map((t) => t.path))]];
-  }
-  return verbs.map((verb) => [
-    `${verb} `,
-    ...joinParts(touched.filter((t) => t.what === verb).map((t) => [pagePart(t, true)])),
-  ]);
-}
-
-/** The comment clauses: "replied on Reader and resolved it", "opened a thread on Tenancy". */
-function commentClauses(events: LedgerEvent[], titleOf: TitleOf): Part[][] {
-  const threads = new Map<string, { path: string; seq: number; kinds: string[] }>();
-  for (const e of events) {
-    if (e.op !== "comment") continue;
-    const c = e.meta?.comment as { kind?: string; thread?: string } | undefined;
-    const id = c?.thread ?? String(e.seq);
-    const t = threads.get(id) ?? { path: e.path, seq: e.seq, kinds: [] };
-    t.kinds.push(c?.kind ?? "reply");
-    threads.set(id, t);
-  }
-  if (threads.size === 0) return [];
-  // A library thread (TEMPRA-222) is on no page.
-  const on = (t: { path: string; seq: number }): Part =>
-    t.path
-      ? { page: t.path, title: titleOf(t.path), seq: t.seq, gone: false, words: null }
-      : "the library";
-  const list = [...threads.values()];
-  if (list.length > 2) {
-    const paths = [...new Set(list.map((t) => t.path))];
-    const first = list[0] as (typeof list)[number];
-    return paths.length === 1
-      ? [[`commented ${list.length} times on `, on(first)]]
-      : [[`commented on ${plural(paths.length, "page")}`]];
-  }
-  return list.map((t) => {
-    const k = new Set(t.kinds);
-    if (k.has("open")) return ["opened a thread on ", on(t)];
-    if (k.has("reply") && k.has("resolve")) return ["replied on ", on(t), " and resolved it"];
-    if (k.has("reply")) return ["replied on ", on(t)];
-    if (k.has("resolve")) return ["resolved a thread on ", on(t)];
-    return ["reopened a thread on ", on(t)];
-  });
-}
-
-/** The verification clause: "verified A", "verified A and B", "verified A and 2 more". */
-function verifyClauses(events: LedgerEvent[], titleOf: TitleOf): Part[][] {
-  const seen = new Map<string, LedgerEvent>();
-  for (const e of events) if (e.op === "verify") seen.set(e.path, e);
-  if (seen.size === 0) return [];
-  const items: Part[][] = [...seen.values()].map((e) => [
-    { page: e.path, title: titleOf(e.path), seq: e.seq, gone: false, words: null },
-  ]);
-  if (items.length > 2)
-    return [["verified ", ...(items[0] ?? []), ` and ${items.length - 1} more`]];
-  return [["verified ", ...joinParts(items)]];
-}
-
-/** The first thing a comment in the request said, on one line and kept short. */
-function commentQuote(events: LedgerEvent[]): string | null {
-  for (const e of events) {
-    const body = (e.meta?.comment as { body?: unknown } | undefined)?.body;
-    if (e.op === "comment" && typeof body === "string" && body.trim()) {
-      const said = body.replace(/\s+/g, " ").trim();
-      return said.length > 160 ? `${said.slice(0, 159)}…` : said;
-    }
-  }
-  return null;
-}
-
-/**
- * A request as an Activity entry, or null when nothing of it is left to show (`hideComments`
- * drops comment events, so a request that only commented goes).
- */
-export function toEntry(
-  r: LedgerRequest,
-  titleOf: TitleOf,
-  opts: { hideComments?: boolean } = {},
-): Entry | null {
-  const events = opts.hideComments ? r.events.filter((e) => e.op !== "comment") : r.events;
-  const first = events[0];
-  const last = events[events.length - 1];
-  if (!first || !last) return null;
-  const touched = touchedBy(events, titleOf);
-  const imported = events.every((e) => e.op === "import");
-  const clauses = [
-    ...contentClauses(touched, imported),
-    ...commentClauses(events, titleOf),
-    ...verifyClauses(events, titleOf),
-  ];
-  return {
-    id: r.request_id,
-    ts: last.ts,
-    actor: r.actor,
-    by: r.by ?? null,
-    first: first.seq,
-    last: last.seq,
-    parts: joinParts(clauses),
-    quote: r.note?.trim() || commentQuote(events),
-    touched,
-    named: touched.length <= 2 && !imported,
-  };
 }
 
 /** Whether a request was made by a person in the app (not by one of their agents). */
@@ -319,6 +156,347 @@ export function whoWorksHere(you: boolean, people: number, agents: number): stri
   if (parts.length === 0) return "Nobody yet";
   const last = parts.pop() as string;
   return parts.length > 0 ? `${parts.join(", ")} and ${last}` : last;
+}
+
+// ---------------------------------------------------------------- by page
+
+/** How many pages one request may change and still be told page by page; past it, one row. */
+export const BULK_PAGES = 3;
+
+/** How many of a bulk row's pages are named before "and n more". */
+export const BULK_LISTED = 2;
+
+/** What happened to a page, as its row's line says it. */
+export type Did = What | "commented" | "replied" | "resolved" | "reopened" | "checked";
+
+/**
+ * One kind of change one person (or agent) made to a page in a day, however many times: "Edited
+ * twice by Claude Code for @dev, +252 −42 words · “note”".
+ */
+export interface Doing {
+  actor: string;
+  by: ActedBy | null;
+  did: Did;
+  /** How many requests did it. */
+  times: number;
+  /** Words added and removed, over all of them. */
+  words: Words | null;
+  /** The newest note (a change) or comment (a comment), on one line. */
+  quote: string | null;
+  /** Its newest event. */
+  seq: number;
+}
+
+/** A page's changes in one day: one row, the title over a line of who did what. */
+export interface PageRow {
+  kind: "page";
+  key: string;
+  /** Its newest path; "" for the library itself (a library thread, TEMPRA-222). */
+  path: string;
+  title: string;
+  /** Its newest event (a deleted page is shown as it was just before). */
+  seq: number;
+  gone: boolean;
+  /** Newest first. */
+  doings: Doing[];
+}
+
+/** One request that changed more than BULK_PAGES pages (an import, a folder moved): one row. */
+export interface BulkRow {
+  kind: "bulk";
+  key: string;
+  actor: string;
+  by: ActedBy | null;
+  /** What it did to all of them, or "changed" when it did several things. */
+  what: What | "changed";
+  imported: boolean;
+  count: number;
+  unit: "page" | "file";
+  /** Their folder by name, "4 folders", or null when some are at the top. */
+  where: string | null;
+  /** The first few, to link. */
+  pages: { path: string; title: string; seq: number; gone: boolean }[];
+  quote: string | null;
+}
+
+export type DayRow = PageRow | BulkRow;
+
+/** One day's rows under its heading. */
+export interface ActivityDay {
+  label: string;
+  rows: DayRow[];
+}
+
+const oneQuote = (s: string | null | undefined, max = 160): string | null => {
+  const t = s?.replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+};
+
+const COMMENT_DID: Record<string, Did> = {
+  open: "commented",
+  reply: "replied",
+  resolve: "resolved",
+  reopen: "reopened",
+};
+
+function addWords(a: Words | null, b: Words | null): Words | null {
+  if (!a) return b;
+  if (!b) return a;
+  return { added: a.added + b.added, removed: a.removed + b.removed };
+}
+
+/** Where a bulk row's pages are: their one folder's name, "n folders", or null. */
+function whereOf(paths: string[]): string | null {
+  const dirs = [...new Set(paths.map(dirOf))];
+  if (dirs.includes("")) return null;
+  if (dirs.length === 1) return folderName(dirs[0] as string);
+  return `${dirs.length} folders`;
+}
+
+const BY_NAME = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+/** Folders in the tree's order: a folder, then what is inside it, then its next sibling. */
+function byFolder(a: string, b: string): number {
+  const x = a.split("/");
+  const y = b.split("/");
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const c = BY_NAME.compare(x[i] as string, y[i] as string);
+    if (c !== 0) return c;
+  }
+  return x.length - y.length;
+}
+
+/**
+ * The folder filter's choices: All folders, then every folder in the library's index in path
+ * order, by readable name ("App / Reader"); the folder in the URL too when the index lacks it.
+ */
+export function folderOptions(
+  index: Pick<OutlineFile, "path" | "kind">[],
+  current: string,
+): { value: string; label: string }[] {
+  const dirs = new Set<string>();
+  for (const f of index) {
+    if (f.kind === "dir") dirs.add(f.path);
+    for (let d = dirOf(f.path); d !== ""; d = dirOf(d)) dirs.add(d);
+  }
+  const now = current.replace(/\/+$/, "");
+  if (now) dirs.add(now);
+  return [
+    { value: "", label: "All folders" },
+    ...[...dirs]
+      .sort(byFolder)
+      .map((d) => ({ value: d, label: d.split("/").map(folderName).join(" / ") })),
+  ];
+}
+
+/** Whether a path is in a folder or is it; with no folder, everything is. */
+export function inFolder(prefix: string, path: string | null | undefined): boolean {
+  const dir = prefix.replace(/\/+$/, "");
+  if (!dir) return true;
+  return !!path && (path === dir || path.startsWith(`${dir}/`));
+}
+
+/**
+ * Activity by page (Option B, TEMPRA-308): requests (newest first, as the API pages them) as
+ * days, newest first, each a row per page changed that day, ordered by its newest change, with
+ * each person's each kind of change once ("Edited twice by …"). A request that changed more than
+ * BULK_PAGES pages is a row of its own. `who` keeps only agents' or only people's requests.
+ */
+export function byPage(
+  requests: LedgerRequest[],
+  titleOf: TitleOf,
+  now: number,
+  who: Who = "everyone",
+): ActivityDay[] {
+  const days: ActivityDay[] = [];
+  const rows = new Map<string, PageRow>();
+  const ids = new Set<string>();
+  for (const r of requests) {
+    if (ids.has(r.request_id)) continue;
+    ids.add(r.request_id);
+    if (who === "people" && !byPerson(r)) continue;
+    if (who === "agents" && byPerson(r)) continue;
+    const last = r.events[r.events.length - 1];
+    if (!last) continue;
+    const label = dayLabel(last.ts, now);
+    let found = days.find((d) => d.label === label);
+    if (!found) {
+      found = { label, rows: [] };
+      days.push(found);
+    }
+    const day = found;
+    const by = r.by ?? null;
+    const add = (
+      e: Pick<LedgerEvent, "page_id" | "path" | "seq">,
+      did: Did,
+      words: Words | null,
+      quote: string | null,
+      gone = false,
+    ) => {
+      const key = `${label} ${e.page_id || e.path}`;
+      let row = rows.get(key);
+      if (!row) {
+        row = {
+          kind: "page",
+          key,
+          path: e.path,
+          title: e.path ? titleOf(e.path) : "The library",
+          seq: e.seq,
+          gone,
+          doings: [],
+        };
+        rows.set(key, row);
+        day.rows.push(row);
+      }
+      const same = row.doings.find(
+        (d) =>
+          d.did === did && d.actor === r.actor && (d.by?.person ?? null) === (by?.person ?? null),
+      );
+      if (same) {
+        same.times++;
+        same.words = addWords(same.words, words);
+        same.quote ??= quote;
+      } else {
+        row.doings.push({ actor: r.actor, by, did, times: 1, words, quote, seq: e.seq });
+      }
+    };
+
+    const note = oneQuote(r.note);
+    const content = r.events.filter((e) => e.op !== "comment" && e.op !== "verify");
+    const touched = touchedBy(content, titleOf);
+    if (touched.length > BULK_PAGES) {
+      const whats = [...new Set(touched.map((t) => t.what))];
+      day.rows.push({
+        kind: "bulk",
+        key: r.request_id,
+        actor: r.actor,
+        by,
+        what: whats.length === 1 ? (whats[0] as What) : "changed",
+        imported: content.every((e) => e.op === "import"),
+        count: touched.length,
+        unit: touched.every((t) => isPage(t.path)) ? "page" : "file",
+        where: whereOf(touched.map((t) => t.path)),
+        pages: touched.slice(0, BULK_LISTED).map((t) => ({
+          path: t.path,
+          title: t.title,
+          seq: t.seq,
+          gone: t.what === "deleted",
+        })),
+        quote: note,
+      });
+    } else {
+      for (const t of touched) {
+        const e = { page_id: t.page, path: t.path, seq: t.seq };
+        add(e, t.what, t.words, note, t.what === "deleted");
+      }
+    }
+    // Comments and checks, newest first, so a row quotes the newest comment.
+    for (const e of [...r.events].reverse()) {
+      if (e.op === "comment") {
+        const c = e.meta?.comment as { kind?: string; body?: unknown } | undefined;
+        const body = typeof c?.body === "string" ? c.body : null;
+        add(e, COMMENT_DID[c?.kind ?? "reply"] ?? "replied", null, oneQuote(body));
+      } else if (e.op === "verify") {
+        add(e, "checked", null, null);
+      }
+    }
+  }
+  return days.filter((d) => d.rows.length > 0);
+}
+
+/** " twice", " 3 times", or nothing for once. */
+const timesText = (n: number) => (n <= 1 ? "" : n === 2 ? " twice" : ` ${n} times`);
+
+/** A change as the line says it before the name ("edited twice by "). */
+const PAST: Record<What | "changed", string> = {
+  added: "added",
+  edited: "edited",
+  rewrote: "rewritten",
+  moved: "moved",
+  deleted: "deleted",
+  reverted: "reverted",
+  changed: "changed",
+};
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * A doing as the words around its person's name: a change says the name after it ("Edited twice
+ * by " … ", +38 −12 words · “note”"), a comment before it (… " commented: “Why?”"). `first` is
+ * whether it starts the line (a later one is lowercase after " · "). People read "checked",
+ * never "verified" (TEMPRA-295).
+ */
+export function doingText(d: Doing, first: boolean): { before: string; after: string } {
+  const quote = d.quote ? `“${d.quote}”` : "";
+  switch (d.did) {
+    case "commented":
+    case "replied":
+      return { before: "", after: ` ${d.did}${timesText(d.times)}${quote ? `: ${quote}` : ""}` };
+    case "resolved":
+    case "reopened": {
+      const threads = d.times === 1 ? "a thread" : `${d.times} threads`;
+      return { before: "", after: ` ${d.did} ${threads}` };
+    }
+    case "checked": {
+      const verb = `checked${timesText(d.times)} by `;
+      return { before: first ? capital(verb) : verb, after: "" };
+    }
+    default: {
+      const verb = `${PAST[d.did]}${timesText(d.times)} by `;
+      const words = wordsText(d.words);
+      return {
+        before: first ? capital(verb) : verb,
+        after: `${words ? `, ${words}` : ""}${quote ? ` · ${quote}` : ""}`,
+      };
+    }
+  }
+}
+
+/** A bulk row's title: "11 new pages", "4 pages moved", "5 files changed". */
+export function bulkTitle(b: Pick<BulkRow, "what" | "count" | "unit">): string {
+  if (b.what === "added") return `${b.count} new ${b.count === 1 ? b.unit : `${b.unit}s`}`;
+  return `${plural(b.count, b.unit)} ${PAST[b.what]}`;
+}
+
+/** A bulk row's words before its person's name: "Imported by ", "Moved by ". */
+export const bulkVerb = (b: Pick<BulkRow, "what" | "imported">) =>
+  `${b.imported ? "Imported" : capital(PAST[b.what])} by `;
+
+/**
+ * Working now (Option B): the agents writing now, newest first, one each; none for People, and
+ * only writes in the folder filter.
+ */
+export function workingNow(
+  writes: Iterable<LiveWrite>,
+  now: number,
+  f: { who?: Who; prefix?: string } = {},
+): LiveWrite[] {
+  if (f.who === "people") return [];
+  return [...writes]
+    .filter((w) => isLive(w, now) && inFolder(f.prefix ?? "", w.path))
+    .sort((a, b) => b.at - a.at);
+}
+
+/** One writer: an actor for one person. */
+export const writerKey = (w: Pick<LiveWrite, "actor" | "by">) => `${w.actor} ${w.by?.person ?? ""}`;
+
+/**
+ * The writers after a batch of feed events heard at `at`: each agent's newest change (not a
+ * comment or a delete, `isAgentChange`) replaces its last.
+ */
+export function heardWrites(
+  writes: ReadonlyMap<string, LiveWrite>,
+  events: FeedEvent[],
+  at: number,
+): Map<string, LiveWrite> {
+  const next = new Map(writes);
+  for (const e of events) {
+    if (!isAgentChange(e)) continue;
+    const w = { actor: e.actor, by: e.by ?? null, path: e.path, seq: e.seq, at };
+    next.set(writerKey(w), w);
+  }
+  return next;
 }
 
 // ---------------------------------------------------------------- every event
@@ -429,12 +607,9 @@ export interface LiveWrite {
 export const isLive = (w: Pick<LiveWrite, "at"> | null | undefined, now: number) =>
   !!w && now - w.at < LIVE_MS;
 
-// ---------------------------------------------------------------- times
+// ---------------------------------------------------------------- days
 
-/** The time of day as `localTime` writes it ("4:52 PM"), in the reader's time zone. */
-const CLOCK = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
-
-/** "Today", "Yesterday", or the date (`day`): the heading of a day's entries (local time). */
+/** "Today", "Yesterday", or the date (`day`): the heading of a day's rows (local time). */
 export function dayLabel(ts: string, now: number): string {
   const d = new Date(ts).toDateString();
   const yesterday = new Date(now);
@@ -442,54 +617,6 @@ export function dayLabel(ts: string, now: number): string {
   if (d === new Date(now).toDateString()) return "Today";
   if (d === yesterday.toDateString()) return "Yesterday";
   return day(ts);
-}
-
-/** Entries in order, split into days, newest first as they come. */
-export function groupByDay<T extends { ts: string }>(
-  items: T[],
-  now: number,
-): { label: string; items: T[] }[] {
-  const days: { label: string; items: T[] }[] = [];
-  for (const item of items) {
-    const label = dayLabel(item.ts, now);
-    const last = days[days.length - 1];
-    if (last?.label === label) last.items.push(item);
-    else days.push({ label, items: [item] });
-  }
-  return days;
-}
-
-/** How far apart two entries of one person may be and still read as one run (TEMPRA-288). */
-export const RUN_GAP_MS = 30 * 60_000;
-
-/**
- * Whether `e` continues the run `prev` is in, on Activity's Summary (TEMPRA-288): the same actor
- * acting for the same person, and within RUN_GAP_MS of it (entries are newest first). A run is
- * drawn as one block, the name and avatar once.
- */
-export function continuesRun(
-  prev: Pick<Entry, "actor" | "by" | "ts"> | undefined,
-  e: Pick<Entry, "actor" | "by" | "ts">,
-): boolean {
-  if (!prev || prev.actor !== e.actor) return false;
-  if ((prev.by?.person ?? null) !== (e.by?.person ?? null)) return false;
-  return Math.abs(Date.parse(prev.ts) - Date.parse(e.ts)) <= RUN_GAP_MS;
-}
-
-/** A sentence's parts without the name before them: its first words capitalised ("Deleted …"). */
-export function withoutName(parts: Part[]): Part[] {
-  const [first, ...rest] = parts;
-  if (typeof first !== "string") return parts;
-  const words = first.trimStart();
-  return [words.charAt(0).toUpperCase() + words.slice(1), ...rest];
-}
-
-/**
- * When, beside an entry under its day's heading: "14 min ago" today (relativeTime), the time of
- * day on an earlier day.
- */
-export function entryTime(ts: string, now: number): string {
-  return dayLabel(ts, now) === "Today" ? relativeTime(ts, now) : CLOCK.format(new Date(ts));
 }
 
 /** Requests per page of Activity, as the ledger pages them. */

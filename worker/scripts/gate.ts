@@ -661,7 +661,7 @@ function greyscalePng(
  * On this page, every panel as a bottom sheet), the Markdown view,
  * figures in the full-screen view, notifications (a reply waiting in the bell's panel, opened into
  * its thread; nothing for a checked page an agent edited), and
- * Activity with its two views (Summary and
+ * Activity with its two views (By page and
  * Every event), all drawn from the API; links move within the app without reloading the page, and
  * nothing is refused by the CSP or throws. GATE_SCREENSHOTS=<dir> saves screenshots of them.
  */
@@ -4428,7 +4428,7 @@ async function browserRenders(
       await agentDeletes(path);
     });
     await step(
-      "Activity: the Summary follows an agent's write live with its live entry, Every event lists it by seq and tails live, -/ledger opens it, Download is the ledger as JSON lines",
+      "Activity: By page follows an agent's write live with Working now, Every event lists it by seq and tails live, -/ledger opens it, Download is the ledger as JSON lines",
       async () => {
         await markStay();
         await sidebar
@@ -4452,14 +4452,34 @@ async function browserRenders(
           })
           .first()
           .waitFor({ timeout: 10_000 });
-        // The agent is writing now: the live entry heads the Summary with the pulsing dot.
-        const liveEntry = main.locator("article.change-row.live");
-        await liveEntry.waitFor({ timeout: 10_000 });
-        if (!/is editing/.test(await liveEntry.innerText())) {
-          throw new Error(`live entry: ${await liveEntry.innerText()}`);
+        // The agent is writing now (Option B, TEMPRA-308): Working now names it with the pulsing
+        // dot, its page's row has the dot too, and no row says when.
+        const working = main.locator(".activity-working-list li").first();
+        await working.waitFor({ timeout: 10_000 });
+        if (!/is editing/.test(await working.innerText())) {
+          throw new Error(`Working now: ${await working.innerText()}`);
         }
-        if (!(await liveEntry.locator(".change-dot.live").count())) {
-          throw new Error("the live entry has no pulsing dot");
+        if (!(await working.locator(".change-dot.live").count())) {
+          throw new Error("Working now has no pulsing dot");
+        }
+        const written = main.locator("article.change-row.activity-page", {
+          hasText: "gate: an agent writes while Activity is open",
+        });
+        if (!(await written.first().locator(".change-dot.live").count())) {
+          throw new Error("the page being written has no pulsing dot on its row");
+        }
+        if (
+          (await main.locator(".activity-day time, .activity-day .change-row-when").count()) > 0
+        ) {
+          throw new Error("Activity's rows say when");
+        }
+        if (
+          (await main
+            .locator(".activity-day")
+            .getByText(/verified/i)
+            .count()) > 0
+        ) {
+          throw new Error("Activity says verified, not checked");
         }
         if (shots) await page.screenshot({ path: `${shots}/activity-live.png` });
         if (!(await stayed())) throw new Error("the page reloaded");
@@ -4547,7 +4567,7 @@ async function browserRenders(
           throw new Error(`ledger.jsonl ends with ${lines.at(-1)}`);
         }
 
-        // The ledger's address opens Every event; the switch goes back to the Summary.
+        // The ledger's address opens Every event; the switch goes back to By page.
         await page.goto(`${lib}/-/ledger`);
         await rows.first().waitFor({ timeout: 15_000 });
         const pressed = main.getByRole("button", { name: "Every event", exact: true });
@@ -4555,7 +4575,7 @@ async function browserRenders(
           throw new Error("-/ledger does not open Every event");
         }
         await markStay();
-        await main.getByRole("button", { name: "Summary", exact: true }).click();
+        await main.getByRole("button", { name: "By page", exact: true }).click();
         await page.waitForURL(`${lib}/-/activity`);
         await main.locator("article.change-row").first().waitFor({ timeout: 10_000 });
         if (!(await stayed())) throw new Error("the switch reloaded the page");
