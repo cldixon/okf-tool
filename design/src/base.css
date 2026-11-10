@@ -51,6 +51,7 @@ h1,
 h2,
 .view-section-title,
 .lib-section-title,
+.activity-day-title,
 .settings-section > h2 {
   margin: var(--tempra-space-32) 0 var(--tempra-space-08);
   font-size: var(--tempra-text-name);
@@ -66,6 +67,7 @@ h3 {
 }
 
 .label,
+.activity-working-title,
 .sidebar-label,
 .menu-list .menu-note,
 .page-info-section > h3,

@@ -701,6 +701,7 @@ h1,
 h2,
 .view-section-title,
 .lib-section-title,
+.activity-day-title,
 .settings-section > h2 {
   margin: var(--tempra-space-32) 0 var(--tempra-space-08);
   font-size: var(--tempra-text-name);
@@ -716,6 +717,7 @@ h3 {
 }
 
 .label,
+.activity-working-title,
 .sidebar-label,
 .menu-list .menu-note,
 .page-info-section > h3,
@@ -5853,11 +5855,9 @@ section.thread.open {
   margin-bottom: var(--tempra-space-32);
 }
 
+/* Its type is the group role's (base.css). */
 .activity-working-title {
   margin: 0;
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
 }
 
 .activity-working-list {
@@ -5890,13 +5890,11 @@ section.thread.open {
   margin-bottom: var(--tempra-space-28);
 }
 
+/* A day: the section role's type (base.css), over a hairline. */
 .activity-day-title {
   margin: 0;
   padding-bottom: var(--tempra-space-06);
   border-bottom: 1px solid var(--tempra-color-border);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
 }
 
 /* A page's row: its title and folder, then one line of who did what, all of it muted. */

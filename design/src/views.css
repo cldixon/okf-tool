@@ -266,11 +266,9 @@
   margin-bottom: var(--tempra-space-32);
 }
 
+/* Its type is the group role's (base.css). */
 .activity-working-title {
   margin: 0;
-  color: var(--tempra-color-muted);
-  font-size: var(--tempra-text-meta);
-  font-weight: var(--tempra-weight-regular);
 }
 
 .activity-working-list {
@@ -303,13 +301,11 @@
   margin-bottom: var(--tempra-space-28);
 }
 
+/* A day: the section role's type (base.css), over a hairline. */
 .activity-day-title {
   margin: 0;
   padding-bottom: var(--tempra-space-06);
   border-bottom: 1px solid var(--tempra-color-border);
-  font-size: var(--tempra-text-reader);
-  font-weight: var(--tempra-weight-strong);
-  line-height: var(--tempra-leading-tight);
 }
 
 /* A page's row: its title and folder, then one line of who did what, all of it muted. */
