@@ -336,6 +336,11 @@
   color: var(--tempra-color-faint);
 }
 
+/* Another agent at the page now, after the author: "… & Codex for @ann". */
+.byline-and {
+  color: var(--tempra-color-muted);
+}
+
 /* Who wrote it from when: a hairline leaning as a slash, a little taller than the text. */
 .byline-slash {
   align-self: center;

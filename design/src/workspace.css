@@ -1451,14 +1451,16 @@ button.tree-name {
 }
 
 /* Agents' presence (TEMPRA-219): a page an agent is reading or writing now, or a closed folder
-   holding one (an open folder leaves it to its rows). The whole cue, with no words beside it (a
+   holding one (an open folder leaves it to its rows); on the page itself, the agent's name in its
+   byline. The whole cue, with no words beside it (a
    hover names the agent): a band of the agent's ink moves through the name's letters, as a
    status line shimmers while a tool runs, and nothing else about the row changes. The ink is the
    name's own fill (background-clip), so nothing lies over or behind the words; text and the ink
    are both at least 4.5:1 on every surface (design/contrast.test.ts), so the name reads at
    every point of the sweep. */
 .tree-row.presence > a,
-.tree-row.presence > .tree-name {
+.tree-row.presence > .tree-name,
+.byline-name.presence .agent-name > b {
   background-image: linear-gradient(
     100deg,
     currentcolor 0 25%,
@@ -1485,7 +1487,8 @@ button.tree-name {
 /* Without motion the name stays still in the agent's ink. In forced colours, plain. */
 @media (prefers-reduced-motion: reduce) {
   .tree-row.presence > a,
-  .tree-row.presence > .tree-name {
+  .tree-row.presence > .tree-name,
+  .byline-name.presence .agent-name > b {
     background: none;
     -webkit-text-fill-color: var(--tempra-color-agent-ink);
     animation: none;
@@ -1494,7 +1497,8 @@ button.tree-name {
 
 @media (forced-colors: active) {
   .tree-row.presence > a,
-  .tree-row.presence > .tree-name {
+  .tree-row.presence > .tree-name,
+  .byline-name.presence .agent-name > b {
     background-image: none;
     -webkit-text-fill-color: currentcolor;
     animation: none;

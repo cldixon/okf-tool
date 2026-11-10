@@ -342,9 +342,11 @@
                (TEMPRA-139, TEMPRA-145). --><nav class="doc-crumbs" aria-label="Folders"
             >{#each folders as f, i (f)}<span>{#if i > 0}<span aria-hidden="true">{" / "}</span>{/if}{folderName(f)}</span>{/each}</nav
           ><!-- Who wrote it and when, above the title, as a blog post's byline (a trial). --><Byline
+            {urls}
             page={c}
             history={props.data.history}
             {name}
+            {current}
             {status}
           /><h1 class="doc-title">{title}</h1
           >{#if typeof fm.description === "string"}<p class="doc-tagline">{fm.description}</p>{/if}{#if current}<CheckedLine {urls} path={c.path} standing={s} {name} />{/if}{@render tools("head")}{#if hasContents}<details
