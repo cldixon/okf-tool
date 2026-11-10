@@ -155,7 +155,9 @@ describe("OAuth for MCP clients", () => {
     expect(page).toContain("The connection name is two parts joined by a slash");
     // Announced, and tied to its field (V-10); the folded options open to show it.
     expect(page).toContain('id="consent-error" role="alert"');
-    expect(page).toMatch(/name="actor"[^>]*aria-invalid="true" aria-describedby="consent-error actor-hint"/);
+    expect(page).toMatch(
+      /name="actor"[^>]*aria-invalid="true" aria-describedby="consent-error actor-hint"/,
+    );
     expect(page).toContain("<details open>");
     // The same handle still works after the error.
     const denied = await submit(app, flow, { decision: "deny" });
