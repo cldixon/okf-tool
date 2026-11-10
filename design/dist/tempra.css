@@ -4464,6 +4464,12 @@ ul.events {
   margin-bottom: var(--tempra-space-32);
 }
 
+/* A page's head starts with its byline: the page starts higher, so the title stays where it was
+   (56px under the top bar) with more room between the two. */
+.page-view .doc:has(> .doc-page > .doc-head) {
+  padding-top: var(--tempra-space-40);
+}
+
 .doc-title {
   font-family: var(--tempra-font-display);
   font-variation-settings: var(--tempra-font-display-settings);
@@ -4493,13 +4499,23 @@ ul.events {
   align-items: center;
   gap: var(--tempra-space-06) var(--tempra-space-08);
   /* Above the title (a trial of a blog post's byline): its space is below it. */
-  margin-bottom: var(--tempra-space-16);
+  margin-bottom: var(--tempra-space-32);
   color: var(--tempra-color-muted);
   font-size: var(--tempra-text-ui);
 }
 
 .byline-sep {
   color: var(--tempra-color-faint);
+}
+
+/* Who wrote it from when: a hairline leaning as a slash, a little taller than the text. */
+.byline-slash {
+  align-self: center;
+  width: 1px;
+  height: 1.25em;
+  margin: 0 var(--tempra-space-04);
+  background: var(--tempra-color-faint);
+  transform: rotate(15deg);
 }
 
 /* What is exceptional about the page, at the byline's end: "Draft", "Stale" (TEMPRA-139). */
@@ -4953,6 +4969,14 @@ ul.events {
     --doc-pad: var(--tempra-space-16);
     padding-top: var(--tempra-space-16);
     padding-bottom: var(--tempra-space-96);
+  }
+
+  .page-view .doc:has(> .doc-page > .doc-head) {
+    padding-top: var(--tempra-space-16);
+  }
+
+  .doc-head .byline {
+    margin-bottom: var(--tempra-space-24);
   }
 
   .doc-crumbs {

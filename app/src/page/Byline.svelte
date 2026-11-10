@@ -28,7 +28,8 @@
   const who = $derived(author ? props.name(author.actor, actedBy(author)) : null);
 </script>
 
-{#snippet sep()}<span class="byline-sep" aria-hidden="true">·</span>{/snippet}
+<!-- Who from when: a thin slanted rule, as a blog post's byline has. -->
+{#snippet sep()}<span class="byline-slash" aria-hidden="true"></span>{/snippet}
 {#if !who || !author}
   <div class="byline"><StatusPills status={props.status ?? null} stale={props.page.stale} /></div>
 {:else}
