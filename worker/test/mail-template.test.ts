@@ -22,7 +22,7 @@ describe("the mail template", () => {
     expect(mail.html).toContain(">Hello &#60;there&#62;</h1>");
     expect(mail.html).toContain('href="https://x.example/a?b=1&#38;c=2"');
     expect(mail.html).toContain(">Go</a>");
-    expect(mail.html).toContain(">K7QMX2PD</p>");
+    expect(mail.html).toContain(">K7QMX2PD</td>");
     expect(mail.html).toContain(">Small print.</p>");
     expect(mail.html).not.toMatch(/<script|<img/);
   });
@@ -34,6 +34,32 @@ describe("the mail template", () => {
     expect(mail.html).toContain("@media (prefers-color-scheme:dark)");
     expect(mail.html).toContain(`.t-bg{background:${brand.dark.bg}!important}`);
     expect(mail.html).toContain(`.t-text{color:${brand.dark.text}!important}`);
+  });
+
+  test("Tempra's one accent: a short orange rule over the headline, light and dark", () => {
+    expect(mail.html).toContain(`class="t-accent"`);
+    expect(mail.html).toContain(`background:${brand.light.agent}`);
+    expect(mail.html).toContain(`.t-accent{background:${brand.dark.agent}!important}`);
+  });
+
+  test("items as links with their excerpts, and links after the small print", () => {
+    const m = renderMail({
+      headline: "2 new notifications",
+      line: "L.",
+      items: [
+        { title: "@bo replied <here>", href: "https://x.example/a", excerpt: "Quote" },
+        { title: "Second", href: "https://x.example/b" },
+      ],
+      foot: "Foot.",
+      footLinks: [{ label: "Unsubscribe", href: "https://x.example/u" }],
+    });
+    expect(m.html).toContain('href="https://x.example/a"');
+    expect(m.html).toContain(">@bo replied &#60;here&#62;</a>");
+    expect(m.html).toContain(">Quote</p>");
+    expect(m.html).toContain(">Unsubscribe</a>");
+    expect(m.text).toBe(
+      "2 new notifications\n\nL.\n\n@bo replied <here>\n  Quote\n  https://x.example/a\n\nSecond\n  https://x.example/b\n\nFoot.\nUnsubscribe: https://x.example/u\n",
+    );
   });
 
   test("a text part with the same words and the link", () => {

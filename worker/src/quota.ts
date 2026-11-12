@@ -14,6 +14,7 @@ import { grows, type LibraryClient, type LibraryMethod } from "./client";
 import { WRITE_METHODS } from "./feed";
 import { type Limits, limitsFrom } from "./limits";
 import type { Outbox } from "./mail-queue";
+import { renderMail } from "./mail-template";
 import type { NewItem } from "./notify";
 import { StoreError } from "./store/errors";
 import type { SqlHandle } from "./store/sql";
@@ -164,6 +165,7 @@ export interface QuotaBackend {
     to: string;
     subject: string;
     text: string;
+    html?: string;
   }): Promise<void>;
   /** Puts a notice in the person's bell. */
   notice(userId: string, n: QuotaNotice): Promise<void>;
@@ -512,7 +514,7 @@ export function quotaMail(
   used: number,
   month: string,
   origin: string,
-): { subject: string; text: string } {
+): { subject: string; text: string; html: string } {
   const what = kind === "storage" ? "storage" : `monthly ${NAMES[kind]}`;
   const subject =
     pct >= 100
@@ -528,15 +530,17 @@ export function quotaMail(
       : kind === "writes"
         ? `your agents can still read, but their writes are refused until ${resetDay(month)} (UTC).`
         : `nothing more is answered for your agents and apps, reads included, until ${resetDay(month)} (UTC). Tempra in your browser keeps working.`;
-  const text = [
-    pct >= 100 ? `Your account has used ${of}. Now ${atLimit}` : `Your account has used ${of}.`,
-    ...(pct >= 100 ? [] : [`At the limit, ${atLimit}`]),
-    "",
-    "If one of your agents is stuck in a loop, stop it.",
-    "",
-    `This month's usage: ${origin}/account#usage`,
-  ].join("\n");
-  return { subject, text };
+  const mail = renderMail({
+    headline:
+      pct >= 100 ? `You've reached your ${what} limit` : `You've used ${pct}% of your ${what}`,
+    line:
+      pct >= 100
+        ? `Your account has used ${of}. Now ${atLimit}`
+        : `Your account has used ${of}. At the limit, ${atLimit}`,
+    button: { label: "See this month's usage", href: `${origin}/account#usage` },
+    foot: "If one of your agents is stuck in a loop, stop it.",
+  });
+  return { subject, ...mail };
 }
 
 /**

@@ -401,7 +401,8 @@ describe("notification mail (TEMPRA-74)", () => {
     expect(m?.subject).toBe("3 new notifications in Tempra");
     expect(m?.text).toContain("@friend replied on a.md in owner/demo");
     expect(m?.text).toContain(`${origin}/owner/demo/a.md#comments`);
-    expect(m?.html).toContain("<ul>");
+    expect(m?.html).toContain(`href="${origin}/owner/demo/a.md#comments"`);
+    expect(m?.html).toContain(">Unsubscribe</a>");
     const unsub = m?.headers?.["List-Unsubscribe"] ?? "";
     expect(m?.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
     // Sent once: nothing waits now.

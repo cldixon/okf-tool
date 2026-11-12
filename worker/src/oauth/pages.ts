@@ -197,6 +197,22 @@ export interface Onward {
 
 export const LIBRARIES: Onward = { href: "/", label: "Go to your libraries" };
 
+/**
+ * A message's markup: the title, the message as the page's lead, and the way onward as the one
+ * action, a pill.
+ */
+export function messageBody(
+  title: string,
+  message: string,
+  onward: Onward | null,
+  opts: { html?: boolean } = {},
+): string {
+  const link = onward
+    ? `<p class="public-actions"><a class="button primary" href="${esc(onward.href)}">${esc(onward.label)}</a></p>`
+    : "";
+  return `<h1>${esc(title)}</h1><p class="public-lead">${opts.html ? message : esc(message)}</p>${link}`;
+}
+
 /** A server page that says one thing, with a link onward. */
 export function messagePage(
   title: string,
@@ -204,8 +220,7 @@ export function messagePage(
   status = 200,
   onward: Onward | null = LIBRARIES,
 ): Response {
-  const link = onward ? `<p><a href="${esc(onward.href)}">${esc(onward.label)}</a></p>` : "";
-  return new Response(page(title, `<h1>${esc(title)}</h1><p>${esc(message)}</p>${link}`), {
+  return new Response(page(title, messageBody(title, message, onward)), {
     status,
     headers: { ...PAGE_HEADERS },
   });

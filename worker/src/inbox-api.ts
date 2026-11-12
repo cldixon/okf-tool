@@ -3,7 +3,7 @@ import type { User } from "./accounts";
 import type { Deps } from "./app";
 import type { ItemKind, Notifications } from "./notify";
 import { devOutbox, flushMail, itemLink } from "./notify-mail";
-import { esc, PAGE_HEADERS } from "./oauth/pages";
+import { esc, messageBody, PAGE_HEADERS } from "./oauth/pages";
 import { devSignIn, html } from "./signin";
 import { StoreError } from "./store/errors";
 
@@ -150,14 +150,21 @@ export function registerInboxApi(
 
   const unsubscribed = () =>
     html(
-      "<h1>Unsubscribed</h1><p>You get no more notification email from Tempra. Turn it back on in the Email section of your Account page.</p>",
+      messageBody(
+        "Unsubscribed",
+        "You get no more notification email from Tempra. Turn it back on in the Email section of your Account page.",
+        { href: "/account#email", label: "Go to your account" },
+      ),
       200,
       {},
       "Unsubscribed",
     );
   const badKey = () =>
     html(
-      "<h1>Link not valid</h1><p>Change what you are mailed from your Account page.</p>",
+      messageBody("Link not valid", "Change what you are mailed from your Account page.", {
+        href: "/account#email",
+        label: "Go to your account",
+      }),
       404,
       {},
       "Unsubscribe",
@@ -168,7 +175,7 @@ export function registerInboxApi(
     const key = c.req.query("k") ?? "";
     if (!/^[0-9a-f]{48}$/.test(key)) return badKey();
     return html(
-      `<h1>Unsubscribe</h1><p>Stop all notification mail from Tempra?</p>
+      `<h1>Unsubscribe</h1><p class="public-lead">Stop all notification mail from Tempra?</p>
 <form method="post" action="/unsubscribe?k=${esc(key)}"><p><button class="primary" type="submit">Unsubscribe</button></p></form>`,
       200,
       {},

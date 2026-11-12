@@ -3,6 +3,7 @@ import type { Context, Hono } from "hono";
 import { checkName, checkTheme, themeOf, type User } from "./accounts";
 import type { Deps } from "./app";
 import { deleteAccount } from "./lifecycle";
+import { renderMail } from "./mail-template";
 import {
   clearedSessionCookie,
   LINK_MINUTES,
@@ -121,7 +122,12 @@ export function registerAccountApi(
       subject: "Confirm your new Tempra email",
       // The link works only signed in as the account that asked (V-3): say which, so the
       // person does not sign in with this new address and make a second account.
-      text: `Open this link to make this your Tempra sign-in email:\n\n${link}\n\nSign in with ${user.email} first: the link works only in that account. It works once, within ${LINK_MINUTES} minutes. If you did not ask for it, ignore this email.\n`,
+      ...renderMail({
+        headline: "Confirm your new email",
+        line: `Make this your Tempra sign-in email. Sign in with ${user.email} first: the link works only in that account.`,
+        button: { label: "Confirm email", href: link },
+        foot: `Works once, within ${LINK_MINUTES} minutes. Didn't ask? Ignore this email.`,
+      }),
     });
     if (sent === null)
       throw new StoreError(502, "mail_failed", "Could not send email. Try again later.");

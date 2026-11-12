@@ -17,9 +17,11 @@ interface Props {
   noindex?: boolean;
   /** The landing page: one window, its doc in place of the plain column. */
   landing?: boolean;
+  /** A document with its contents beside it (Terms, Privacy): a wider column. */
+  doc?: boolean;
 }
 
-const { title, description, noindex = false, landing = false } = Astro.props;
+const { title, description, noindex = false, landing = false, doc = false } = Astro.props;
 // The page's one URL, with no trailing slash and no .html (pages build to terms.html; W-9).
 const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.site);
 ---
@@ -44,7 +46,7 @@ const url = new URL(Astro.url.pathname.replace(/(index)?\.html$/, ""), Astro.sit
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
   </head>
-  <body class:list={["public", "site", { landing }]}>
+  <body class:list={["public", "site", { landing, doc }]}>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="public-head">
       <a class="wordmark mark-lockup" href="/"><Fragment set:html={markSvg({ small: true })} />Tempra</a>

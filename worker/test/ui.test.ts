@@ -467,7 +467,7 @@ describe("errors as pages (V-1)", () => {
       expect(r.headers.get("X-Robots-Tag")).toBe("noindex");
       const html = await r.text();
       expect(html).toContain("<h1>Not found</h1>");
-      expect(html).toContain('<a href="/">Go to your libraries</a>');
+      expect(html).toContain('<a class="button primary" href="/">Go to your libraries</a>');
       // The public pages' flat frame (TEMPRA-126): a skip link to the main content, the
       // wordmark linking to tempra.dev, no sheet, and the foot's links as a list.
       expect(r.headers.get("Content-Security-Policy")).toContain("default-src 'none'");

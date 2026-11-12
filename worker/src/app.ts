@@ -37,6 +37,7 @@ import { deleteLibrary } from "./lifecycle";
 import type { Outbox } from "./mail-queue";
 import type { ManagedDeps } from "./managed/agent";
 import { managedAgents, type Notifications, notifying, postComment } from "./notify";
+import { libraryInvitationMail } from "./notify-mail";
 import { messagePage, wantsPage } from "./oauth/pages";
 import { type GrantProps, registerAppRoutes } from "./oauth/routes";
 import { withCostHeader, withCosts } from "./op-costs";
@@ -1145,7 +1146,7 @@ export function createApp(deps: (env: Cloudflare.Env) => Deps) {
           account: invitee.handle,
           to: invitee.email,
           subject: `${who} invited you to ${ref.owner}/${ref.slug} on Tempra`,
-          text: `${who} invited you to the library ${ref.owner}/${ref.slug} with ${role} access${role === "read" ? " (read and comment)" : ""}.\n\nAccept or decline: ${origin}/invitations\n\nThe invitation is open for 14 days. If you did not expect it, ignore this email.\n`,
+          ...libraryInvitationMail(who, `${ref.owner}/${ref.slug}`, role, origin),
         })
         .catch((e) =>
           console.error(JSON.stringify({ mail_not_queued: "invitation", error: String(e) })),
