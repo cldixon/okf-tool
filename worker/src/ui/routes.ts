@@ -9,7 +9,8 @@ import { isRouteName } from "../handles";
 import { VARIANT_EDGES } from "../images";
 import { fromSite } from "../legal";
 import { mailKey } from "../mail-queue";
-import { esc, messagePage, type Onward, PAGE_HEADERS, page } from "../oauth/pages";
+import { renderMail } from "../mail-template";
+import { esc, messageBody, messagePage, type Onward, PAGE_HEADERS, page } from "../oauth/pages";
 import { fromThisSite } from "../origin";
 import { byteRange } from "../range";
 import { LINK_MINUTES, readCookie, SESSION_COOKIE } from "../session";
@@ -296,9 +297,11 @@ function emailChangePage(
   if (!link) {
     return serverPage(
       "Link expired",
-      `<h1>This link has expired or was already used</h1>
-<p>Email links work once, within ${LINK_MINUTES} minutes. Ask for a new one from your account.</p>
-<p><a href="/account">Go to your account</a></p>`,
+      messageBody(
+        "This link has expired or was already used",
+        `Email links work once, within ${LINK_MINUTES} minutes. Ask for a new one from your account.`,
+        { href: "/account", label: "Go to your account" },
+      ),
       400,
     );
   }
@@ -307,15 +310,15 @@ function emailChangePage(
     return serverPage(
       "Sign in first",
       `<h1>Sign in first</h1>
-<p>This link makes <strong>${esc(link.email)}</strong> the email a Tempra account signs in with. Sign in with the email that account uses now, not the new one, and you come back here to confirm.</p>
-<p><a class="button primary" href="/sign-in?next=${esc(next)}">Sign in</a></p>`,
+<p class="public-lead">This link makes <strong>${esc(link.email)}</strong> the email a Tempra account signs in with. Sign in with the email that account uses now, not the new one, and you come back here to confirm.</p>
+<p class="public-actions"><a class="button primary" href="/sign-in?next=${esc(next)}">Sign in</a></p>`,
     );
   }
   if (link.user !== user.id) {
     return serverPage(
       "Another account",
       `<h1>This link is for another account</h1>
-<p>You are signed in as ${esc(user.email)}. Sign out, then sign in with the email the other account uses now, not ${esc(link.email)}.</p>
+<p class="public-lead">You are signed in as <strong>${esc(user.email)}</strong>. Sign out, then sign in with the email the other account uses now, not ${esc(link.email)}.</p>
 <form method="post" action="/sign-out"><input type="hidden" name="next" value="${esc(self)}">
 <p><button class="primary" type="submit">Sign out</button></p></form>`,
       403,
@@ -324,7 +327,7 @@ function emailChangePage(
   return serverPage(
     "Confirm email",
     `<h1>Confirm your new email</h1>
-<p>Sign in with <strong>${esc(link.email)}</strong> from now on, in place of ${esc(user.email)}.</p>
+<p class="public-lead">Sign in with <strong>${esc(link.email)}</strong> from now on, in place of ${esc(user.email)}.</p>
 <form method="post" action="/account/email/confirm">
 <input type="hidden" name="t" value="${esc(t)}">
 <div class="actions"><button class="primary" type="submit">Confirm</button><a class="button" href="/account">Back to Account</a></div>
@@ -633,7 +636,11 @@ export function registerUiRoutes<E extends AppEnv>(
           account: p.user.handle,
           to: old,
           subject: "Your Tempra email changed",
-          text: `Your Tempra account now signs in with ${link.email}.\n`,
+          ...renderMail({
+            headline: "Your email changed",
+            line: `Your Tempra account now signs in with ${link.email}.`,
+            foot: "Didn't change it? Sign in with the new address and change it back, or write to hello@tempra.dev.",
+          }),
         })
         .catch((e) =>
           console.error(

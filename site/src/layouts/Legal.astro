@@ -1,0 +1,50 @@
+---
+/**
+ * Terms and Privacy drawn as Tempra pages are in the app: the title, a one-line description, a
+ * byline by Tempra (its round orange mark, as on the landing page) with the date it last changed,
+ * the text in the reader's typography (`.prose`), and its contents beside it, or "On this page"
+ * on a phone. Its sections are given here so the contents and the headings' anchors agree.
+ */
+import { LEGAL_UPDATED } from "../site";
+import Base from "./Base.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  sections: { id: string; title: string }[];
+}
+
+const { title, description, sections } = Astro.props;
+
+const chevron =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+---
+
+<Base title={`${title} · Tempra`} description={description} doc>
+  <article class="legal-doc" aria-labelledby="title">
+    <div class="legal-text">
+      <h1 id="title" class="doc-title">{title}</h1>
+      <p class="doc-tagline">{description}</p>
+      <p class="landing-byline">
+        <span class="avatar-mark agent tempra" aria-hidden="true">T</span>
+        <span>Tempra</span>
+        <span class="muted" aria-hidden="true">·</span>
+        <span class="muted">updated <time datetime={LEGAL_UPDATED.iso}>{LEGAL_UPDATED.text}</time></span>
+      </p>
+      <details class="toc-inline">
+        <summary>On this page<Fragment set:html={chevron} /></summary>
+        <ul class="toc" role="list">
+          {sections.map((s) => <li><a href={`#${s.id}`}>{s.title}</a></li>)}
+        </ul>
+      </details>
+      <div class="prose">
+        <slot />
+      </div>
+    </div>
+    <nav class="legal-contents" aria-label="On this page">
+      <ul class="toc" role="list">
+        {sections.map((s) => <li><a href={`#${s.id}`}>{s.title}</a></li>)}
+      </ul>
+    </nav>
+  </article>
+</Base>

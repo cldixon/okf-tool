@@ -11,6 +11,10 @@ export interface BrandColours {
   text: string;
   muted: string;
   border: string;
+  /** A quiet fill behind a code to type (`--tempra-color-ground`). */
+  ground: string;
+  /** Tempra's own accent, the agent's orange (`--tempra-color-agent`): a mail's one short rule. */
+  agent: string;
   markFront: string;
   markMid: string;
   markBack: string;
@@ -22,6 +26,8 @@ export const brand: Record<"light" | "dark", BrandColours> = {
     "text": "#282a2f",
     "muted": "#67666e",
     "border": "#e7e7ea",
+    "ground": "#f9f8f9",
+    "agent": "#de5600",
     "markFront": "#161618",
     "markMid": "#808082",
     "markBack": "#bcbcbf"
@@ -31,6 +37,8 @@ export const brand: Record<"light" | "dark", BrandColours> = {
     "text": "#f6f6f9",
     "muted": "#989ca4",
     "border": "#23252a",
+    "ground": "#1d1d1f",
+    "agent": "#fa8233",
     "markFront": "#f0f0f3",
     "markMid": "#a4a4a7",
     "markBack": "#636365"

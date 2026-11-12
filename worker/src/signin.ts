@@ -4,7 +4,15 @@ import type { Deps } from "./app";
 import { LEGAL } from "./legal";
 import { mailKey, sendNow } from "./mail-queue";
 import { renderMail } from "./mail-template";
-import { alertNotice, esc, invalid, messagePage, PAGE_HEADERS, page } from "./oauth/pages";
+import {
+  alertNotice,
+  esc,
+  invalid,
+  messageBody,
+  messagePage,
+  PAGE_HEADERS,
+  page,
+} from "./oauth/pages";
 import { fromThisSite } from "./origin";
 import {
   clearedSessionCookie,
@@ -228,7 +236,11 @@ ${err}<form method="post" action="/sign-in" class="stack">
 
 const notSetUp = () =>
   html(
-    `<h1>Sign-in is not set up</h1><p>This deployment has no way to send sign-in emails yet.</p>`,
+    messageBody(
+      "Sign-in is not set up",
+      "This deployment has no way to send sign-in emails yet.",
+      null,
+    ),
     503,
     {},
     "Sign-in is not set up",
@@ -245,7 +257,7 @@ function formEmail(form: FormData): { email: string; ok: boolean } {
 /** Local dev: the link (and its code) shown on the page instead of mailed. */
 const devLink = (shown: string, code?: string) =>
   shown
-    ? `<p>Local dev, no email sent: <a id="dev-link" href="${esc(shown)}">link</a>${
+    ? `<p class="public-aside">Local dev, no email sent: <a id="dev-link" href="${esc(shown)}">link</a>${
         code ? `, code <code id="dev-code">${esc(code)}</code>` : ""
       }</p>`
     : "";
@@ -320,14 +332,17 @@ function checkEmail(
 ${err}<form method="post" action="/sign-in/code" class="stack">
 <input type="hidden" name="email" value="${esc(email)}"><input type="hidden" name="next" value="${esc(next)}">
 <label class="field">Code
-<input id="code" name="code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" required autofocus${invalid("code-error", !!opts.error)}></label>
+<input id="code" class="code-input" name="code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" required autofocus${invalid("code-error", !!opts.error)}></label>
 <p><button class="primary" type="submit">Continue</button></p></form>
 <p class="public-aside">Works once, within ${LINK_MINUTES} minutes. Nothing? Check spam, or <a href="/sign-in?next=${esc(encodeURIComponent(next))}">use another email</a>.</p>${devLink(opts.shown ?? "", opts.code)}`;
 }
 
 const couldNotSend = (back: string) =>
   html(
-    `<h1>Could not send email</h1><p>Try again in a few minutes.</p><p><a href="${esc(back)}">Back</a></p>`,
+    messageBody("Could not send email", "Try again in a few minutes.", {
+      href: back,
+      label: "Back",
+    }),
     502,
     {},
     "Could not send email",
@@ -375,10 +390,10 @@ async function finishSignIn(c: C, d: Deps, email: string, next: string): Promise
   if (!(await d.accounts.mayJoin(email, mode))) {
     const onward =
       mode === "invite"
-        ? `<a href="/sign-in">Back to sign in</a>`
-        : `<a href="${LEGAL}">About Tempra</a>`;
+        ? { href: "/sign-in", label: "Back to sign in" }
+        : { href: LEGAL, label: "About Tempra" };
     return html(
-      `<h1>Not invited</h1><p>This address cannot sign in yet.</p><p>${onward}</p>`,
+      messageBody("Not invited", "This address cannot sign in yet.", onward),
       403,
       {},
       "Not invited",
@@ -407,7 +422,11 @@ async function deadLink(d: Deps, t: string, next: string): Promise<Response> {
     });
   }
   return html(
-    `<h1>This link has expired or was already used</h1><p class="public-lead">Sign-in links work once, within ${LINK_MINUTES} minutes.</p><p><a href="/sign-in?next=${esc(encodeURIComponent(next))}">Get a new link</a></p>`,
+    messageBody(
+      "This link has expired or was already used",
+      `Sign-in links work once, within ${LINK_MINUTES} minutes.`,
+      { href: `/sign-in?next=${encodeURIComponent(next)}`, label: "Get a new link" },
+    ),
     400,
     {},
     "Link expired",

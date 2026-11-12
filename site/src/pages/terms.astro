@@ -1,77 +1,80 @@
 ---
-import Base from "../layouts/Base.astro";
-import { CONTACT, DELETION, LEGAL_UPDATED } from "../site";
+import Legal from "../layouts/Legal.astro";
+import { CONTACT, DELETION } from "../site";
+
+const sections = [
+  { id: "the-service", title: "The service" },
+  { id: "your-account", title: "Your account" },
+  { id: "your-content", title: "Your content" },
+  { id: "acceptable-use", title: "Acceptable use" },
+  { id: "limits-and-suspension", title: "Limits and suspension" },
+  { id: "ending", title: "Ending" },
+  { id: "no-warranty", title: "No warranty" },
+  { id: "contact", title: "Contact" },
+];
 ---
 
-<Base title="Terms · Tempra" description="The terms for using Tempra during its private beta.">
-  <article class="legal" aria-labelledby="title">
-    <header class="doc-head">
-      <h1 id="title" class="doc-title">Terms</h1>
-      <p class="doc-tagline">Last updated <time datetime={LEGAL_UPDATED.iso}>{LEGAL_UPDATED.text}</time></p>
-    </header>
-    <div class="prose">
-      <p>
-        These terms cover Tempra at tempra.dev, the landing page and the app. By using Tempra you agree to
-        them. Questions go to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
-      </p>
+<Legal title="Terms" description="The terms for using Tempra during its private beta." sections={sections}>
+  <p>
+    These terms cover Tempra at tempra.dev, the landing page and the app. By using Tempra you agree to
+    them. Questions go to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+  </p>
 
-      <h2>1. The service</h2>
-      <p>
-        Tempra is in private beta and experimental. It may change, pause or end, and these terms may
-        change with it; we will date each change here.
-      </p>
+  <h2 id="the-service">1. The service</h2>
+  <p>
+    Tempra is in private beta and experimental. It may change, pause or end, and these terms may
+    change with it; we will date each change here.
+  </p>
 
-      <h2>2. Your account</h2>
-      <ul>
-        <li>Keep your email account and the tokens you create safe.</li>
-        <li>
-          You are responsible for what is done with your account, including by the agents and apps
-          you connect to it.
-        </li>
-      </ul>
+  <h2 id="your-account">2. Your account</h2>
+  <ul>
+    <li>Keep your email account and the tokens you create safe.</li>
+    <li>
+      You are responsible for what is done with your account, including by the agents and apps
+      you connect to it.
+    </li>
+  </ul>
 
-      <h2>3. Your content</h2>
-      <ul>
-        <li>You own your content. We store and serve it only to run the service.</li>
-        <li>
-          People you share a library with can read it, comment on it and, if you let them, change it.
-        </li>
-        <li>
-          If @tempra is turned on for a library's owner, it reads that library to answer comments,
-          as the <a href="/privacy">Privacy</a> page explains.
-        </li>
-      </ul>
+  <h2 id="your-content">3. Your content</h2>
+  <ul>
+    <li>You own your content. We store and serve it only to run the service.</li>
+    <li>
+      People you share a library with can read it, comment on it and, if you let them, change it.
+    </li>
+    <li>
+      If @tempra is turned on for a library's owner, it reads that library to answer comments,
+      as the <a href="/privacy">Privacy</a> page explains.
+    </li>
+  </ul>
 
-      <h2>4. Acceptable use</h2>
-      <ul>
-        <li>
-          Use Tempra for your own knowledge and your agents. Do not store anything illegal, or other
-          people's private data without their consent.
-        </li>
-        <li>Do not try to break, overload or get around the service's limits or security.</li>
-        <li>
-          Do not pose as someone else, Tempra, or its staff. We may rename or reclaim a handle that
-          does, or that holds a name for no use.
-        </li>
-      </ul>
+  <h2 id="acceptable-use">4. Acceptable use</h2>
+  <ul>
+    <li>
+      Use Tempra for your own knowledge and your agents. Do not store anything illegal, or other
+      people's private data without their consent.
+    </li>
+    <li>Do not try to break, overload or get around the service's limits or security.</li>
+    <li>
+      Do not pose as someone else, Tempra, or its staff. We may rename or reclaim a handle that
+      does, or that holds a name for no use.
+    </li>
+  </ul>
 
-      <h2>5. Limits and suspension</h2>
-      <p>
-        Limits apply to libraries, tokens, storage and requests. We may suspend an account that
-        abuses the service or breaks these terms.
-      </p>
+  <h2 id="limits-and-suspension">5. Limits and suspension</h2>
+  <p>
+    Limits apply to libraries, tokens, storage and requests. We may suspend an account that
+    abuses the service or breaks these terms.
+  </p>
 
-      <h2>6. Ending</h2>
-      <p>
-        You can delete a library or your account at any time from the app. {DELETION} Keep your own
-        exports.
-      </p>
+  <h2 id="ending">6. Ending</h2>
+  <p>
+    You can delete a library or your account at any time from the app. {DELETION} Keep your own
+    exports.
+  </p>
 
-      <h2>7. No warranty</h2>
-      <p>The service is provided as is, with no warranty.</p>
+  <h2 id="no-warranty">7. No warranty</h2>
+  <p>The service is provided as is, with no warranty.</p>
 
-      <h2>8. Contact</h2>
-      <p>Write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
-    </div>
-  </article>
-</Base>
+  <h2 id="contact">8. Contact</h2>
+  <p>Write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
+</Legal>

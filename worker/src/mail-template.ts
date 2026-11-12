@@ -4,8 +4,9 @@ import type { Mailer } from "./signin";
 
 /**
  * The one mail template (TEMPRA-287, tempra-dev `v2/accounts.md`, The email): the Tempra mark and
- * name, a headline, one line, at most one button, an optional code, and a muted foot over a
- * hairline; an HTML part and a text part with the same words. Light, and dark under
+ * name, a short orange rule (Tempra's one accent, as on the server pages), a headline, one line,
+ * optionally a list of items (a notification batch's), at most one button, an optional code, and
+ * a muted foot over a hairline, with links after it if the mail has any; an HTML part and a text part with the same words. Light, and dark under
  * `prefers-color-scheme: dark` where the client honours it, in the design package's colours
  * (`@tempra/design/brand`). Mail clients take no stylesheet but a `<style>` in the head, and
  * Gmail not even that, so the light look is inline and dark is the `<style>`'s overrides. Free of
@@ -21,8 +22,15 @@ export interface MailContent {
   button?: { label: string; href: string };
   /** A code to type, shown large in a monospace face under a small label. */
   code?: { label: string; value: string };
+  /**
+   * Items under the line (a batch of notifications): each a title linking to it, with a muted
+   * excerpt under it.
+   */
+  items?: { title: string; href: string; excerpt?: string }[];
   /** The small print, as plain text. */
   foot: string;
+  /** Links after the small print (Email settings, Unsubscribe). */
+  footLinks?: { label: string; href: string }[];
 }
 
 /** Who every mail is from, beside MAIL_FROM's address: "Tempra <noreply@…>". */
@@ -63,6 +71,8 @@ const DARK_CSS = `:root{color-scheme:light dark;supported-color-schemes:light da
 .t-text{color:${dark.text}!important}
 .t-muted{color:${dark.muted}!important}
 .t-rule{border-color:${dark.border}!important}
+.t-accent{background:${dark.agent}!important}
+.t-code{background:${dark.ground}!important;color:${dark.text}!important}
 .t-button{background:${dark.text}!important;color:${dark.bg}!important}
 .t-front{fill:${dark.markFront}!important}
 .t-mid{fill:${dark.markMid}!important}
@@ -84,8 +94,28 @@ export function renderMail(m: MailContent): { html: string; text: string } {
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px"><tr><td class="t-button" style="border-radius:999px;background:${light.text}"><a class="t-button" href="${esc(m.button.href)}" style="display:inline-block;padding:10px 20px;border-radius:999px;background:${light.text};color:${light.bg};font-family:${SANS};font-size:15px;font-weight:500;line-height:20px;text-decoration:none">${esc(m.button.label)}</a></td></tr></table>`
     : "";
   const code = m.code
-    ? `<p class="t-muted" style="margin:0 0 6px;color:${light.muted};font-family:${SANS};font-size:13px;line-height:20px">${esc(m.code.label)}</p>
-<p class="t-text" style="margin:0 0 36px;color:${light.text};font-family:${MONO};font-size:28px;font-weight:600;letter-spacing:0.12em;line-height:36px">${esc(m.code.value)}</p>`
+    ? `<p class="t-muted" style="margin:0 0 8px;color:${light.muted};font-family:${SANS};font-size:13px;line-height:20px">${esc(m.code.label)}</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 32px"><tr><td class="t-code" style="padding:12px 20px;border-radius:8px;background:${light.ground};color:${light.text};font-family:${MONO};font-size:28px;font-weight:600;letter-spacing:0.16em;line-height:36px">${esc(m.code.value)}</td></tr></table>`
+    : "";
+  const items = m.items?.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px">${m.items
+        .map(
+          (i) =>
+            `<tr><td class="t-rule" style="padding:12px 0;border-top:1px solid ${light.border}"><a class="t-text" href="${esc(i.href)}" style="color:${light.text};font-family:${SANS};font-size:15px;font-weight:500;line-height:22px;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px">${esc(i.title)}</a>${
+              i.excerpt
+                ? `<p class="t-muted" style="margin:4px 0 0;color:${light.muted};font-family:${SANS};font-size:14px;line-height:21px">${esc(i.excerpt)}</p>`
+                : ""
+            }</td></tr>`,
+        )
+        .join("")}</table>`
+    : "";
+  const footLinks = m.footLinks?.length
+    ? `<br>${m.footLinks
+        .map(
+          (l) =>
+            `<a class="t-muted" href="${esc(l.href)}" style="color:${light.muted};text-decoration:underline">${esc(l.label)}</a>`,
+        )
+        .join(" &#183; ")}`
     : "";
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -95,18 +125,20 @@ export function renderMail(m: MailContent): { html: string; text: string } {
 <table role="presentation" class="t-bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${light.bg}"><tr><td style="padding:40px 24px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px"><tr><td>
 ${lockup()}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px"><tr><td class="t-accent" width="24" height="2" style="width:24px;height:2px;font-size:0;line-height:0;background:${light.agent}">&#8203;</td></tr></table>
 <h1 class="t-text" style="margin:0 0 10px;color:${light.text};font-family:${SANS};font-size:22px;font-weight:500;letter-spacing:-0.01em;line-height:28px">${esc(m.headline)}</h1>
 <p class="t-muted" style="margin:0 0 24px;color:${light.muted};font-family:${SANS};font-size:15px;line-height:23px">${esc(m.line)}</p>
-${button}${code}<p class="t-muted t-rule" style="margin:0;padding:16px 0 0;border-top:1px solid ${light.border};color:${light.muted};font-family:${SANS};font-size:13px;line-height:20px">${esc(m.foot)}</p>
+${items}${button}${code}<p class="t-muted t-rule" style="margin:0;padding:16px 0 0;border-top:1px solid ${light.border};color:${light.muted};font-family:${SANS};font-size:13px;line-height:20px">${esc(m.foot)}${footLinks}</p>
 </td></tr></table>
 </td></tr></table>
 </body></html>`;
   const text = [
     m.headline,
     m.line,
+    ...(m.items ?? []).map((i) => `${i.title}${i.excerpt ? `\n  ${i.excerpt}` : ""}\n  ${i.href}`),
     m.button ? `${m.button.label}:\n${m.button.href}` : "",
     m.code ? `${m.code.label}: ${m.code.value}` : "",
-    m.foot,
+    [m.foot, ...(m.footLinks ?? []).map((l) => `${l.label}: ${l.href}`)].join("\n"),
   ]
     .filter(Boolean)
     .join("\n\n");

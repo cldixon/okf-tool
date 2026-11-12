@@ -179,7 +179,7 @@ describe("magic-link sign-in (v2 spec: Accounts and sign-in)", () => {
     expect(mail.html).toContain('href="https://app.tempra.dev/sign-in/link?t=abc&#38;next=%2F"');
     expect(mail.html).toContain(">Sign in</a>");
     expect(mail.html).toContain(">Sign in to Tempra</h1>");
-    expect(mail.html).toContain(">K7QMX2PD</p>");
+    expect(mail.html).toContain(">K7QMX2PD</td>");
     expect(mail.subject).toBe("Tempra sign-in code: K7QMX2PD");
     // The link is a hyperlink, never its raw address as text.
     expect(mail.html.replace(/href="[^"]*"/g, "")).not.toContain("sign-in/link");

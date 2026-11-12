@@ -1,7 +1,7 @@
 import type { Accounts } from "./accounts";
 import { mailKey, type Outbox } from "./mail-queue";
+import { renderMail } from "./mail-template";
 import type { Item, Notifications } from "./notify";
-import { esc } from "./oauth/pages";
 import type { Mailer } from "./signin";
 
 /**
@@ -69,8 +69,10 @@ function footer(origin: string, key: string) {
   const unsubscribe = `${origin}/unsubscribe?k=${key}`;
   const settings = `${origin}/account#email`;
   return {
-    text: `\n--\nEmail settings: ${settings}\nUnsubscribe from all notification mail: ${unsubscribe}\n`,
-    html: `<hr><p><small><a href="${esc(settings)}">Email settings</a> · <a href="${esc(unsubscribe)}">Unsubscribe</a></small></p>`,
+    links: [
+      { label: "Email settings", href: settings },
+      { label: "Unsubscribe", href: unsubscribe },
+    ],
     // Mail providers reject non-https unsubscribe URIs; local dev has none to send anyway.
     headers: origin.startsWith("https:")
       ? {
@@ -81,29 +83,31 @@ function footer(origin: string, key: string) {
   };
 }
 
-/** One mail for a person's batch of items: plain text plus minimal HTML. */
+/**
+ * One mail for a person's batch of items, in the mail template (TEMPRA-287): each item a link to
+ * its thread with its excerpt, Open Tempra as the button, the settings and unsubscribe links in
+ * the foot.
+ */
 export function composeBatch(origin: string, key: string, items: Item[]): Composed {
   const first = items[0];
-  const subject =
-    items.length === 1 && first
-      ? `${who(first.actor)} ${KIND_TEXT[first.kind] ?? first.kind}${first.path ? ` on ${first.path}` : ""}`
-      : `${items.length} new notifications in Tempra`;
-  const text = items
-    .map((i) => `${itemLine(i)}:\n${i.excerpt ? `  ${i.excerpt}\n` : ""}  ${itemLink(origin, i)}\n`)
-    .join("\n");
-  const html = `<ul>${items
-    .map(
-      (i) =>
-        `<li><p><a href="${esc(itemLink(origin, i))}">${esc(itemLine(i))}</a></p>${i.excerpt ? `<p>${esc(i.excerpt)}</p>` : ""}</li>`,
-    )
-    .join("")}</ul>`;
+  const one = items.length === 1 && first;
+  const subject = one
+    ? `${who(first.actor)} ${KIND_TEXT[first.kind] ?? first.kind}${first.path ? ` on ${first.path}` : ""}`
+    : `${items.length} new notifications in Tempra`;
   const f = footer(origin, key);
-  return {
-    subject,
-    text: `${text}\nTempra: ${origin}/\n${f.text}`,
-    html: `${html}<p><a href="${esc(`${origin}/`)}">Open Tempra</a></p>${f.html}`,
-    headers: f.headers,
-  };
+  const mail = renderMail({
+    headline: one ? subject : `${items.length} new notifications`,
+    line: one ? `In ${first.place}.` : "Mentions and replies since your last email.",
+    items: items.map((i) => ({
+      title: itemLine(i),
+      href: itemLink(origin, i),
+      excerpt: i.excerpt ?? undefined,
+    })),
+    button: { label: "Open Tempra", href: `${origin}/` },
+    foot: "You get these for mentions and replies.",
+    footLinks: f.links,
+  });
+  return { subject, text: mail.text, html: mail.html, headers: f.headers };
 }
 
 /**
@@ -196,3 +200,21 @@ export const devMailer: Mailer = {
     console.log(`Mail for ${m.to}: ${m.subject}`);
   },
 };
+
+/**
+ * A library's invitation mail (TEMPRA-62), in the mail template (TEMPRA-287): who invited, to
+ * which library and with what access, one button to accept or decline.
+ */
+export function libraryInvitationMail(
+  who: string,
+  library: string,
+  role: string,
+  origin: string,
+): { text: string; html: string } {
+  return renderMail({
+    headline: `${who} invited you to ${library}`,
+    line: `You can ${role === "write" ? "read, comment and write" : "read and comment"} there once you accept.`,
+    button: { label: "Accept or decline", href: `${origin}/invitations` },
+    foot: "The invitation is open for 14 days. Didn't expect it? Ignore this email.",
+  });
+}

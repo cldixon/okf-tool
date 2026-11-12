@@ -248,6 +248,8 @@ export function generateBrand(): string {
     text: token("--tempra-color-text", s),
     muted: token("--tempra-color-muted", s),
     border: token("--tempra-color-border", s),
+    ground: token("--tempra-color-ground", s),
+    agent: token("--tempra-color-agent", s),
     markFront: token("--tempra-color-mark-front", s),
     markMid: token("--tempra-color-mark-mid", s),
     markBack: token("--tempra-color-mark-back", s),
@@ -266,6 +268,10 @@ export interface BrandColours {
   text: string;
   muted: string;
   border: string;
+  /** A quiet fill behind a code to type (\`--tempra-color-ground\`). */
+  ground: string;
+  /** Tempra's own accent, the agent's orange (\`--tempra-color-agent\`): a mail's one short rule. */
+  agent: string;
   markFront: string;
   markMid: string;
   markBack: string;

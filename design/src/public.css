@@ -174,6 +174,30 @@
   margin-bottom: var(--tempra-space-12);
 }
 
+/* Tempra's one accent on its own pages (and in its mail, mail-template.ts): a short rule in the
+   agent's orange over the title, as Tempra's own avatar is orange. Nothing else here is coloured. */
+.public.narrow .public-main > h1::before {
+  content: "";
+  display: block;
+  width: var(--tempra-space-24);
+  height: var(--tempra-space-02);
+  margin-bottom: var(--tempra-space-20);
+  background: var(--tempra-color-agent);
+}
+
+/* A message page's onward link, drawn as the one action (a pill). */
+.public.narrow .public-actions {
+  margin-top: var(--tempra-space-28);
+}
+
+.public .public-actions a.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tempra-size-control);
+  padding: 0 var(--tempra-space-18);
+  font-size: var(--tempra-text-base);
+}
+
 /* What the page is for, under its title: muted, a line or two. */
 .public-lead {
   margin: 0 0 var(--tempra-space-28);
@@ -228,6 +252,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--tempra-space-08);
+}
+
+/* A code to type from an email (Check your email): the mono, large and spaced, as the email
+   shows it, so the two read alike; the caret in the accent. */
+.public.narrow .field input.code-input {
+  height: auto;
+  padding: var(--tempra-space-08) var(--tempra-space-14);
+  font-family: var(--tempra-font-mono);
+  font-size: var(--tempra-text-h2);
+  font-weight: var(--tempra-weight-medium);
+  letter-spacing: 0.16em; /* one-off: the code's spacing, as the email's */
+  line-height: var(--tempra-leading-tight);
+  text-transform: uppercase;
+  caret-color: var(--tempra-color-agent);
 }
 
 /* ---------- The site (tempra.dev): its frame and the landing page ---------- */
@@ -420,14 +458,89 @@
   }
 }
 
-/* Terms and privacy: drawn as a Tempra page is (its title and a dated line as the head, the
-   text in the reader's typography, .prose), so they read as the documents they are. */
-.legal {
-  max-width: var(--tempra-size-column-text);
+/* Terms and privacy (site/src/layouts/Legal.astro): drawn as a Tempra page is in the app, the
+   title, its description and a byline by Tempra over a hairline, the text in the reader's
+   typography (.prose), and the contents beside it, sticky, as a page's are. */
+.public.site.doc {
+  --public-width: calc(
+    var(--tempra-size-column-text) +
+    var(--tempra-space-96) +
+    var(--tempra-size-contents)
+  );
 }
 
-.legal .doc-head {
+.legal-doc {
+  display: grid;
+  grid-template-columns: minmax(0, var(--tempra-size-column-text)) var(--tempra-size-contents);
+  column-gap: var(--tempra-space-96);
+  align-items: start;
+}
+
+.legal-doc .doc-title {
+  margin-bottom: var(--tempra-space-10);
+}
+
+.legal-doc .landing-byline {
   margin-bottom: var(--tempra-space-32);
+}
+
+.legal-doc .toc-inline {
+  display: none;
+}
+
+.legal-contents {
+  position: sticky;
+  top: var(--tempra-space-24);
+  padding-top: var(--tempra-space-12);
+}
+
+.legal-doc .prose h2 {
+  scroll-margin-top: var(--tempra-space-24);
+}
+
+/* Not found on the site: a message as the server pages draw one, in their narrow column. */
+.site-message {
+  max-width: var(--tempra-size-field);
+  margin: max(var(--tempra-space-40), 10vh) auto 0;
+}
+
+.site-message h1 {
+  margin-bottom: var(--tempra-space-12);
+}
+
+.site-message .public-actions {
+  margin-top: var(--tempra-space-28);
+}
+
+@media (max-width: 900px) {
+  .legal-doc {
+    display: block;
+  }
+
+  .legal-contents {
+    display: none;
+  }
+
+  .legal-doc .landing-byline {
+    margin-bottom: 0;
+  }
+
+  .legal-doc .toc-inline {
+    display: block;
+    margin: var(--tempra-space-18) 0 var(--tempra-space-28);
+    border-width: 1px 0;
+    border-radius: 0;
+  }
+
+  .legal-doc .toc-inline summary {
+    min-height: var(--tempra-size-touch);
+    padding: 0;
+    color: var(--tempra-color-muted);
+  }
+
+  .legal-doc .toc-inline .toc {
+    margin: 0 0 var(--tempra-space-12);
+  }
 }
 
 @media (max-width: 640px) {
